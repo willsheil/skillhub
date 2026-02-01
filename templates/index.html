@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -88,17 +88,124 @@
             color: #333;
         }
 
-        .plugins-table-container {
+        /* Filter section */
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .filter-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .filter-controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .filter-controls button:hover {
+            background: #5a6fd6;
+        }
+
+        /* Collection section styles */
+        .collection-section {
+            margin-bottom: 30px;
             background: white;
             border-radius: 12px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .collection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .collection-header h3 {
+            margin: 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .collection-org {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .collection-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .collection-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .skill-count {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .install-collection-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .install-collection-btn:hover {
+            background: #5a6fd6;
+        }
+
+        .plugins-table-container {
             overflow-x: auto;
         }
 
         .plugins-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 800px;
+            min-width: 900px;
         }
 
         .plugins-table thead {
@@ -106,16 +213,16 @@
         }
 
         .plugins-table th {
-            padding: 16px 20px;
+            padding: 14px 20px;
             text-align: left;
             font-weight: 600;
             color: #555;
-            border-bottom: 2px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
             white-space: nowrap;
         }
 
         .plugins-table td {
-            padding: 16px 20px;
+            padding: 14px 20px;
             border-bottom: 1px solid #eee;
             vertical-align: middle;
         }
@@ -136,6 +243,17 @@
             display: inline-block;
             background: #e3f2fd;
             color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .plugin-collection {
+            display: inline-block;
+            background: #f3e5f5;
+            color: #7b1fa2;
             padding: 4px 12px;
             border-radius: 12px;
             font-size: 12px;
@@ -207,6 +325,23 @@
             background: #5a6fd6;
         }
 
+        .install-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .install-btn:hover {
+            background: #45a049;
+        }
+
         .download-link {
             color: #667eea;
             text-decoration: none;
@@ -230,6 +365,141 @@
             color: #666;
         }
 
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .modal-btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .modal-btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .modal-btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .skill-list {
+            list-style: none;
+        }
+
+        .skill-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .skill-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .skill-list-item input[type="checkbox"] {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .skill-list-item label {
+            flex: 1;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-list-item .skill-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .skill-list-item .skill-desc {
+            font-size: 13px;
+            color: #666;
+            margin-top: 2px;
+        }
+
         footer {
             text-align: center;
             padding: 40px 20px;
@@ -246,6 +516,21 @@
                 flex-direction: column;
             }
 
+            .collection-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+
+            .filter-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-controls select {
+                width: 100%;
+            }
+
             .plugins-table th,
             .plugins-table td {
                 padding: 12px 16px;
@@ -256,22 +541,26 @@
 <body>
     <div class="container">
         <header>
-            <h1>🛠️ {{ registry_name }}</h1>
+            <h1>{{ registry_name }}</h1>
             <p>内部 Claude Code Skill Registry - 管理和发现团队技能插件</p>
             <div class="stats">
                 <div class="stat-card">
                     <div class="number">{{ plugin_count }}</div>
                     <div class="label">可用技能</div>
                 </div>
+                <div class="stat-card">
+                    <div class="number">{{ collection_count | default(plugins | map(attribute='collection') | unique | list | length) }}</div>
+                    <div class="label">技能集合</div>
+                </div>
             </div>
         </header>
 
         <div class="usage-info">
-            <h3>📖 使用方法</h3>
+            <h3>使用方法</h3>
             <p>在 Claude Code 中添加此 Registry：</p>
             <code>/plugins marketplace add {{ request.base_url }}marketplace.json</code>
             <p>然后安装所需技能：</p>
-            <code>/plugin install &lt;skill-name&gt;</code>
+            <code>/plugin install &lt;organization&gt;/&lt;collection&gt;/&lt;skill-name&gt;</code>
         </div>
 
         {% set desc_map = {
@@ -295,44 +584,91 @@
         } %}
 
         {% if plugins %}
-        <div class="plugins-table-container">
-            <table class="plugins-table">
-                <thead>
-                    <tr>
-                        <th>组织</th>
-                        <th>技能名称</th>
-                        <th>版本</th>
-                        <th>描述</th>
-                        <th>作者</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for plugin in plugins %}
-                    {% set raw_desc = plugin.metadata.description or "暂无描述" %}
-                    {% set translated_desc = desc_map.get(raw_desc, raw_desc) %}
-                    <tr>
-                        <td><span class="plugin-org">{{ plugin.organization }}</span></td>
-                        <td class="plugin-name">{{ plugin.metadata.name or plugin.name }}</td>
-                        <td><span class="plugin-version">v{{ plugin.latest_version }}</span></td>
-                        <td class="plugin-description" title="{{ raw_desc }}">{{ translated_desc }}</td>
-                        <td class="plugin-author">{{ plugin.metadata.author.name or "未知" }}</td>
-                        <td>
-                            <div class="plugin-actions">
-                                {% for ver in plugin.versions %}
-                                <a href="/plugins/{{ plugin.organization }}/{{ plugin.name }}/{{ ver.filename }}"
-                                   class="version-tag {% if ver.version == plugin.latest_version %}latest{% endif %}"
-                                   title="下载 {{ ver.version }} ({{ (ver.size / 1024)|round(1) }} KB)">
-                                    {{ ver.version }}
-                                </a>
-                                {% endfor %}
-                            </div>
-                        </td>
-                    </tr>
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <h3>筛选技能</h3>
+            <div class="filter-controls">
+                <select id="orgFilter" onchange="filterSkills()">
+                    <option value="">所有组织</option>
+                    {% for org in plugins | map(attribute='organization') | unique | sort %}
+                    <option value="{{ org }}">{{ org }}</option>
                     {% endfor %}
-                </tbody>
-            </table>
+                </select>
+                <select id="collectionFilter" onchange="filterSkills()">
+                    <option value="">所有集合</option>
+                    {% for coll in plugins | map(attribute='collection') | unique | sort %}
+                    <option value="{{ coll }}">{{ coll }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="clearFilters()">清除筛选</button>
+            </div>
         </div>
+
+        <!-- Skills grouped by Organization and Collection -->
+        {% for (org, coll), skills_in_collection in plugins|groupby(['organization', 'collection']) %}
+        <div class="collection-section" data-org="{{ org }}" data-collection="{{ coll }}">
+            <div class="collection-header">
+                <h3>
+                    <span class="collection-org">{{ org }}</span>
+                    <span class="collection-name">/ {{ coll }}</span>
+                </h3>
+                <div class="collection-actions">
+                    <span class="skill-count">{{ skills_in_collection|length }} 个技能</span>
+                    <button class="install-collection-btn"
+                            data-org="{{ org }}"
+                            data-collection="{{ coll }}"
+                            onclick="showCollectionSkills('{{ org }}', '{{ coll }}')">
+                        查看集合
+                    </button>
+                </div>
+            </div>
+            <div class="plugins-table-container">
+                <table class="plugins-table">
+                    <thead>
+                        <tr>
+                            <th>组织</th>
+                            <th>集合</th>
+                            <th>技能名称</th>
+                            <th>版本</th>
+                            <th>描述</th>
+                            <th>作者</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plugin in skills_in_collection %}
+                        {% set raw_desc = plugin.metadata.description or "暂无描述" %}
+                        {% set translated_desc = desc_map.get(raw_desc, raw_desc) %}
+                        <tr>
+                            <td><span class="plugin-org">{{ plugin.organization }}</span></td>
+                            <td><span class="plugin-collection">{{ plugin.collection }}</span></td>
+                            <td class="plugin-name">{{ plugin.metadata.name or plugin.name }}</td>
+                            <td><span class="plugin-version">v{{ plugin.latest_version }}</span></td>
+                            <td class="plugin-description" title="{{ raw_desc }}">{{ translated_desc }}</td>
+                            <td class="plugin-author">{{ plugin.metadata.author.name or "未知" }}</td>
+                            <td>
+                                <div class="plugin-actions">
+                                    {% for ver in plugin.versions %}
+                                    <a href="/plugins/{{ plugin.organization }}/{{ plugin.collection }}/{{ plugin.name }}/{{ ver.filename }}"
+                                       class="version-tag {% if ver.version == plugin.latest_version %}latest{% endif %}"
+                                       title="下载 {{ ver.version }} ({{ (ver.size / 1024)|round(1) }} KB)">
+                                        {{ ver.version }}
+                                    </a>
+                                    {% endfor %}
+                                    <button class="install-btn"
+                                            onclick="installSkill('{{ plugin.organization }}', '{{ plugin.collection }}', '{{ plugin.name }}')"
+                                            title="安装 {{ plugin.metadata.name or plugin.name }}">
+                                        安装
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
         {% else %}
         <div class="no-plugins">
             <h2>暂无技能插件</h2>
@@ -344,5 +680,128 @@
             <p>Private Claude Code Skill Registry | Built with FastAPI</p>
         </footer>
     </div>
+
+    <!-- Collection Skills Modal -->
+    <div id="collectionModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">技能集合</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <ul id="skillList" class="skill-list">
+                    <!-- Skills will be populated here -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal()">取消</button>
+                <button class="modal-btn modal-btn-primary" onclick="installSelectedSkills()">安装选中技能</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store all plugins data for JavaScript access
+        const allPlugins = {{ plugins | tojson | safe }};
+
+        function filterSkills() {
+            const orgFilter = document.getElementById('orgFilter').value;
+            const collFilter = document.getElementById('collectionFilter').value;
+
+            const sections = document.querySelectorAll('.collection-section');
+            sections.forEach(section => {
+                const org = section.getAttribute('data-org');
+                const coll = section.getAttribute('data-collection');
+
+                const orgMatch = !orgFilter || org === orgFilter;
+                const collMatch = !collFilter || coll === collFilter;
+
+                if (orgMatch && collMatch) {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        }
+
+        function clearFilters() {
+            document.getElementById('orgFilter').value = '';
+            document.getElementById('collectionFilter').value = '';
+            filterSkills();
+        }
+
+        function showCollectionSkills(org, coll) {
+            const modal = document.getElementById('collectionModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const skillList = document.getElementById('skillList');
+
+            modalTitle.textContent = `${org} / ${coll} - 技能列表`;
+            skillList.innerHTML = '';
+
+            // Find skills in this collection
+            const skills = allPlugins.filter(p => p.organization === org && p.collection === coll);
+
+            skills.forEach(skill => {
+                const li = document.createElement('li');
+                li.className = 'skill-list-item';
+                li.innerHTML = `
+                    <input type="checkbox" id="skill_${skill.name}" value="${skill.name}" checked>
+                    <label for="skill_${skill.name}">
+                        <span class="skill-name">${skill.metadata.name || skill.name}</span>
+                        <span class="skill-desc">${skill.metadata.description || '暂无描述'} (v${skill.latest_version})</span>
+                    </label>
+                `;
+                skillList.appendChild(li);
+            });
+
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('collectionModal');
+            modal.classList.remove('active');
+        }
+
+        function installSelectedSkills() {
+            const checkboxes = document.querySelectorAll('#skillList input[type="checkbox"]:checked');
+            const selectedSkills = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedSkills.length === 0) {
+                alert('请至少选择一个技能');
+                return;
+            }
+
+            // Get current org and collection from modal title
+            const modalTitle = document.getElementById('modalTitle').textContent;
+            const parts = modalTitle.split(' / ');
+            const org = parts[0];
+            const coll = parts[1].split(' - ')[0];
+
+            // Install each selected skill
+            selectedSkills.forEach(skillName => {
+                installSkill(org, coll, skillName);
+            });
+
+            closeModal();
+        }
+
+        function installSkill(org, coll, skillName) {
+            // Copy install command to clipboard
+            const command = `/plugin install ${org}/${coll}/${skillName}`;
+            navigator.clipboard.writeText(command).then(() => {
+                alert(`安装命令已复制到剪贴板：\n${command}`);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                alert(`请手动复制安装命令：\n${command}`);
+            });
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('collectionModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
 </body>
 </html>
