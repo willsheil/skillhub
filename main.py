@@ -44,40 +44,46 @@ def scan_plugins() -> List[dict]:
             continue
         organization = org_dir.name
 
-        for plugin_dir in org_dir.iterdir():
-            if not plugin_dir.is_dir():
+        for collection_dir in org_dir.iterdir():
+            if not collection_dir.is_dir():
                 continue
+            collection = collection_dir.name
 
-            # Find all versions (zip files)
-            versions = []
-            for zip_file in sorted(plugin_dir.glob("*.zip")):
-                version = zip_file.stem  # e.g., "1.0.0" from "1.0.0.zip"
-                versions.append({
-                    "version": version,
-                    "filename": zip_file.name,
-                    "size": zip_file.stat().st_size,
-                    "updated_at": datetime.fromtimestamp(zip_file.stat().st_mtime).isoformat()
+            for plugin_dir in collection_dir.iterdir():
+                if not plugin_dir.is_dir():
+                    continue
+
+                # Find all versions (zip files)
+                versions = []
+                for zip_file in sorted(plugin_dir.glob("*.zip")):
+                    version = zip_file.stem  # e.g., "1.0.0" from "1.0.0.zip"
+                    versions.append({
+                        "version": version,
+                        "filename": zip_file.name,
+                        "size": zip_file.stat().st_size,
+                        "updated_at": datetime.fromtimestamp(zip_file.stat().st_mtime).isoformat()
+                    })
+
+                if not versions:
+                    continue
+
+                # Get latest version metadata
+                latest_zip = plugin_dir / versions[-1]["filename"]
+                metadata = extract_metadata(organization, collection, plugin_dir.name, latest_zip)
+
+                plugins.append({
+                    "name": plugin_dir.name,
+                    "organization": organization,
+                    "collection": collection,
+                    "metadata": metadata,
+                    "versions": versions,
+                    "latest_version": versions[-1]["version"]
                 })
 
-            if not versions:
-                continue
-
-            # Get latest version metadata
-            latest_zip = plugin_dir / versions[-1]["filename"]
-            metadata = extract_metadata(organization, plugin_dir.name, latest_zip)
-
-            plugins.append({
-                "name": plugin_dir.name,
-                "organization": organization,
-                "metadata": metadata,
-                "versions": versions,
-                "latest_version": versions[-1]["version"]
-            })
-
-    return sorted(plugins, key=lambda x: (x["organization"], x["name"]))
+    return sorted(plugins, key=lambda x: (x["organization"], x["collection"], x["name"]))
 
 
-def extract_metadata(organization: str, plugin_name: str, zip_path: Path) -> Optional[dict]:
+def extract_metadata(organization: str, collection: str, plugin_name: str, zip_path: Path) -> Optional[dict]:
     """Extract metadata from plugin.json inside zip."""
     import zipfile
 
@@ -89,6 +95,7 @@ def extract_metadata(organization: str, plugin_name: str, zip_path: Path) -> Opt
                     content = zf.read(name)
                     metadata = json.loads(content)
                     metadata["organization"] = organization
+                    metadata["collection"] = collection
                     return metadata
     except Exception:
         pass
@@ -97,6 +104,7 @@ def extract_metadata(organization: str, plugin_name: str, zip_path: Path) -> Opt
     return {
         "name": plugin_name,
         "organization": organization,
+        "collection": collection,
         "version": "unknown",
         "description": "No description available",
         "author": {"name": "Unknown"}
@@ -143,19 +151,20 @@ async def marketplace_json():
         marketplace["plugins"].append({
             "name": meta.get("name", plugin["name"]),
             "organization": plugin["organization"],
+            "collection": plugin["collection"],
             "version": latest["version"],
             "description": meta.get("description", "No description"),
             "author": meta.get("author", {"name": "Unknown"}),
-            "source": f"{base_url}/{plugin['organization']}/{plugin['name']}/{latest['filename']}"
+            "source": f"{base_url}/{plugin['organization']}/{plugin['collection']}/{plugin['name']}/{latest['filename']}"
         })
 
     return marketplace
 
 
-@app.get("/plugins/{organization}/{plugin_name}/{filename}")
-async def download_plugin(organization: str, plugin_name: str, filename: str):
+@app.get("/plugins/{organization}/{collection}/{plugin_name}/{filename}")
+async def download_plugin(organization: str, collection: str, plugin_name: str, filename: str):
     """Download plugin ZIP file."""
-    file_path = PLUGINS_DIR / organization / plugin_name / filename
+    file_path = PLUGINS_DIR / organization / collection / plugin_name / filename
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Plugin not found")
@@ -178,6 +187,7 @@ async def upload_plugin(
     name: str = Form(...),
     version: str = Form(...),
     organization: str = Form("default"),
+    collection: str = Form("default"),
     file: UploadFile = File(...)
 ):
     """Upload a new plugin version."""
@@ -186,7 +196,7 @@ async def upload_plugin(
         raise HTTPException(400, "Only ZIP files allowed")
 
     # Create plugin directory
-    plugin_dir = PLUGINS_DIR / organization / name
+    plugin_dir = PLUGINS_DIR / organization / collection / name
     plugin_dir.mkdir(parents=True, exist_ok=True)
 
     # Save file
@@ -199,16 +209,17 @@ async def upload_plugin(
         "success": True,
         "name": name,
         "organization": organization,
+        "collection": collection,
         "version": version,
         "path": str(target_path),
         "size": target_path.stat().st_size
     }
 
 
-@app.delete("/admin/plugins/{organization}/{plugin_name}/{version}")
-async def delete_plugin(organization: str, plugin_name: str, version: str):
+@app.delete("/admin/plugins/{organization}/{collection}/{plugin_name}/{version}")
+async def delete_plugin(organization: str, collection: str, plugin_name: str, version: str):
     """Delete a plugin version."""
-    file_path = PLUGINS_DIR / organization / plugin_name / f"{version}.zip"
+    file_path = PLUGINS_DIR / organization / collection / plugin_name / f"{version}.zip"
 
     if not file_path.exists():
         raise HTTPException(404, "Plugin version not found")
@@ -216,16 +227,65 @@ async def delete_plugin(organization: str, plugin_name: str, version: str):
     file_path.unlink()
 
     # Remove empty plugin directory
-    plugin_dir = PLUGINS_DIR / organization / plugin_name
+    plugin_dir = PLUGINS_DIR / organization / collection / plugin_name
     if plugin_dir.exists() and not any(plugin_dir.iterdir()):
         plugin_dir.rmdir()
+
+    # Remove empty collection directory
+    collection_dir = PLUGINS_DIR / organization / collection
+    if collection_dir.exists() and not any(collection_dir.iterdir()):
+        collection_dir.rmdir()
 
     # Remove empty organization directory
     org_dir = PLUGINS_DIR / organization
     if org_dir.exists() and not any(org_dir.iterdir()):
         org_dir.rmdir()
 
-    return {"success": True, "message": f"Deleted {organization}/{plugin_name}@{version}"}
+    return {"success": True, "message": f"Deleted {organization}/{collection}/{plugin_name}@{version}"}
+
+
+@app.get("/api/collections")
+async def list_collections():
+    """List all skill collections grouped by organization."""
+    plugins = scan_plugins()
+    collections = {}
+
+    for plugin in plugins:
+        org = plugin["organization"]
+        coll = plugin["collection"]
+
+        if org not in collections:
+            collections[org] = {}
+        if coll not in collections[org]:
+            collections[org][coll] = {
+                "organization": org,
+                "collection": coll,
+                "skills": []
+            }
+
+        collections[org][coll]["skills"].append(plugin)
+
+    return collections
+
+
+@app.get("/api/collections/{organization}/{collection}")
+async def get_collection_skills(organization: str, collection: str):
+    """Get all skills in a specific collection."""
+    plugins = scan_plugins()
+    collection_skills = [
+        p for p in plugins
+        if p["organization"] == organization and p["collection"] == collection
+    ]
+
+    if not collection_skills:
+        raise HTTPException(404, "Collection not found")
+
+    return {
+        "organization": organization,
+        "collection": collection,
+        "skills": collection_skills,
+        "skill_count": len(collection_skills)
+    }
 
 
 if __name__ == "__main__":
