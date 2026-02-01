@@ -10,13 +10,14 @@ from pathlib import Path
 import sys
 
 
-def extract_and_repackage(skills_zip: Path, output_dir: Path, organization: str = "default"):
+def extract_and_repackage(skills_zip: Path, output_dir: Path, organization: str = "default", collection: str = "default"):
     """Extract skills from marketplace zip and repackage as individual plugin zips.
 
     Args:
         skills_zip: Path to the skills marketplace zip file
         output_dir: Base output directory for plugins
         organization: Organization name (default: "default")
+        collection: Skill collection name (default: "default")
     """
 
 
@@ -39,7 +40,7 @@ def extract_and_repackage(skills_zip: Path, output_dir: Path, organization: str 
             continue
 
         plugin_name = plugin_dir.name
-        target_dir = output_dir / organization / plugin_name
+        target_dir = output_dir / organization / collection / plugin_name
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Read plugin.json for version
@@ -71,8 +72,9 @@ def extract_and_repackage(skills_zip: Path, output_dir: Path, organization: str 
     # Cleanup
     shutil.rmtree(temp_dir, ignore_errors=True)
 
-    print(f"\n✅ Imported {imported} plugins to {output_dir}/{organization}")
+    print(f"\n✅ Imported {imported} plugins to {output_dir}/{organization}/{collection}")
     print(f"\nOrganization: {organization}")
+    print(f"Collection: {collection}")
     print(f"\nNext steps:")
     print(f"  1. Start registry: docker-compose up -d")
     print(f"  2. Visit: http://localhost:8000")
@@ -87,6 +89,8 @@ if __name__ == "__main__":
                        help="Path to skills marketplace zip file")
     parser.add_argument("-o", "--org", default="default",
                        help="Organization name (default: default)")
+    parser.add_argument("-c", "--collection", default="default",
+                       help="Skill collection name (default: default)")
     parser.add_argument("-d", "--output", default="plugins",
                        help="Output directory (default: plugins)")
 
@@ -98,4 +102,4 @@ if __name__ == "__main__":
         print(f"Error: {zip_file} not found")
         sys.exit(1)
 
-    extract_and_repackage(zip_file, Path(args.output), args.org)
+    extract_and_repackage(zip_file, Path(args.output), args.org, args.collection)
