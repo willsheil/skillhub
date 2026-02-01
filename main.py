@@ -248,17 +248,115 @@ async def upload_page(request: Request, _: bool = Depends(require_auth)):
     })
 
 
+def process_skill_collection(
+    zip_path: Path,
+    output_dir: Path,
+    organization: str,
+    collection: str
+) -> List[dict]:
+    """Process a skill collection ZIP and extract individual skills.
+
+    Args:
+        zip_path: Path to the uploaded ZIP file
+        output_dir: Base output directory (PLUGINS_DIR)
+        organization: Organization name
+        collection: Collection name
+
+    Returns:
+        List of processed skills with name and version
+    """
+    import zipfile
+    import tempfile
+
+    processed_skills = []
+    temp_dir = tempfile.mkdtemp()
+
+    try:
+        # Extract ZIP to temp directory
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(temp_dir)
+
+        # Look for skills in common locations
+        skills_base_paths = [
+            Path(temp_dir) / "skills" / "plugins",
+            Path(temp_dir) / "plugins",
+            Path(temp_dir),
+        ]
+
+        skills_found = False
+        for skills_path in skills_base_paths:
+            if not skills_path.exists():
+                continue
+
+            # Iterate through potential skill directories
+            for item in skills_path.iterdir():
+                if not item.is_dir():
+                    continue
+
+                # Check if this is a skill directory (has .claude-plugin/plugin.json)
+                plugin_json = item / ".claude-plugin" / "plugin.json"
+                if not plugin_json.exists():
+                    # Try alternative location
+                    plugin_json = item / "plugin.json"
+
+                if plugin_json.exists():
+                    try:
+                        # Read skill metadata
+                        with open(plugin_json, 'r', encoding='utf-8') as f:
+                            metadata = json.load(f)
+
+                        skill_name = metadata.get("name", item.name)
+                        skill_version = metadata.get("version", "1.0.0")
+
+                        # Create target directory
+                        skill_dir = output_dir / organization / collection / skill_name
+                        skill_dir.mkdir(parents=True, exist_ok=True)
+
+                        # Create ZIP for this skill
+                        target_zip = skill_dir / f"{skill_version}.zip"
+
+                        with zipfile.ZipFile(target_zip, 'w', zipfile.ZIP_DEFLATED) as zf_out:
+                            for file_path in item.rglob("*"):
+                                if file_path.is_file():
+                                    arcname = str(file_path.relative_to(item))
+                                    zf_out.write(file_path, arcname)
+
+                        processed_skills.append({
+                            "name": skill_name,
+                            "version": skill_version,
+                            "path": str(target_zip)
+                        })
+                        skills_found = True
+
+                    except Exception as e:
+                        print(f"Error processing skill {item.name}: {e}")
+                        continue
+
+        # If no skills found in collection structure, treat as single skill
+        if not skills_found:
+            return []
+
+        return processed_skills
+
+    finally:
+        # Cleanup temp directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 @app.post("/admin/upload")
 async def upload_plugin(
     request: Request,
-    name: str = Form(...),
-    version: str = Form(...),
+    name: str = Form(""),
+    version: str = Form(""),
     organization: str = Form("default"),
     collection: str = Form("default"),
     file: UploadFile = File(...),
     _: bool = Depends(require_auth)
 ):
-    """Upload a new plugin version (requires auth)."""
+    """Upload a new plugin or skill collection (requires auth)."""
+    import zipfile
+    import tempfile
+
     # Validate file extension
     if not file.filename.endswith('.zip'):
         return templates.TemplateResponse("admin_upload.html", {
@@ -267,28 +365,61 @@ async def upload_plugin(
             "error": "Only ZIP files allowed"
         })
 
-    # Create plugin directory
-    plugin_dir = PLUGINS_DIR / organization / collection / name
-    plugin_dir.mkdir(parents=True, exist_ok=True)
-
-    # Save file
-    target_path = plugin_dir / f"{version}.zip"
+    # Save uploaded file to temp location
+    temp_dir = tempfile.mkdtemp()
+    temp_zip = Path(temp_dir) / "upload.zip"
 
     try:
-        with open(target_path, "wb") as f:
+        with open(temp_zip, "wb") as f:
             shutil.copyfileobj(file.file, f)
+
+        # Try to process as skill collection first
+        processed_skills = process_skill_collection(
+            temp_zip, PLUGINS_DIR, organization, collection
+        )
+
+        if processed_skills:
+            # Successfully processed as skill collection
+            skill_names = ", ".join([s["name"] for s in processed_skills])
+            return templates.TemplateResponse("admin_upload.html", {
+                "request": request,
+                "success": f"Successfully uploaded {len(processed_skills)} skills: {skill_names}",
+                "error": None
+            })
+
+        # Treat as single skill upload
+        if not name or not version:
+            return templates.TemplateResponse("admin_upload.html", {
+                "request": request,
+                "success": None,
+                "error": "For single skill upload, name and version are required"
+            })
+
+        # Create plugin directory
+        plugin_dir = PLUGINS_DIR / organization / collection / name
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save file
+        target_path = plugin_dir / f"{version}.zip"
+
+        shutil.copy(temp_zip, target_path)
 
         return templates.TemplateResponse("admin_upload.html", {
             "request": request,
             "success": f"Successfully uploaded {organization}/{collection}/{name}@{version}",
             "error": None
         })
+
     except Exception as e:
         return templates.TemplateResponse("admin_upload.html", {
             "request": request,
             "success": None,
             "error": f"Upload failed: {str(e)}"
         })
+
+    finally:
+        # Cleanup
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @app.delete("/admin/plugins/{organization}/{collection}/{plugin_name}/{version}")

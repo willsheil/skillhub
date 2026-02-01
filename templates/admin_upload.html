@@ -124,38 +124,42 @@
             {% endif %}
 
             <div class="info">
-                Upload a .zip file containing your Claude Code skill plugin.
+                <strong>上传类型：</strong>
+                <ul style="margin: 10px 0 0 20px;">
+                    <li><strong>Skill 集</strong>：包含多个技能的 ZIP 文件（系统会自动提取其中的每个技能）</li>
+                    <li><strong>单个 Skill</strong>：单个技能的 ZIP 文件（需要填写名称和版本）</li>
+                </ul>
             </div>
 
             <form method="post" action="/admin/upload" enctype="multipart/form-data">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="organization">Organization</label>
+                        <label for="organization">Organization *</label>
                         <input type="text" id="organization" name="organization" value="default" required>
                     </div>
                     <div class="form-group">
-                        <label for="collection">Collection</label>
+                        <label for="collection">Collection *</label>
                         <input type="text" id="collection" name="collection" value="default" required>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="name">Plugin Name</label>
-                        <input type="text" id="name" name="name" placeholder="my-skill" required>
+                        <label for="name">Plugin Name <small style="color: #999; font-weight: normal;">(单个 Skill 时必填)</small></label>
+                        <input type="text" id="name" name="name" placeholder="my-skill">
                     </div>
                     <div class="form-group">
-                        <label for="version">Version</label>
-                        <input type="text" id="version" name="version" placeholder="1.0.0" required>
+                        <label for="version">Version <small style="color: #999; font-weight: normal;">(单个 Skill 时必填)</small></label>
+                        <input type="text" id="version" name="version" placeholder="1.0.0">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="file">Plugin File (.zip)</label>
+                    <label for="file">Plugin File (.zip) *</label>
                     <input type="file" id="file" name="file" accept=".zip" required>
                 </div>
 
-                <button type="submit">Upload Plugin</button>
+                <button type="submit">Upload Plugin / Skill Collection</button>
             </form>
         </div>
 
