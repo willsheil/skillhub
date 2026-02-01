@@ -88,37 +88,65 @@
             color: #333;
         }
 
-        .plugins-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
-        }
-
-        .plugin-card {
+        .plugins-table-container {
             background: white;
             border-radius: 12px;
-            padding: 24px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
+            overflow-x: auto;
         }
 
-        .plugin-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        .plugins-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
         }
 
-        .plugin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 12px;
+        .plugins-table thead {
+            background: #f8f9fa;
+        }
+
+        .plugins-table th {
+            padding: 16px 20px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #e0e0e0;
+            white-space: nowrap;
+        }
+
+        .plugins-table td {
+            padding: 16px 20px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .plugins-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .plugins-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .plugins-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .plugin-org {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
         }
 
         .plugin-name {
-            font-size: 1.4em;
             font-weight: 600;
             color: #333;
-            margin-bottom: 4px;
+            white-space: nowrap;
         }
 
         .plugin-version {
@@ -128,70 +156,42 @@
             border-radius: 20px;
             font-size: 0.85em;
             font-weight: 500;
-        }
-
-        .plugin-org {
+            white-space: nowrap;
             display: inline-block;
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-top: 4px;
         }
 
         .plugin-description {
             color: #666;
-            margin-bottom: 16px;
             line-height: 1.5;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
         }
 
-        .plugin-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-bottom: 16px;
-            font-size: 0.9em;
-        }
-
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .plugin-author {
             color: #666;
+            white-space: nowrap;
         }
 
-        .meta-item .icon {
-            width: 16px;
-            height: 16px;
-            opacity: 0.6;
-        }
-
-        .plugin-versions {
-            border-top: 1px solid #eee;
-            padding-top: 12px;
-        }
-
-        .versions-title {
-            font-size: 0.85em;
-            color: #999;
-            margin-bottom: 8px;
-        }
-
-        .version-list {
+        .plugin-actions {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
+            max-width: 200px;
         }
 
         .version-tag {
             background: #f0f0f0;
             padding: 4px 10px;
             border-radius: 4px;
-            font-size: 0.85em;
+            font-size: 0.8em;
             color: #555;
             text-decoration: none;
             transition: background 0.2s;
+            white-space: nowrap;
         }
 
         .version-tag:hover {
@@ -205,6 +205,18 @@
 
         .version-tag.latest:hover {
             background: #5a6fd6;
+        }
+
+        .download-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .download-link:hover {
+            text-decoration: underline;
         }
 
         .no-plugins {
@@ -226,16 +238,17 @@
         }
 
         @media (max-width: 768px) {
-            .plugins-grid {
-                grid-template-columns: 1fr;
-            }
-
             header h1 {
                 font-size: 1.8em;
             }
 
             .stats {
                 flex-direction: column;
+            }
+
+            .plugins-table th,
+            .plugins-table td {
+                padding: 12px 16px;
             }
         }
     </style>
@@ -261,47 +274,64 @@
             <code>/plugin install &lt;skill-name&gt;</code>
         </div>
 
+        {% set desc_map = {
+            "No description available": "暂无描述",
+            "No description provided": "暂无描述",
+            "Security audit skill for Python code": "Python代码安全审计技能",
+            "Security audit skill": "安全审计技能",
+            "Code review skill": "代码审查技能",
+            "Code review skill for Python": "Python代码审查技能",
+            "Documentation skill": "文档生成技能",
+            "Testing skill": "测试技能",
+            "Linting skill": "代码检查技能",
+            "Formatting skill": "代码格式化技能",
+            "Git skill": "Git版本控制技能",
+            "CI/CD skill": "持续集成/持续部署技能",
+            "Docker skill": "Docker容器技能",
+            "Kubernetes skill": "Kubernetes编排技能",
+            "Database skill": "数据库技能",
+            "API testing skill": "API测试技能",
+            "Performance testing skill": "性能测试技能"
+        } %}
+
         {% if plugins %}
-        <div class="plugins-grid">
-            {% for plugin in plugins %}
-            <div class="plugin-card">
-                <div class="plugin-header">
-                    <div>
-                        <div class="plugin-name">{{ plugin.metadata.name or plugin.name }}</div>
-                        <span class="plugin-org">{{ plugin.organization }}</span>
-                    </div>
-                    <span class="plugin-version">v{{ plugin.latest_version }}</span>
-                </div>
-
-                <div class="plugin-description">
-                    {{ plugin.metadata.description or "暂无描述" }}
-                </div>
-
-                <div class="plugin-meta">
-                    <div class="meta-item">
-                        <span class="icon">👤</span>
-                        <span>{{ plugin.metadata.author.name or "Unknown" }}</span>
-                    </div>
-                    <div class="meta-item">
-                        <span class="icon">📦</span>
-                        <span>{{ plugin.versions|length }} 个版本</span>
-                    </div>
-                </div>
-
-                <div class="plugin-versions">
-                    <div class="versions-title">可用版本</div>
-                    <div class="version-list">
-                        {% for ver in plugin.versions %}
-                        <a href="/plugins/{{ plugin.organization }}/{{ plugin.name }}/{{ ver.filename }}"
-                           class="version-tag {% if ver.version == plugin.latest_version %}latest{% endif %}"
-                           title="下载 {{ ver.version }} ({{ (ver.size / 1024)|round(1) }} KB)">
-                            {{ ver.version }}
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+        <div class="plugins-table-container">
+            <table class="plugins-table">
+                <thead>
+                    <tr>
+                        <th>组织</th>
+                        <th>技能名称</th>
+                        <th>版本</th>
+                        <th>描述</th>
+                        <th>作者</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plugin in plugins %}
+                    {% set raw_desc = plugin.metadata.description or "暂无描述" %}
+                    {% set translated_desc = desc_map.get(raw_desc, raw_desc) %}
+                    <tr>
+                        <td><span class="plugin-org">{{ plugin.organization }}</span></td>
+                        <td class="plugin-name">{{ plugin.metadata.name or plugin.name }}</td>
+                        <td><span class="plugin-version">v{{ plugin.latest_version }}</span></td>
+                        <td class="plugin-description" title="{{ raw_desc }}">{{ translated_desc }}</td>
+                        <td class="plugin-author">{{ plugin.metadata.author.name or "未知" }}</td>
+                        <td>
+                            <div class="plugin-actions">
+                                {% for ver in plugin.versions %}
+                                <a href="/plugins/{{ plugin.organization }}/{{ plugin.name }}/{{ ver.filename }}"
+                                   class="version-tag {% if ver.version == plugin.latest_version %}latest{% endif %}"
+                                   title="下载 {{ ver.version }} ({{ (ver.size / 1024)|round(1) }} KB)">
+                                    {{ ver.version }}
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% else %}
         <div class="no-plugins">
