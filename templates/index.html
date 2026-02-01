@@ -605,6 +605,12 @@
         </div>
 
         <!-- Skills grouped by Organization and Collection -->
+        {% if not plugins %}
+        <div class="no-plugins">
+            <h2>暂无技能插件</h2>
+            <p>请使用 <a href="/admin/upload">上传页面</a> 添加技能插件</p>
+        </div>
+        {% else %}
         {% for (org, coll), skills_in_collection in plugins|groupby(['organization', 'collection']) %}
         <div class="collection-section" data-org="{{ org }}" data-collection="{{ coll }}">
             <div class="collection-header">
@@ -669,11 +675,6 @@
             </div>
         </div>
         {% endfor %}
-        {% else %}
-        <div class="no-plugins">
-            <h2>暂无技能插件</h2>
-            <p>请使用上传接口添加技能插件</p>
-        </div>
         {% endif %}
 
         <footer>
