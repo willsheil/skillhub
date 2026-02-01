@@ -4,27 +4,54 @@ Claude Code Skill Registry - Private Marketplace Server
 """
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
+from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
 # Configuration
 PLUGINS_DIR = Path("./plugins")
 PLUGINS_DIR.mkdir(exist_ok=True)
 
+# Admin credentials (can be overridden via environment variables)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # 默认密码，生产环境应修改
+
+# Session secret key (should be changed in production)
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
+
 app = FastAPI(title="Skill Registry", version="1.0.0")
+
+# Add session middleware
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+def require_auth(request: Request):
+    """Check if user is logged in."""
+    if request.session.get("user") != ADMIN_USERNAME:
+        raise HTTPException(
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={"Location": "/admin/login"}
+        )
+    return True
+
+
+def verify_credentials(username: str, password: str) -> bool:
+    """Verify admin credentials."""
+    return username == ADMIN_USERNAME and password == ADMIN_PASSWORD
 
 
 class PluginMetadata(BaseModel):
@@ -182,18 +209,59 @@ async def api_skills():
     return scan_plugins()
 
 
+@app.get("/admin/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: str = None):
+    """Display login page."""
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "error": error
+    })
+
+
+@app.post("/admin/login")
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    """Process login."""
+    if verify_credentials(username, password):
+        request.session["user"] = username
+        return RedirectResponse(url="/admin/upload", status_code=302)
+    return RedirectResponse(url="/admin/login?error=invalid", status_code=302)
+
+
+@app.get("/admin/logout")
+async def logout(request: Request):
+    """Logout admin."""
+    request.session.clear()
+    return RedirectResponse(url="/", status_code=302)
+
+
+@app.get("/admin/upload", response_class=HTMLResponse)
+async def upload_page(request: Request, _: bool = Depends(require_auth)):
+    """Display upload page (requires auth)."""
+    return templates.TemplateResponse("admin_upload.html", {
+        "request": request,
+        "success": None,
+        "error": None
+    })
+
+
 @app.post("/admin/upload")
 async def upload_plugin(
+    request: Request,
     name: str = Form(...),
     version: str = Form(...),
     organization: str = Form("default"),
     collection: str = Form("default"),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _: bool = Depends(require_auth)
 ):
-    """Upload a new plugin version."""
+    """Upload a new plugin version (requires auth)."""
     # Validate file extension
     if not file.filename.endswith('.zip'):
-        raise HTTPException(400, "Only ZIP files allowed")
+        return templates.TemplateResponse("admin_upload.html", {
+            "request": request,
+            "success": None,
+            "error": "Only ZIP files allowed"
+        })
 
     # Create plugin directory
     plugin_dir = PLUGINS_DIR / organization / collection / name
@@ -202,23 +270,32 @@ async def upload_plugin(
     # Save file
     target_path = plugin_dir / f"{version}.zip"
 
-    with open(target_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    try:
+        with open(target_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
 
-    return {
-        "success": True,
-        "name": name,
-        "organization": organization,
-        "collection": collection,
-        "version": version,
-        "path": str(target_path),
-        "size": target_path.stat().st_size
-    }
+        return templates.TemplateResponse("admin_upload.html", {
+            "request": request,
+            "success": f"Successfully uploaded {organization}/{collection}/{name}@{version}",
+            "error": None
+        })
+    except Exception as e:
+        return templates.TemplateResponse("admin_upload.html", {
+            "request": request,
+            "success": None,
+            "error": f"Upload failed: {str(e)}"
+        })
 
 
 @app.delete("/admin/plugins/{organization}/{collection}/{plugin_name}/{version}")
-async def delete_plugin(organization: str, collection: str, plugin_name: str, version: str):
-    """Delete a plugin version."""
+async def delete_plugin(
+    organization: str,
+    collection: str,
+    plugin_name: str,
+    version: str,
+    _: bool = Depends(require_auth)
+):
+    """Delete a plugin version (requires auth)."""
     file_path = PLUGINS_DIR / organization / collection / plugin_name / f"{version}.zip"
 
     if not file_path.exists():
