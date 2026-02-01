@@ -3,6 +3,10 @@
 Claude Code Skill Registry - Private Marketplace Server
 """
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
 import os
 import shutil
@@ -19,7 +23,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
 # Configuration
-PLUGINS_DIR = Path("./plugins")
+PLUGINS_DIR = Path(os.getenv("PLUGINS_DIR", "./plugins"))
 PLUGINS_DIR.mkdir(exist_ok=True)
 
 # Admin credentials (can be overridden via environment variables)
