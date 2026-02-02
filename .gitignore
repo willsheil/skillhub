@@ -14,3 +14,6 @@ __pycache__/
 
 # Plugins (optional, depending on your deployment strategy)
 # plugins/
+
+# Git worktrees
+.worktrees/
