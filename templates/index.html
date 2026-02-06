@@ -12,798 +12,1115 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 20px;
-            margin-bottom: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-
-        .stats {
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .stat-card {
-            background: rgba(255,255,255,0.2);
-            padding: 15px 25px;
-            border-radius: 8px;
-        }
-
-        .stat-card .number {
-            font-size: 2em;
-            font-weight: bold;
-        }
-
-        .stat-card .label {
-            font-size: 0.9em;
-            opacity: 0.8;
-        }
-
-        .usage-info {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            border-left: 4px solid #667eea;
-        }
-
-        .usage-info h3 {
-            margin-bottom: 10px;
-            color: #667eea;
-        }
-
-        .usage-info code {
-            background: #f4f4f4;
-            padding: 12px 16px;
-            border-radius: 4px;
-            display: block;
-            font-family: 'Consolas', 'Monaco', monospace;
-            margin: 10px 0;
-            color: #333;
-        }
-
-        /* Filter section */
-        .filter-section {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .filter-section h3 {
-            margin-bottom: 15px;
-            color: #333;
-        }
-
-        .filter-controls {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .filter-controls select {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            min-width: 200px;
-        }
-
-        .filter-controls button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .filter-controls button:hover {
-            background: #5a6fd6;
-        }
-
-        /* Collection section styles */
-        .collection-section {
-            margin-bottom: 30px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .collection-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            background: #f8f9fa;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .collection-header h3 {
-            margin: 0;
-            color: #333;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .collection-org {
-            display: inline-block;
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .collection-name {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .collection-actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .skill-count {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .install-collection-btn {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-
-        .install-collection-btn:hover {
-            background: #5a6fd6;
-        }
-
-        .plugins-table-container {
-            overflow-x: auto;
-        }
-
-        .plugins-table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 900px;
-        }
-
-        .plugins-table thead {
-            background: #f8f9fa;
-        }
-
-        .plugins-table th {
-            padding: 14px 20px;
-            text-align: left;
-            font-weight: 600;
-            color: #555;
-            border-bottom: 1px solid #e0e0e0;
-            white-space: nowrap;
-        }
-
-        .plugins-table td {
-            padding: 14px 20px;
-            border-bottom: 1px solid #eee;
-            vertical-align: middle;
-        }
-
-        .plugins-table tbody tr {
-            transition: background 0.2s;
-        }
-
-        .plugins-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-
-        .plugins-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .plugin-org {
-            display: inline-block;
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .plugin-collection {
-            display: inline-block;
-            background: #f3e5f5;
-            color: #7b1fa2;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .plugin-name {
-            font-weight: 600;
-            color: #333;
-            white-space: nowrap;
-        }
-
-        .plugin-version {
-            background: #667eea;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 500;
-            white-space: nowrap;
-            display: inline-block;
-        }
-
-        .plugin-description {
-            color: #666;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
+            background: #fafafa;
+            color: #171717;
             line-height: 1.5;
-            max-width: 300px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
+            font-size: 14px;
         }
 
-        .plugin-author {
-            color: #666;
-            white-space: nowrap;
-        }
-
-        .plugin-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            max-width: 200px;
-        }
-
-        .version-tag {
-            background: #f0f0f0;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            color: #555;
-            text-decoration: none;
-            transition: background 0.2s;
-            white-space: nowrap;
-        }
-
-        .version-tag:hover {
-            background: #e0e0e0;
-        }
-
-        .version-tag.latest {
-            background: #667eea;
-            color: white;
-        }
-
-        .version-tag.latest:hover {
-            background: #5a6fd6;
-        }
-
-        .install-btn {
-            background: #4caf50;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 500;
-            transition: background 0.2s;
-            white-space: nowrap;
-        }
-
-        .install-btn:hover {
-            background: #45a049;
-        }
-
-        .download-link {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 0.9em;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .download-link:hover {
-            text-decoration: underline;
-        }
-
-        .no-plugins {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-
-        .no-plugins h2 {
-            margin-bottom: 10px;
-            color: #666;
-        }
-
-        /* Modal styles */
-        .modal-overlay {
-            display: none;
+        /* Sidebar */
+        .sidebar {
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: white;
-            border-radius: 12px;
-            max-width: 800px;
-            width: 90%;
-            max-height: 80vh;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: #333;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
-        }
-
-        .modal-close:hover {
-            color: #333;
-        }
-
-        .modal-body {
-            padding: 20px;
-            overflow-y: auto;
-            max-height: 60vh;
-        }
-
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .modal-btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .modal-btn-primary:hover {
-            background: #5a6fd6;
-        }
-
-        .modal-btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-
-        .modal-btn-secondary:hover {
-            background: #d0d0d0;
-        }
-
-        .skill-list {
-            list-style: none;
-        }
-
-        .skill-list-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .skill-list-item:last-child {
-            border-bottom: none;
-        }
-
-        .skill-list-item input[type="checkbox"] {
-            margin-right: 12px;
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .skill-list-item label {
-            flex: 1;
-            cursor: pointer;
+            width: 220px;
+            height: 100vh;
+            background: #ffffff;
+            border-right: 1px solid #eaeaea;
+            z-index: 100;
             display: flex;
             flex-direction: column;
         }
 
-        .skill-list-item .skill-name {
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
             font-weight: 600;
-            color: #333;
+            color: #667eea;
         }
 
-        .skill-list-item .skill-desc {
-            font-size: 13px;
-            color: #666;
-            margin-top: 2px;
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 0;
+            overflow-y: auto;
         }
 
-        footer {
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #64748b;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: #f8f9fa;
+            color: #171717;
+        }
+
+        .nav-item.active {
+            background: #f0f3ff;
+            color: #667eea;
+            border-left-color: #667eea;
+        }
+
+        .nav-icon {
+            font-size: 18px;
+            width: 24px;
             text-align: center;
-            padding: 40px 20px;
-            color: #999;
-            margin-top: 40px;
         }
 
+        .nav-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-divider {
+            margin: 16px 20px;
+            border-top: 1px solid #eaeaea;
+        }
+
+        .nav-section-title {
+            padding: 8px 20px;
+            font-size: 12px;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Main Content Area */
+        .main-wrapper {
+            margin-left: 220px;
+            min-height: 100vh;
+        }
+
+        /* Fixed Header */
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 220px;
+            right: 0;
+            height: 60px;
+            background: #ffffff;
+            border-bottom: 1px solid #eaeaea;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 99;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #171717;
+        }
+
+        .header-stats {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        /* Fixed Toolbar (shown when items selected) */
+        .fixed-toolbar {
+            position: fixed;
+            top: 60px;
+            left: 220px;
+            right: 0;
+            height: 48px;
+            background: #ffffff;
+            border-bottom: 1px solid #eaeaea;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 98;
+            transition: all 0.2s ease;
+        }
+
+        .fixed-toolbar.visible {
+            display: flex;
+        }
+
+        .toolbar-info {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .toolbar-info strong {
+            color: #171717;
+            font-weight: 500;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 60px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Search Section */
+        .search-section {
+            background: #ffffff;
+            border: 1px solid #eaeaea;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #eaeaea;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #171717;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .search-input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .search-input::placeholder {
+            color: #a1a1aa;
+        }
+
+        .sort-select, .pagesize-select {
+            padding: 8px 12px;
+            border: 1px solid #eaeaea;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #171717;
+            background: #ffffff;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .sort-select:focus, .pagesize-select:focus {
+            border-color: #2563eb;
+        }
+
+        .pagesize-label {
+            font-size: 14px;
+            color: #64748b;
+            margin-right: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            color: #171717;
+            border: 1px solid #eaeaea;
+        }
+
+        .btn-secondary:hover {
+            background: #fafafa;
+            border-color: #d4d4d4;
+        }
+
+        /* Skills Table */
+        .skills-table-container {
+            background: #ffffff;
+            border: 1px solid #eaeaea;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .skills-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .skills-table thead {
+            background: #fafafa;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .skills-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .skills-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .skills-table th.sortable:hover {
+            background: #f0f0f0;
+        }
+
+        .skills-table th .sort-indicator {
+            margin-left: 4px;
+            color: #a1a1aa;
+        }
+
+        .skills-table th.sort-asc .sort-indicator::after {
+            content: '↑';
+            color: #2563eb;
+        }
+
+        .skills-table th.sort-desc .sort-indicator::after {
+            content: '↓';
+            color: #2563eb;
+        }
+
+        .skills-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eaeaea;
+            vertical-align: middle;
+            font-size: 14px;
+        }
+
+        .skills-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .skills-table tbody tr:hover {
+            background: #fafafa;
+        }
+
+        /* Checkbox */
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
+
+        .checkbox-cell input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #2563eb;
+        }
+
+        /* Skill Name */
+        .skill-name {
+            font-weight: 500;
+            color: #171717;
+        }
+
+        /* Version Badge */
+        .version-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            color: #64748b;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Download Count */
+        .download-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #2563eb;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .download-count .icon {
+            color: #2563eb;
+        }
+
+        /* Description */
+        .description {
+            color: #737373;
+            max-width: 500px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .description:hover {
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        /* Author */
+        .author {
+            color: #737373;
+            font-size: 13px;
+        }
+
+        /* Download Links */
+        .download-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .download-link {
+            color: #2563eb;
+            text-decoration: none;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: background 0.15s ease;
+        }
+
+        .download-link:hover {
+            background: #f3f4f6;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding: 16px 0;
+        }
+
+        .pagination-info {
+            font-size: 13px;
+            color: #737373;
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #eaeaea;
+            border-radius: 4px;
+            color: #171717;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: #fafafa;
+            border-color: #d4d4d4;
+        }
+
+        .page-btn:disabled {
+            color: #d4d4d4;
+            cursor: not-allowed;
+        }
+
+        .page-btn.current {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 80px 24px;
+            color: #737373;
+        }
+
+        .empty-state h2 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #171717;
+            margin-bottom: 8px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: #737373;
+            font-size: 13px;
+        }
+
+        .footer a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 80px 24px;
+            color: #737373;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 2px solid #eaeaea;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            header h1 {
-                font-size: 1.8em;
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
             }
 
-            .stats {
-                flex-direction: column;
+            .sidebar.open {
+                transform: translateX(0);
             }
 
-            .collection-header {
-                flex-direction: column;
-                gap: 10px;
-                align-items: flex-start;
+            .main-wrapper {
+                margin-left: 0;
             }
 
-            .filter-controls {
-                flex-direction: column;
-                align-items: stretch;
+            .fixed-header, .fixed-toolbar {
+                left: 0;
             }
 
-            .filter-controls select {
-                width: 100%;
+            .toolbar-actions {
+                gap: 4px;
             }
 
-            .plugins-table th,
-            .plugins-table td {
-                padding: 12px 16px;
+            .btn {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+
+            .skills-table {
+                font-size: 13px;
+            }
+
+            .skills-table th,
+            .skills-table td {
+                padding: 10px 12px;
+            }
+
+            .description {
+                max-width: 300px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>{{ registry_name }}</h1>
-            <p>内部 Claude Code Skill Registry - 管理和发现团队技能插件</p>
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="number">{{ plugin_count }}</div>
-                    <div class="label">可用技能</div>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Skill应用商店</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item active">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">首页</span>
+            </a>
+
+            <a href="/install-guide" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span class="nav-text">安装指南</span>
+            </a>
+
+            <a href="/stats" class="nav-item">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">下载统计</span>
+            </a>
+
+            <div class="nav-divider"></div>
+
+            <div class="nav-section-title">管理</div>
+
+            <a href="/admin/upload" class="nav-item">
+                <span class="nav-icon">⬆️</span>
+                <span class="nav-text">上传 Skill</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+        <!-- Fixed Header -->
+        <div class="fixed-header">
+            <div class="header-title">技能列表</div>
+            <div class="header-stats">
+                <span id="headerStats">{{ plugin_count }} 个技能</span>
+            </div>
+        </div>
+
+        <!-- Fixed Toolbar (shown when items selected) -->
+        <div class="fixed-toolbar" id="fixedToolbar">
+            <div class="toolbar-info">
+                已选择 <strong id="selectedCount">0</strong> 个技能
+            </div>
+            <div class="toolbar-actions">
+                <button class="btn btn-primary" onclick="downloadSelected()">⬇️ 批量下载</button>
+                <button class="btn btn-secondary" onclick="clearSelection()">清除选择</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="container">
+                <!-- Search Section -->
+                <div class="search-section">
+                    <input type="text"
+                           class="search-input"
+                           id="searchInput"
+                           placeholder="搜索技能名称、描述、作者..."
+                           oninput="handleSearch()">
+                    <select class="sort-select" id="sortSelect" onchange="handleSort()">
+                        <option value="upload_time_desc">上传时间 ↓</option>
+                        <option value="upload_time_asc">上传时间 ↑</option>
+                        <option value="downloads_desc">下载次数 ↓</option>
+                        <option value="downloads_asc">下载次数 ↑</option>
+                        <option value="name_asc">名称 A-Z</option>
+                        <option value="name_desc">名称 Z-A</option>
+                    </select>
+                    <span class="pagesize-label">每页</span>
+                    <select class="pagesize-select" id="pageSizeSelect" onchange="handlePageSizeChange()">
+                        <option value="20" selected>20条</option>
+                        <option value="50">50条</option>
+                        <option value="100">100条</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="clearSearch()">清除</button>
                 </div>
-                <div class="stat-card">
-                    <div class="number">{{ collection_count | default(plugins | map(attribute='collection') | unique | list | length) }}</div>
-                    <div class="label">技能集合</div>
+
+                <!-- Skills Table -->
+                <div class="skills-table-container">
+                    <table class="skills-table" id="skillsTable">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-cell">
+                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                </th>
+                                <th>技能名称</th>
+                                <th>版本</th>
+                                <th class="sortable" onclick="sortByColumn('downloads')">
+                                    下载次数 <span class="sort-indicator" id="downloadSort">↓</span>
+                                </th>
+                                <th style="width: 40%;">描述</th>
+                                <th>作者</th>
+                            </tr>
+                        </thead>
+                        <tbody id="skillsTableBody">
+                            <!-- Skills will be loaded via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" id="pagination">
+                    <div class="pagination-info" id="paginationInfo">
+                        显示 1-20 / 共 24 个技能
+                    </div>
+                    <div class="pagination-controls" id="paginationControls">
+                        <!-- Pagination buttons will be added via JavaScript -->
+                    </div>
                 </div>
             </div>
-        </header>
-
-        <div class="usage-info">
-            <h3>使用方法</h3>
-            <p>在 Claude Code 中添加此 Registry：</p>
-            <code>/plugins marketplace add {{ request.base_url }}marketplace.json</code>
-            <p>然后安装所需技能：</p>
-            <code>/plugin install &lt;organization&gt;/&lt;collection&gt;/&lt;skill-name&gt;</code>
         </div>
 
-        {% set desc_map = {
-            "No description available": "暂无描述",
-            "No description provided": "暂无描述",
-            "Security audit skill for Python code": "Python代码安全审计技能",
-            "Security audit skill": "安全审计技能",
-            "Code review skill": "代码审查技能",
-            "Code review skill for Python": "Python代码审查技能",
-            "Documentation skill": "文档生成技能",
-            "Testing skill": "测试技能",
-            "Linting skill": "代码检查技能",
-            "Formatting skill": "代码格式化技能",
-            "Git skill": "Git版本控制技能",
-            "CI/CD skill": "持续集成/持续部署技能",
-            "Docker skill": "Docker容器技能",
-            "Kubernetes skill": "Kubernetes编排技能",
-            "Database skill": "数据库技能",
-            "API testing skill": "API测试技能",
-            "Performance testing skill": "性能测试技能"
-        } %}
-
-        {% if plugins %}
-        <!-- Filter Section -->
-        <div class="filter-section">
-            <h3>筛选技能</h3>
-            <div class="filter-controls">
-                <select id="orgFilter" onchange="filterSkills()">
-                    <option value="">所有组织</option>
-                    {% for org in plugins | map(attribute='organization') | unique | sort %}
-                    <option value="{{ org }}">{{ org }}</option>
-                    {% endfor %}
-                </select>
-                <select id="collectionFilter" onchange="filterSkills()">
-                    <option value="">所有集合</option>
-                    {% for coll in plugins | map(attribute='collection') | unique | sort %}
-                    <option value="{{ coll }}">{{ coll }}</option>
-                    {% endfor %}
-                </select>
-                <button onclick="clearFilters()">清除筛选</button>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Skills grouped by Organization and Collection -->
-        {% if not plugins %}
-        <div class="no-plugins">
-            <h2>暂无技能插件</h2>
-            <p>请使用 <a href="/admin/upload">上传页面</a> 添加技能插件</p>
-        </div>
-        {% else %}
-        {% for (org, coll), skills_in_collection in plugins|groupby(['organization', 'collection']) %}
-        <div class="collection-section" data-org="{{ org }}" data-collection="{{ coll }}">
-            <div class="collection-header">
-                <h3>
-                    <span class="collection-org">{{ org }}</span>
-                    <span class="collection-name">/ {{ coll }}</span>
-                </h3>
-                <div class="collection-actions">
-                    <span class="skill-count">{{ skills_in_collection|length }} 个技能</span>
-                    <button class="install-collection-btn"
-                            data-org="{{ org }}"
-                            data-collection="{{ coll }}"
-                            onclick="showCollectionSkills('{{ org }}', '{{ coll }}')">
-                        查看集合
-                    </button>
-                </div>
-            </div>
-            <div class="plugins-table-container">
-                <table class="plugins-table">
-                    <thead>
-                        <tr>
-                            <th>组织</th>
-                            <th>集合</th>
-                            <th>技能名称</th>
-                            <th>版本</th>
-                            <th>描述</th>
-                            <th>作者</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for plugin in skills_in_collection %}
-                        {% set raw_desc = plugin.metadata.description or "暂无描述" %}
-                        {% set translated_desc = desc_map.get(raw_desc, raw_desc) %}
-                        <tr>
-                            <td><span class="plugin-org">{{ plugin.organization }}</span></td>
-                            <td><span class="plugin-collection">{{ plugin.collection }}</span></td>
-                            <td class="plugin-name">{{ plugin.metadata.name or plugin.name }}</td>
-                            <td><span class="plugin-version">v{{ plugin.latest_version }}</span></td>
-                            <td class="plugin-description" title="{{ raw_desc }}">{{ translated_desc }}</td>
-                            <td class="plugin-author">{{ plugin.metadata.author.name or "未知" }}</td>
-                            <td>
-                                <div class="plugin-actions">
-                                    {% for ver in plugin.versions %}
-                                    <a href="/plugins/{{ plugin.organization }}/{{ plugin.collection }}/{{ plugin.name }}/{{ ver.filename }}"
-                                       class="version-tag {% if ver.version == plugin.latest_version %}latest{% endif %}"
-                                       title="下载 {{ ver.version }} ({{ (ver.size / 1024)|round(1) }} KB)">
-                                        {{ ver.version }}
-                                    </a>
-                                    {% endfor %}
-                                    <button class="install-btn"
-                                            onclick="installSkill('{{ plugin.organization }}', '{{ plugin.collection }}', '{{ plugin.name }}')"
-                                            title="安装 {{ plugin.metadata.name or plugin.name }}">
-                                        安装
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endfor %}
-        {% endif %}
-
-        <footer>
-            <p>Private Claude Code Skill Registry | Built with FastAPI</p>
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Skill应用商店@内部网络安全实验室</p>
         </footer>
     </div>
 
-    <!-- Collection Skills Modal -->
-    <div id="collectionModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 id="modalTitle">技能集合</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <ul id="skillList" class="skill-list">
-                    <!-- Skills will be populated here -->
-                </ul>
-            </div>
-            <div class="modal-footer">
-                <button class="modal-btn modal-btn-secondary" onclick="closeModal()">取消</button>
-                <button class="modal-btn modal-btn-primary" onclick="installSelectedSkills()">安装选中技能</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Store all plugins data for JavaScript access
-        const allPlugins = {{ plugins | tojson | safe }};
+        // State
+        let allSkills = [];
+        let filteredSkills = [];
+        let currentPage = 1;
+        let pageSize = 20;  // 默认每页20条
+        let selectedSkills = new Set();
+        let downloadStats = {};
+        let currentSort = { field: 'upload_time', order: 'desc' };
 
-        function filterSkills() {
-            const orgFilter = document.getElementById('orgFilter').value;
-            const collFilter = document.getElementById('collectionFilter').value;
+        // Load skills on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Initialize page size select
+            document.getElementById('pageSizeSelect').value = pageSize.toString();
+            await loadData();
+        });
 
-            const sections = document.querySelectorAll('.collection-section');
-            sections.forEach(section => {
-                const org = section.getAttribute('data-org');
-                const coll = section.getAttribute('data-collection');
+        // Load skills and download stats
+        async function loadData() {
+            try {
+                // Load skills
+                const skillsResponse = await fetch('/api/skills?page=1&per_page=1000');
+                const skillsResult = await skillsResponse.json();
+                allSkills = skillsResult.data || [];
 
-                const orgMatch = !orgFilter || org === orgFilter;
-                const collMatch = !collFilter || coll === collFilter;
+                // Load download stats
+                const statsResponse = await fetch('/api/stats/top');
+                const statsResult = await statsResponse.json();
 
-                if (orgMatch && collMatch) {
-                    section.style.display = 'block';
-                } else {
-                    section.style.display = 'none';
+                // Build download count map
+                downloadStats = {};
+                if (statsResult.rankings) {
+                    statsResult.rankings.forEach(item => {
+                        downloadStats[item.skill_name] = item.downloads;
+                    });
                 }
+
+                // Add download counts to skills
+                allSkills.forEach(skill => {
+                    skill.download_count = downloadStats[skill.name] || 0;
+                });
+
+                // Sort by default (upload time desc)
+                sortSkills();
+                filteredSkills = [...allSkills];
+
+                renderTable();
+                updatePagination();
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                showError();
+            }
+        }
+
+        // Sort skills based on current sort settings
+        function sortSkills() {
+            const { field, order } = currentSort;
+            const multiplier = order === 'asc' ? 1 : -1;
+
+            allSkills.sort((a, b) => {
+                let valA, valB;
+
+                switch (field) {
+                    case 'upload_time':
+                        // Use the latest version's updated_at
+                        valA = a.versions && a.versions.length > 0 ?
+                            new Date(a.versions[a.versions.length - 1].updated_at) : new Date(0);
+                        valB = b.versions && b.versions.length > 0 ?
+                            new Date(b.versions[b.versions.length - 1].updated_at) : new Date(0);
+                        break;
+                    case 'downloads':
+                        valA = a.download_count || 0;
+                        valB = b.download_count || 0;
+                        break;
+                    case 'name':
+                        valA = (a.metadata?.name || a.name).toLowerCase();
+                        valB = (b.metadata?.name || b.name).toLowerCase();
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (valA < valB) return -1 * multiplier;
+                if (valA > valB) return 1 * multiplier;
+                return 0;
             });
         }
 
-        function clearFilters() {
-            document.getElementById('orgFilter').value = '';
-            document.getElementById('collectionFilter').value = '';
-            filterSkills();
+        // Handle sort select change
+        function handleSort() {
+            const value = document.getElementById('sortSelect').value;
+            const [field, order] = value.split('_');
+            currentSort = { field, order };
+
+            sortSkills();
+
+            // Re-apply search filter
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (query) {
+                filterSkills(query);
+            } else {
+                filteredSkills = [...allSkills];
+            }
+
+            currentPage = 1;
+            renderTable();
+            updatePagination();
         }
 
-        function showCollectionSkills(org, coll) {
-            const modal = document.getElementById('collectionModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const skillList = document.getElementById('skillList');
+        // Sort by column click
+        function sortByColumn(column) {
+            if (currentSort.field === column) {
+                // Toggle order
+                currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.field = column;
+                currentSort.order = 'desc';
+            }
 
-            modalTitle.textContent = `${org} / ${coll} - 技能列表`;
-            skillList.innerHTML = '';
+            // Update sort indicator
+            document.getElementById('downloadSort').textContent = currentSort.order === 'asc' ? '↑' : '↓';
 
-            // Find skills in this collection
-            const skills = allPlugins.filter(p => p.organization === org && p.collection === coll);
+            // Update select to match
+            const selectValue = `${currentSort.field}_${currentSort.order}`;
+            document.getElementById('sortSelect').value = selectValue;
 
-            skills.forEach(skill => {
-                const li = document.createElement('li');
-                li.className = 'skill-list-item';
-                li.innerHTML = `
-                    <input type="checkbox" id="skill_${skill.name}" value="${skill.name}" checked>
-                    <label for="skill_${skill.name}">
-                        <span class="skill-name">${skill.metadata.name || skill.name}</span>
-                        <span class="skill-desc">${skill.metadata.description || '暂无描述'} (v${skill.latest_version})</span>
-                    </label>
+            handleSort();
+        }
+
+        // Filter skills based on search query
+        function filterSkills(query) {
+            filteredSkills = allSkills.filter(skill => {
+                const name = (skill.metadata?.name || skill.name).toLowerCase();
+                const description = (skill.metadata?.description || '').toLowerCase();
+                const author = (skill.metadata?.author?.name || '').toLowerCase();
+
+                return name.includes(query) ||
+                       description.includes(query) ||
+                       author.includes(query);
+            });
+        }
+
+        // Render skills table
+        function renderTable() {
+            const tbody = document.getElementById('skillsTableBody');
+            const start = (currentPage - 1) * pageSize;
+            const end = Math.min(start + pageSize, filteredSkills.length);
+            const pageSkills = filteredSkills.slice(start, end);
+
+            if (pageSkills.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <h2>未找到技能</h2>
+                            <p>请调整搜索条件或<a href="#" onclick="location.reload()">刷新页面</a></p>
+                        </td>
+                    </tr>
                 `;
-                skillList.appendChild(li);
-            });
-
-            modal.classList.add('active');
-        }
-
-        function closeModal() {
-            const modal = document.getElementById('collectionModal');
-            modal.classList.remove('active');
-        }
-
-        function installSelectedSkills() {
-            const checkboxes = document.querySelectorAll('#skillList input[type="checkbox"]:checked');
-            const selectedSkills = Array.from(checkboxes).map(cb => cb.value);
-
-            if (selectedSkills.length === 0) {
-                alert('请至少选择一个技能');
                 return;
             }
 
-            // Get current org and collection from modal title
-            const modalTitle = document.getElementById('modalTitle').textContent;
-            const parts = modalTitle.split(' / ');
-            const org = parts[0];
-            const coll = parts[1].split(' - ')[0];
+            tbody.innerHTML = pageSkills.map(skill => `
+                <tr data-skill-id="${skill.name}" data-filenames='${JSON.stringify(skill.versions.map(v => v.filename)).replace(/'/g, "\\'")}'>
+                    <td class="checkbox-cell">
+                        <input type="checkbox"
+                               class="skill-checkbox"
+                               ${selectedSkills.has(skill.name) ? 'checked' : ''}
+                               onchange="updateSelection()">
+                    </td>
+                    <td>
+                        <div class="skill-name">${skill.metadata?.name || skill.name}</div>
+                    </td>
+                    <td><span class="version-badge">v${skill.latest_version}</span></td>
+                    <td>
+                        <div class="download-links">
+                            ${skill.versions.map(ver => `
+                                <a href="/plugins/${ver.filename}"
+                                   class="download-link"
+                                   title="下载 ${ver.version} (${Math.round(ver.size / 1024)} KB)"
+                                   download>
+                                    <span class="download-count">
+                                        <span class="icon">⬇️</span>
+                                        ${skill.download_count || 0}
+                                    </span>
+                                </a>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="description" title="${skill.metadata?.description || '暂无描述'}">
+                            ${skill.metadata?.description || '暂无描述'}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="author">${skill.metadata?.author?.name || '未知'}</div>
+                    </td>
+                </tr>
+            `).join('');
 
-            // Install each selected skill
-            selectedSkills.forEach(skillName => {
-                installSkill(org, coll, skillName);
-            });
+            // Update header stats
+            document.getElementById('headerStats').textContent = `${allSkills.length} 个技能`;
 
-            closeModal();
+            // Update select all checkbox state
+            const pageCheckboxes = document.querySelectorAll('.skill-checkbox');
+            const allSelected = pageCheckboxes.length > 0 && Array.from(pageCheckboxes).every(cb => cb.checked);
+            const someSelected = Array.from(pageCheckboxes).some(cb => cb.checked);
+
+            const selectAllCheckbox = document.getElementById('selectAll');
+            selectAllCheckbox.checked = allSelected;
+            selectAllCheckbox.indeterminate = someSelected && !allSelected;
         }
 
-        function installSkill(org, coll, skillName) {
-            // Copy install command to clipboard
-            const command = `/plugin install ${org}/${coll}/${skillName}`;
-            navigator.clipboard.writeText(command).then(() => {
-                alert(`安装命令已复制到剪贴板：\n${command}`);
-            }).catch(err => {
-                console.error('复制失败:', err);
-                alert(`请手动复制安装命令：\n${command}`);
-            });
-        }
+        // Pagination
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredSkills.length / pageSize);
+            const start = (currentPage - 1) * pageSize + 1;
+            const end = Math.min(currentPage * pageSize, filteredSkills.length);
 
-        // Close modal when clicking outside
-        document.getElementById('collectionModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
+            document.getElementById('paginationInfo').textContent =
+                `显示 ${start}-${end} / 共 ${filteredSkills.length} 个技能`;
+
+            const controls = document.getElementById('paginationControls');
+
+            let buttons = '';
+
+            // Previous button
+            buttons += `
+                <button class="page-btn" ${currentPage === 1 ? 'disabled' : ''}
+                        onclick="${currentPage > 1 ? `goToPage(${currentPage - 1})` : ''}">
+                    上一页
+                </button>
+            `;
+
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
             }
-        });
+
+            for (let i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    buttons += `<button class="page-btn current">${i}</button>`;
+                } else {
+                    buttons += `<button class="page-btn" onclick="goToPage(${i})">${i}</button>`;
+                }
+            }
+
+            // Next button
+            buttons += `
+                <button class="page-btn" ${currentPage >= totalPages ? 'disabled' : ''}
+                        onclick="${currentPage < totalPages ? `goToPage(${currentPage + 1})` : ''}">
+                    下一页
+                </button>
+            `;
+
+            controls.innerHTML = buttons;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderTable();
+            updatePagination();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Selection
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.skill-checkbox');
+            const isChecked = selectAllCheckbox.checked;
+
+            checkboxes.forEach(cb => {
+                cb.checked = isChecked;
+                const skillId = cb.closest('tr').dataset.skillId;
+                if (isChecked) {
+                    selectedSkills.add(skillId);
+                } else {
+                    selectedSkills.delete(skillId);
+                }
+            });
+
+            updateToolbar();
+        }
+
+        function updateSelection() {
+            const checkboxes = document.querySelectorAll('.skill-checkbox:checked');
+
+            selectedSkills.clear();
+            checkboxes.forEach(cb => {
+                selectedSkills.add(cb.closest('tr').dataset.skillId);
+            });
+
+            const allCheckboxes = document.querySelectorAll('.skill-checkbox');
+            const allSelected = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.checked);
+            const someSelected = Array.from(allCheckboxes).some(cb => cb.checked);
+
+            const selectAllCheckbox = document.getElementById('selectAll');
+            selectAllCheckbox.checked = allSelected;
+            selectAllCheckbox.indeterminate = someSelected && !allSelected;
+
+            updateToolbar();
+        }
+
+        function updateToolbar() {
+            const toolbar = document.getElementById('fixedToolbar');
+            const count = selectedSkills.size;
+
+            document.getElementById('selectedCount').textContent = count;
+
+            if (count > 0) {
+                toolbar.classList.add('visible');
+            } else {
+                toolbar.classList.remove('visible');
+            }
+        }
+
+        function clearSelection() {
+            const checkboxes = document.querySelectorAll('.skill-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+
+            const selectAllCheckbox = document.getElementById('selectAll');
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+
+            selectedSkills.clear();
+            updateToolbar();
+        }
+
+        // Search
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            if (!query) {
+                filteredSkills = [...allSkills];
+            } else {
+                filterSkills(query);
+            }
+
+            currentPage = 1;
+            renderTable();
+            updatePagination();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            filteredSkills = [...allSkills];
+            currentPage = 1;
+            renderTable();
+            updatePagination();
+        }
+
+        // Handle page size change
+        function handlePageSizeChange() {
+            const newSize = parseInt(document.getElementById('pageSizeSelect').value);
+            pageSize = newSize;
+
+            // Recalculate current page to avoid going out of bounds
+            const totalPages = Math.ceil(filteredSkills.length / pageSize);
+            if (currentPage > totalPages) {
+                currentPage = Math.max(1, totalPages);
+            }
+
+            renderTable();
+            updatePagination();
+        }
+
+        // Batch Download
+        async function downloadSelected() {
+            if (selectedSkills.size === 0) {
+                alert('请先选择要下载的技能');
+                return;
+            }
+
+            const selectedFilenames = [];
+            selectedSkills.forEach(skillName => {
+                const row = document.querySelector(`tr[data-skill-id="${skillName}"]`);
+                if (row) {
+                    const filenames = JSON.parse(row.dataset.filenames);
+                    filenames.forEach(filename => selectedFilenames.push(filename));
+                }
+            });
+
+            if (selectedFilenames.length === 0) {
+                alert('没有找到要下载的文件');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/batch-download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filenames: selectedFilenames })
+                });
+
+                if (!response.ok) {
+                    throw new Error('下载失败');
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'skills-batch.zip';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (match) {
+                        filename = match[1];
+                    }
+                }
+
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+            } catch (error) {
+                console.error('Download failed:', error);
+                alert('下载失败，请重试');
+            }
+        }
+
+        // Show error
+        function showError() {
+            document.getElementById('skillsTableBody').innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        <h2>加载失败</h2>
+                        <p>请刷新页面重试</p>
+                    </td>
+                </tr>
+            `;
+        }
     </script>
 </body>
 </html>

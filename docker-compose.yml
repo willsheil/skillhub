@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  registry:
+    build: .
+    container_name: skill-registry
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./plugins:/app/plugins
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
