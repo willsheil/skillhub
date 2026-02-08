@@ -35,6 +35,23 @@ def init_db():
             ON downloads(skill_name, downloaded_at)
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id TEXT UNIQUE NOT NULL,
+                api_key TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            )
+        """)
+
+        # Index for employee_id lookups
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_users_employee_id
+            ON users(employee_id)
+        """)
+
         conn.commit()
 
 
@@ -165,3 +182,84 @@ def get_stats_with_author(
         ranking["author"] = skill_author_map.get(ranking["skill_name"], "Unknown")
 
     return stats
+
+
+def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str, Any]]:
+    """Query user by employee ID and API key.
+
+    Args:
+        employee_id: The employee's ID
+        api_key: The API key for authentication
+
+    Returns:
+        User dictionary if found, None otherwise
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT id, employee_id, api_key, role, created_at, last_login
+            FROM users
+            WHERE employee_id = ? AND api_key = ?
+            """,
+            (employee_id, api_key)
+        ).fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "employee_id": row["employee_id"],
+                "api_key": row["api_key"],
+                "role": row["role"],
+                "created_at": row["created_at"],
+                "last_login": row["last_login"]
+            }
+        return None
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Query user by ID.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        User dictionary if found, None otherwise
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT id, employee_id, api_key, role, created_at, last_login
+            FROM users
+            WHERE id = ?
+            """,
+            (user_id,)
+        ).fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "employee_id": row["employee_id"],
+                "api_key": row["api_key"],
+                "role": row["role"],
+                "created_at": row["created_at"],
+                "last_login": row["last_login"]
+            }
+        return None
+
+
+def update_last_login(user_id: int) -> None:
+    """Update the last login timestamp for a user.
+
+    Args:
+        user_id: The user's ID
+    """
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE users
+            SET last_login = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (user_id,)
+        )
+        conn.commit()
