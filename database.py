@@ -12,9 +12,27 @@ from contextlib import contextmanager
 DB_PATH = Path("./data/registry.db")
 
 
+def migrate_add_user_id_to_downloads():
+    """Migrate downloads table to add user_id column if it doesn't exist."""
+    with get_connection() as conn:
+        # Check if user_id column already exists
+        cursor = conn.execute("PRAGMA table_info(downloads)")
+        columns = [row["name"] for row in cursor.fetchall()]
+
+        if "user_id" not in columns:
+            conn.execute("ALTER TABLE downloads ADD COLUMN user_id INTEGER")
+            conn.commit()
+            print("Migration: Added user_id column to downloads table")
+        else:
+            print("Migration: user_id column already exists in downloads table")
+
+
 def init_db():
     """Initialize database and create tables."""
     DB_PATH.parent.mkdir(exist_ok=True)
+
+    # Run migrations first
+    migrate_add_user_id_to_downloads()
 
     with get_connection() as conn:
         conn.execute("""
@@ -100,9 +118,18 @@ def record_download(
     version: str,
     filename: str,
     ip_address: Optional[str] = None,
-    user_agent: Optional[str] = None
+    user_agent: Optional[str] = None,
+    user_id: Optional[int] = None
 ) -> int:
     """Record a download event.
+
+    Args:
+        skill_name: The name of the skill being downloaded
+        version: The version of the skill
+        filename: The filename being downloaded
+        ip_address: Optional IP address of the downloader
+        user_agent: Optional user agent string
+        user_id: Optional user ID if authenticated
 
     Returns:
         The ID of the inserted record
@@ -110,10 +137,10 @@ def record_download(
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO downloads (skill_name, version, filename, ip_address, user_agent)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO downloads (skill_name, version, filename, ip_address, user_agent, user_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (skill_name, version, filename, ip_address, user_agent)
+            (skill_name, version, filename, ip_address, user_agent, user_id)
         )
         conn.commit()
         return cursor.lastrowid
@@ -490,3 +517,85 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
             })
 
         return results
+
+
+def get_user_downloads(
+    user_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> Dict[str, Any]:
+    """Get download history for a specific user.
+
+    Args:
+        user_id: The user's ID
+        start_date: Optional start date for filtering
+        end_date: Optional end date for filtering
+        limit: Maximum number of records to return
+        offset: Number of records to skip for pagination
+
+    Returns:
+        Dictionary containing:
+        - downloads: List of download records
+        - total: Total count matching the filter
+        - limit: The limit used
+        - offset: The offset used
+    """
+    # Default to all time if no dates provided
+    if start_date is None:
+        start_date = date(1970, 1, 1)
+    if end_date is None:
+        end_date = date.today()
+
+    with get_connection() as conn:
+        # Get total count
+        total_row = conn.execute(
+            """
+            SELECT COUNT(*) as total FROM downloads
+            WHERE user_id = ?
+              AND date(downloaded_at) BETWEEN ? AND ?
+            """,
+            (user_id, start_date.isoformat(), end_date.isoformat())
+        ).fetchone()
+
+        total = total_row["total"] if total_row else 0
+
+        # Get paginated results
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                skill_name,
+                version,
+                filename,
+                downloaded_at,
+                ip_address,
+                user_agent
+            FROM downloads
+            WHERE user_id = ?
+              AND date(downloaded_at) BETWEEN ? AND ?
+            ORDER BY downloaded_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (user_id, start_date.isoformat(), end_date.isoformat(), limit, offset)
+        ).fetchall()
+
+        downloads = []
+        for row in rows:
+            downloads.append({
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "downloaded_at": row["downloaded_at"],
+                "ip_address": row["ip_address"],
+                "user_agent": row["user_agent"]
+            })
+
+        return {
+            "downloads": downloads,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
