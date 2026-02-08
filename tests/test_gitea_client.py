@@ -95,6 +95,26 @@ def test_exception_catching():
         assert "Auth failed" in str(e)
 
 
+def test_clone_or_pull_repo(monkeypatch):
+    # Mock environment variables
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token")
+
+    client = GiteaClient()
+
+    # Mock subprocess.run
+    class MockResult:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: MockResult())
+
+    # Should not raise
+    repo_path = client.clone_or_pull_repo()
+    assert repo_path == client.temp_dir / "repo"
+
+
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])

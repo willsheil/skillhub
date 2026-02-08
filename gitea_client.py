@@ -110,3 +110,59 @@ class GiteaClient:
         )
 
         return result.stdout, result.stderr, result.returncode
+
+    def clone_or_pull_repo(self) -> Path:
+        """Clone or pull latest code from Gitea repository.
+
+        Returns:
+            Path to local repository
+        """
+        local_path = self.temp_dir / "repo"
+
+        if local_path.exists():
+            logger.info(f"Repository exists, pulling latest: {local_path}")
+            self._git_pull(local_path)
+        else:
+            logger.info(f"Cloning repository: {self.repo_url}")
+            self._git_clone(self.repo_url, local_path)
+
+        return local_path
+
+    def _git_clone(self, url: str, path: Path):
+        """Clone repository."""
+        # Inject token into URL for authentication
+        if self.token:
+            # URL format: https://token@url
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            auth_url = f"{parsed.scheme}://{self.token}@{parsed.netloc}{parsed.path}"
+            if parsed.query:
+                auth_url += f"?{parsed.query}"
+        else:
+            auth_url = url
+
+        stdout, stderr, returncode = self._run_git_command(
+            Path.cwd(),
+            ["clone", auth_url, str(path)]
+        )
+
+        if returncode != 0:
+            if "Authentication failed" in stderr or "could not read Username" in stderr:
+                raise AuthenticationError(f"Git authentication failed: {stderr}")
+            elif "repository not found" in stderr.lower() or "could not find repository" in stderr.lower():
+                raise RepositoryNotFoundError(f"Repository not found: {url}")
+            else:
+                raise GiteaError(f"Git clone failed: {stderr}")
+
+    def _git_pull(self, path: Path):
+        """Pull latest changes."""
+        stdout, stderr, returncode = self._run_git_command(
+            path,
+            ["pull", "origin", "master"]
+        )
+
+        if returncode != 0:
+            if "Authentication failed" in stderr:
+                raise AuthenticationError(f"Git authentication failed: {stderr}")
+            else:
+                raise NetworkError(f"Git pull failed: {stderr}")
