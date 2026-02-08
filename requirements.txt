@@ -6,3 +6,5 @@ starlette
 python-multipart
 openpyxl
 pyyaml
+pytest
+requests
