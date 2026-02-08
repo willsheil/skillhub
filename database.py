@@ -193,6 +193,42 @@ def init_db():
 
     # Run migrations after all tables are created
     migrate_add_user_id_to_downloads()
+    migrate_gitea_push_tasks()
+
+
+def migrate_gitea_push_tasks():
+    """Create gitea_push_tasks table if not exists."""
+    with get_connection() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS gitea_push_tasks (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                skill_id INT NOT NULL,
+                skill_name VARCHAR(255) NOT NULL,
+                version VARCHAR(50) NOT NULL,
+                status ENUM('pending', 'pushing', 'success', 'failed') DEFAULT 'pending',
+                retry_count INT DEFAULT 0,
+                max_retries INT DEFAULT 3,
+                error_message TEXT,
+                commit_hash VARCHAR(40),
+                gitea_path VARCHAR(500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP NULL,
+                completed_at TIMESTAMP NULL,
+                FOREIGN KEY (skill_id) REFERENCES skills(id),
+                INDEX idx_status_created (status, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        # Add column to skills table if not exists
+        cursor = conn._conn.cursor()
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        if "latest_push_task_id" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN latest_push_task_id INT NULL")
+
+        conn.commit()
+        print("Migration: gitea_push_tasks table created")
 
 
 @contextmanager
