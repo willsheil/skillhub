@@ -237,6 +237,19 @@ PLUGINS_DIR=./plugins
 
 **安全提示**：生产环境请务必修改默认密码和密钥！
 
+## Gitea Integration
+
+To enable automatic skill pushing to Gitea:
+
+1. Set up a Gitea repository
+2. Configure environment variables in `.env`:
+   ```bash
+   GITEA_REPO_URL=http://your-gitea-server/owner/repo.git
+   GITEA_TOKEN=your_access_token
+   ```
+
+Skills will be automatically pushed to Gitea when approved by admin.
+
 ## 安装 Skill
 
 ### 安装整个 Skill Set（技能集）
