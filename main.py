@@ -639,11 +639,76 @@ async def login(request: Request, username: str = Form(...), password: str = For
     return RedirectResponse(url="/admin/login?error=invalid", status_code=302)
 
 
-@app.get("/admin/logout")
+@app.post("/api/login")
+async def api_login(
+    request: Request,
+    employee_id: str = Form(...),
+    api_key: str = Form(...)
+):
+    """User login API endpoint.
+
+    Accepts employee_id and api_key as form parameters.
+    Sets session variables on success.
+    Updates last login timestamp.
+    Returns success response or redirects on failure.
+    """
+    # Query user by credentials
+    user = get_user_by_credentials(employee_id, api_key)
+
+    if user:
+        # Set session variables
+        request.session["user_id"] = user["id"]
+        request.session["employee_id"] = user["employee_id"]
+        request.session["role"] = user["role"]
+
+        # Update last login
+        update_last_login(user["id"])
+
+        return {
+            "success": True,
+            "message": "Login successful",
+            "user": {
+                "id": user["id"],
+                "employee_id": user["employee_id"],
+                "role": user["role"]
+            }
+        }
+    else:
+        return RedirectResponse(
+            url="/admin/login?error=invalid",
+            status_code=302
+        )
+
+
+@app.get("/logout")
 async def logout(request: Request):
-    """Logout admin."""
+    """Logout and clear session."""
     request.session.clear()
     return RedirectResponse(url="/", status_code=302)
+
+
+@app.get("/api/me")
+async def api_me(request: Request):
+    """Get current user information.
+
+    Returns the current authenticated user's details.
+    Raises HTTP 401 if not authenticated.
+    """
+    user = get_current_user(request)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    return {
+        "id": user["id"],
+        "employee_id": user["employee_id"],
+        "role": user["role"],
+        "created_at": user["created_at"],
+        "last_login": user["last_login"]
+    }
 
 
 @app.get("/admin/upload", response_class=HTMLResponse)
