@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - Skill Registry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
+            background: #fafafa;
+            color: #171717;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: #ffffff;
+            border-bottom: 1px solid #eaeaea;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            font-size: 18px;
+            font-weight: 600;
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.15s ease;
+        }
+
+        .nav-link:hover {
+            background: #f3f4f6;
+        }
+
+        .user-info {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .user-info strong {
+            color: #171717;
+            font-weight: 500;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 80px;
+            padding-bottom: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #171717;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        /* Tabs */
+        .tabs {
+            background: #ffffff;
+            border: 1px solid #eaeaea;
+            border-radius: 8px 8px 0 0;
+            border-bottom: none;
+            padding: 0 24px;
+            display: flex;
+            gap: 32px;
+        }
+
+        .tab {
+            padding: 16px 0;
+            font-size: 15px;
+            font-weight: 500;
+            color: #64748b;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            color: #171717;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        /* Tab Content */
+        .tab-content {
+            background: #ffffff;
+            border: 1px solid #eaeaea;
+            border-radius: 0 0 8px 8px;
+            padding: 24px;
+            min-height: 400px;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid #eaeaea;
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: #171717;
+        }
+
+        .stat-description {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        .data-table thead {
+            background: #fafafa;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .data-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eaeaea;
+            font-size: 14px;
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tbody tr:hover {
+            background: #fafafa;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: all 0.15s ease;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            color: #171717;
+            border: 1px solid #eaeaea;
+        }
+
+        .btn-secondary:hover {
+            background: #fafafa;
+            border-color: #d4d4d4;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 48px;
+            color: #64748b;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 2px solid #eaeaea;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: #64748b;
+        }
+
+        .empty-state-text {
+            font-size: 14px;
+        }
+
+        /* Messages */
+        .message {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .message.success {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .message.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        /* Skill Info */
+        .skill-name {
+            font-weight: 500;
+            color: #171717;
+        }
+
+        .skill-version {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .uploader-id {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .upload-date {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        /* Comment */
+        .comment {
+            font-size: 13px;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        /* Top Skills Table */
+        .top-skills-table {
+            margin-top: 24px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .data-table {
+                font-size: 13px;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 10px 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">Skill 应用商店 - 管理后台</a>
+        <div class="navbar-nav">
+            <span class="user-info">管理员: <strong>{{ user.employee_id }}</strong></span>
+            <a href="/upload" class="nav-link">上传</a>
+            <a href="/" class="nav-link">首页</a>
+            <a href="/logout" class="nav-link">退出</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">管理后台</h1>
+            <p class="page-subtitle">管理技能审核和查看系统统计</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" data-tab="pending">待审核技能</div>
+            <div class="tab" data-tab="stats">统计信息</div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Pending Skills Tab -->
+            <div class="tab-pane active" id="pendingPane">
+                <div id="pendingContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Tab -->
+            <div class="tab-pane" id="statsPane">
+                <div id="statsContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update active pane
+                document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+                document.getElementById(`${tabName}Pane`).classList.add('active');
+
+                // Load content
+                if (tabName === 'pending') {
+                    loadPendingSkills();
+                } else if (tabName === 'stats') {
+                    loadStats();
+                }
+            });
+        });
+
+        // Load pending skills
+        async function loadPendingSkills() {
+            const content = document.getElementById('pendingContent');
+
+            try {
+                const response = await fetch('/api/pending');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error('Failed to load pending skills');
+                }
+
+                const pendingSkills = result.data || [];
+
+                if (pendingSkills.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-text">暂无待审核技能</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const table = document.createElement('table');
+                table.className = 'data-table';
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Skill 名称</th>
+                            <th>版本</th>
+                            <th>上传者</th>
+                            <th>上传时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${pendingSkills.map(skill => `
+                            <tr data-skill-id="${skill.id}">
+                                <td>
+                                    <div class="skill-name">${skill.skill_name}</div>
+                                </td>
+                                <td>
+                                    <span class="skill-version">${skill.version}</span>
+                                </td>
+                                <td>
+                                    <div class="uploader-id">${skill.uploader_employee_id}</div>
+                                </td>
+                                <td>
+                                    <div class="upload-date">${formatDate(skill.uploaded_at)}</div>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-success" onclick="reviewSkill(${skill.id}, 'approve')">
+                                            通过
+                                        </button>
+                                        <button class="btn btn-danger" onclick="reviewSkill(${skill.id}, 'reject')">
+                                            拒绝
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
+
+                content.innerHTML = '';
+                content.appendChild(table);
+
+            } catch (error) {
+                console.error('Failed to load pending skills:', error);
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-text">加载失败</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Review skill
+        async function reviewSkill(skillId, action) {
+            let comment = null;
+
+            if (action === 'reject') {
+                comment = prompt('请输入拒绝原因（可选）:');
+                if (comment === null) return; // User cancelled
+            }
+
+            try {
+                const response = await fetch(`/api/review/${skillId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        comment: comment
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show success message
+                    showMessage(result.message, 'success');
+
+                    // Remove row from table
+                    const row = document.querySelector(`tr[data-skill-id="${skillId}"]`);
+                    if (row) {
+                        row.style.opacity = '0.5';
+                        setTimeout(() => row.remove(), 500);
+                    }
+
+                    // Check if table is empty
+                    const tbody = document.querySelector('#pendingContent tbody');
+                    if (tbody && tbody.children.length === 0) {
+                        loadPendingSkills();
+                    }
+                } else {
+                    showMessage('操作失败: ' + (result.detail || '未知错误'), 'error');
+                }
+
+            } catch (error) {
+                console.error('Review failed:', error);
+                showMessage('操作失败: ' + error.message, 'error');
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            const content = document.getElementById('statsContent');
+
+            try {
+                // Load pending count
+                const pendingResponse = await fetch('/api/pending');
+                const pendingResult = await pendingResponse.json();
+                const pendingCount = pendingResult.count || 0;
+
+                // Load download stats
+                const statsResponse = await fetch('/api/stats/top');
+                const statsResult = await statsResponse.json();
+                const totalDownloads = statsResult.total_downloads || 0;
+                const rankings = statsResult.rankings || [];
+
+                content.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">待审核技能</div>
+                            <div class="stat-value">${pendingCount}</div>
+                            <div class="stat-description">等待管理员审核</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">总下载次数</div>
+                            <div class="stat-value">${totalDownloads}</div>
+                            <div class="stat-description">所有技能的累计下载</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">可用技能</div>
+                            <div class="stat-value">${rankings.length}</div>
+                            <div class="stat-description">已发布的技能数量</div>
+                        </div>
+                    </div>
+
+                    <div class="top-skills-table">
+                        <h3 style="font-size: 18px; font-weight: 500; margin-bottom: 16px; color: #171717;">
+                            下载排行 Top 10
+                        </h3>
+                        ${renderTopSkillsTable(rankings.slice(0, 10))}
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-text">加载失败</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderTopSkillsTable(rankings) {
+            if (rankings.length === 0) {
+                return '<div class="empty-state"><div class="empty-state-text">暂无数据</div></div>';
+            }
+
+            return `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">排名</th>
+                            <th>Skill 名称</th>
+                            <th>作者</th>
+                            <th>下载次数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rankings.map((item, index) => `
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 600; color: #667eea;">
+                                        #${index + 1}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="skill-name">${item.skill_name}</div>
+                                </td>
+                                <td>
+                                    <div class="uploader-id">${item.author || '未知'}</div>
+                                </td>
+                                <td>
+                                    <div style="font-weight: 500; color: #2563eb;">
+                                        ${item.downloads}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+
+            const tabContent = document.querySelector('.tab-content');
+            tabContent.insertBefore(messageDiv, tabContent.firstChild);
+
+            setTimeout(() => messageDiv.remove(), 5000);
+        }
+
+        // Load pending skills on page load
+        document.addEventListener('DOMContentLoaded', loadPendingSkills);
+    </script>
+</body>
+</html>
