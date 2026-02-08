@@ -10,7 +10,7 @@ import os
 import tempfile
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 import logging
 
 logger = logging.getLogger(__name__)
@@ -308,3 +308,82 @@ class GiteaClient:
                 raise NetworkError(f"Git push network error: {stderr}")
             else:
                 raise GiteaError(f"Git push failed: {stderr}")
+
+    def push_with_retry(self, skill_zip: Path, skill_name: str,
+                       version: str, max_retries: int = 3) -> Dict:
+        """Push skill to Gitea with retry logic.
+
+        Args:
+            skill_zip: Path to skill ZIP file
+            skill_name: Name of the skill
+            version: Version string
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            Dict with success status, commit_hash, folder, or error
+        """
+        import time
+
+        last_error = None
+        retry_intervals = [1, 5, 30]  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Push attempt {attempt + 1}/{max_retries} for {skill_name}-{version}")
+
+                # Clone or pull repository
+                repo_path = self.clone_or_pull_repo()
+
+                # Extract skill to versioned folder
+                folder = self.add_skill_folder(
+                    repo_path,
+                    skill_zip,
+                    skill_name,
+                    version
+                )
+
+                # Commit and push
+                commit_hash = self.commit_and_push(
+                    repo_path,
+                    f"feat: add {skill_name}-{version}"
+                )
+
+                logger.info(f"Successfully pushed {skill_name}-{version} at {commit_hash[:8]}")
+
+                return {
+                    "success": True,
+                    "commit_hash": commit_hash,
+                    "folder": folder
+                }
+
+            except (AuthenticationError, RepositoryNotFoundError, GitConflictError) as e:
+                # Fatal errors - don't retry
+                logger.error(f"Fatal error pushing {skill_name}-{version}: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "fatal": True
+                }
+
+            except NetworkError as e:
+                # Retryable error
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = retry_intervals[min(attempt, len(retry_intervals) - 1)]
+                    logger.warning(f"Network error, retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Failed after {max_retries} attempts: {e}")
+
+            except Exception as e:
+                # Unknown error
+                last_error = e
+                logger.error(f"Unexpected error: {e}")
+                break
+
+        # All retries failed
+        return {
+            "success": False,
+            "error": str(last_error),
+            "fatal": False
+        }

@@ -188,6 +188,47 @@ def test_commit_and_push(monkeypatch):
         assert call_count[0] == 3  # add, commit, push
 
 
+def test_push_with_retry_success_on_third_attempt(monkeypatch):
+    """Test that push_with_retry retries on network errors"""
+    import time
+    import tempfile
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token")
+
+    client = GiteaClient()
+
+    attempt = [0]
+    def mock_push(*args, **kwargs):
+        attempt[0] += 1
+        if attempt[0] < 3:
+            # Simulate network error on first 2 attempts
+            raise NetworkError("Network timeout")
+        else:
+            # Third attempt succeeds - don't raise, method completes normally
+            return None
+
+    # Mock the actual push operation
+    monkeypatch.setattr(client, "clone_or_pull_repo", lambda: Path("/tmp/repo"))
+    monkeypatch.setattr(client, "add_skill_folder", lambda *args: "test-1.0.0")
+    monkeypatch.setattr(client, "commit_and_push", mock_push)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_zip = Path(tmpdir) / "test.zip"
+        test_zip.touch()
+
+        result = client.push_with_retry(
+            test_zip,
+            "test",
+            "1.0.0",
+            max_retries=3
+        )
+
+        assert result["success"] is True
+        assert result["commit_hash"] is None  # Since our mock returns None
+        assert result["folder"] == "test-1.0.0"
+
+
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])
