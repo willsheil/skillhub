@@ -7,6 +7,7 @@ Claude Code Skill Registry - Private Marketplace Server
 from dotenv import load_dotenv
 load_dotenv()
 
+import asyncio
 import json
 import logging
 import os
@@ -43,9 +44,6 @@ from database import (
     get_top_skills_by_downloads, get_top_users_by_downloads
 )
 
-# Initialize database on startup
-init_db()
-
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -64,6 +62,38 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 # Static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+# Startup and shutdown event handlers
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and start background services."""
+    # Initialize database
+    init_db()
+
+    # Start Gitea push service if configured
+    if os.getenv("GITEA_REPO_URL"):
+        try:
+            from gitea_push_service import GiteaPushService
+
+            push_service = GiteaPushService(
+                interval=int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
+            )
+
+            # Start service in background
+            asyncio.create_task(push_service.run())
+
+            logger.info("Gitea push service started")
+        except Exception as e:
+            logger.error(f"Failed to start Gitea push service: {e}")
+    else:
+        logger.info("Gitea integration disabled (GITEA_REPO_URL not set)")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    logger.info("Shutting down...")
 
 
 def require_auth(request: Request):
