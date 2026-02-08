@@ -485,6 +485,11 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Web UI - Display all skills."""
+    # Check if user is authenticated
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=302)
+
     plugins = scan_plugins()
 
     # Get current user if authenticated
