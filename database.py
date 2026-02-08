@@ -20,6 +20,54 @@ DB_CONFIG = {
 }
 
 
+class ConnectionWrapper:
+    """Wrapper to provide execute() method on PyMySQL connections.
+
+    PyMySQL doesn't support conn.execute() directly, requiring cursor.execute().
+    This wrapper provides compatibility with code that expects execute() on the connection.
+    """
+
+    def __init__(self, conn):
+        """Initialize wrapper with a PyMySQL connection.
+
+        Args:
+            conn: PyMySQL connection object
+        """
+        self._conn = conn
+
+    def execute(self, query, params=None):
+        """Execute a query using a cursor.
+
+        Args:
+            query: SQL query string
+            params: Optional parameters for the query
+
+        Returns:
+            Cursor object with results
+        """
+        cursor = self._conn.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        return cursor
+
+    def commit(self):
+        """Commit the current transaction."""
+        self._conn.commit()
+
+    def __getattr__(self, name):
+        """Delegate all other attributes to the underlying connection.
+
+        Args:
+            name: Attribute name
+
+        Returns:
+            Attribute from the underlying connection
+        """
+        return getattr(self._conn, name)
+
+
 def migrate_add_user_id_to_downloads():
     """Migrate downloads table to add user_id column if it doesn't exist.
 
@@ -118,7 +166,7 @@ def get_connection():
     """Get database connection context manager."""
     conn = pymysql.connect(**DB_CONFIG)
     try:
-        yield conn
+        yield ConnectionWrapper(conn)
     finally:
         conn.close()
 
