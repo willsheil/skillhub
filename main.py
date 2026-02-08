@@ -549,6 +549,11 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
         ZIP file with installer scripts included (by default)
         or original ZIP if raw=True
     """
+    # Require authentication
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/admin/login", status_code=302)
+
     file_path = PLUGINS_DIR / filename
 
     if not file_path.exists():
@@ -571,7 +576,8 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
             version=version,
             filename=filename,
             ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            user_id=user_id
         )
     except Exception as e:
         # Log error but don't block download
