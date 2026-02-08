@@ -21,7 +21,7 @@ MYSQL_CONFIG = {
     'port': 3306,
     'user': 'root',
     'password': 'root',
-    'database': 'skill',
+    'database': 'skills',
     'charset': 'utf8mb4'
 }
 

@@ -4,7 +4,7 @@
 
 - Conda 环境：a2a.mysql
 - MySQL 服务器：127.0.0.1:3306
-- 数据库名：skill
+- 数据库名：skills
 - 用户：root（有完整权限）
 
 ## 迁移步骤

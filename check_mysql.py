@@ -16,17 +16,17 @@ try:
     )
     print("Connected to MySQL server successfully!")
 
-    # Check if Skill database exists
+    # Check if skills database exists
     cursor = conn.cursor()
-    cursor.execute("SHOW DATABASES LIKE 'Skill'")
+    cursor.execute("SHOW DATABASES LIKE 'skills'")
     result = cursor.fetchone()
 
     if result:
-        print("Database 'Skill' already exists.")
+        print("Database 'skills' already exists.")
     else:
-        print("Creating database 'Skill'...")
-        cursor.execute("CREATE DATABASE Skill CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-        print("Database 'Skill' created successfully!")
+        print("Creating database 'skills'...")
+        cursor.execute("CREATE DATABASE skills CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+        print("Database 'skills' created successfully!")
 
     cursor.close()
     conn.close()
