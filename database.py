@@ -197,7 +197,12 @@ def init_db():
 
 
 def migrate_gitea_push_tasks():
-    """Create gitea_push_tasks table if not exists."""
+    """Migrate database to add gitea_push_tasks table and skills.latest_push_task_id column.
+
+    Creates the gitea_push_tasks table for tracking async push operations
+    and adds a foreign key column to the skills table for tracking the latest
+    push task. This should be called AFTER the skills table is created.
+    """
     with get_connection() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS gitea_push_tasks (
@@ -218,6 +223,8 @@ def migrate_gitea_push_tasks():
                 INDEX idx_status_created (status, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+        conn.commit()
+        print("Migration: gitea_push_tasks table created")
 
         # Add column to skills table if not exists
         cursor = conn._conn.cursor()
@@ -226,9 +233,10 @@ def migrate_gitea_push_tasks():
 
         if "latest_push_task_id" not in columns:
             conn.execute("ALTER TABLE skills ADD COLUMN latest_push_task_id INT NULL")
-
-        conn.commit()
-        print("Migration: gitea_push_tasks table created")
+            conn.commit()
+            print("Migration: Added latest_push_task_id column to skills table")
+        else:
+            print("Migration: latest_push_task_id column already exists in skills table")
 
 
 @contextmanager
