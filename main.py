@@ -1053,6 +1053,64 @@ async def api_review_skill(
         )
 
 
+@app.get("/api/user/downloads")
+async def api_user_downloads(
+    request: Request,
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
+    _: bool = Depends(require_auth)
+):
+    """Get the current user's download history with pagination.
+
+    Query parameters:
+    - page: Page number (default: 1, min: 1)
+    - per_page: Items per page (default: 20, min: 1, max: 100)
+
+    Returns paginated list of downloads for the authenticated user.
+    """
+    try:
+        # Get current user
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Calculate offset from page number
+        offset = (page - 1) * per_page
+
+        # Get user downloads from database
+        result = get_user_downloads(
+            user_id=user_id,
+            limit=per_page,
+            offset=offset
+        )
+
+        # Calculate pagination metadata
+        total = result["total"]
+        total_pages = (total + per_page - 1) // per_page
+
+        return {
+            "success": True,
+            "data": result["downloads"],
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch downloads: {str(e)}"
+        )
+
+
 @app.get("/api/user/uploads")
 async def api_user_uploads(
     request: Request,
