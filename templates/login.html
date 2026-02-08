@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Skill Registry</title>
+    <title>用户登录 - Skill Registry</title>
     <style>
         * {
             margin: 0;
@@ -29,8 +29,14 @@
         h1 {
             text-align: center;
             color: #333;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
             font-size: 24px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
         }
         .form-group {
             margin-bottom: 20px;
@@ -78,6 +84,7 @@
             border-radius: 5px;
             margin-bottom: 20px;
             text-align: center;
+            font-size: 14px;
         }
         .back-link {
             text-align: center;
@@ -90,27 +97,47 @@
         .back-link a:hover {
             text-decoration: underline;
         }
+        .info-text {
+            background: #f0f7ff;
+            color: #036;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h1>Admin Login</h1>
+        <h1>用户登录</h1>
+        <p class="subtitle">Skill 应用商店</p>
+
         {% if error %}
-        <div class="error">Invalid username or password</div>
+        <div class="error">{{ error }}</div>
         {% endif %}
-        <form method="post" action="/admin/login">
+
+        <div class="info-text">
+            请输入您的工号和 API 密钥登录系统。<br>
+            如需账号，请联系管理员。
+        </div>
+
+        <form method="post" action="/api/login">
             <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autofocus>
+                <label for="employee_id">工号</label>
+                <input type="text" id="employee_id" name="employee_id" required autofocus
+                       placeholder="例如: w00545471">
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <label for="api_key">API 密钥</label>
+                <input type="password" id="api_key" name="api_key" required
+                       placeholder="请输入您的 API 密钥">
             </div>
-            <button type="submit">Login</button>
+            <button type="submit">登录</button>
         </form>
+
         <div class="back-link">
-            <a href="/">Back to Home</a>
+            <a href="/">返回首页</a>
         </div>
     </div>
 </body>
