@@ -39,6 +39,7 @@
             container.innerHTML = data.data.map(task => `
                 <div class="task status-${task.status}">
                     <h3>${task.skill_name}-${task.version}</h3>
+                    <p>Uploaded by: ${task.uploader_name || 'Unknown'}</p>
                     <p>Status: ${task.status}</p>
                     <p>Created: ${task.created_at}</p>
                     ${task.error_message ? `<p>Error: ${task.error_message}</p>` : ''}
