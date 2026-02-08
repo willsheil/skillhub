@@ -2,14 +2,21 @@
 Database module for download statistics.
 """
 
-import sqlite3
+import pymysql
 import json
 from pathlib import Path
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
 
-DB_PATH = Path("./data/registry.db")
+DB_CONFIG = {
+    'host': '127.0.0.1',
+    'user': 'root',
+    'password': 'root',
+    'database': 'Skill',
+    'charset': 'utf8mb4',
+    'cursorclass': pymysql.cursors.DictCursor
+}
 
 
 def migrate_add_user_id_to_downloads():
@@ -19,12 +26,12 @@ def migrate_add_user_id_to_downloads():
     the table exists before attempting to add the column.
     """
     with get_connection() as conn:
-        # Check if user_id column already exists
-        cursor = conn.execute("PRAGMA table_info(downloads)")
-        columns = [row["name"] for row in cursor.fetchall()]
+        # Check if user_id column already exists using DESCRIBE
+        cursor = conn.execute("DESCRIBE downloads")
+        columns = [row["Field"] for row in cursor.fetchall()]
 
         if "user_id" not in columns:
-            conn.execute("ALTER TABLE downloads ADD COLUMN user_id INTEGER")
+            conn.execute("ALTER TABLE downloads ADD COLUMN user_id INT")
             conn.commit()
             print("Migration: Added user_id column to downloads table")
         else:
@@ -33,18 +40,17 @@ def migrate_add_user_id_to_downloads():
 
 def init_db():
     """Initialize database and create tables."""
-    DB_PATH.parent.mkdir(exist_ok=True)
-
     with get_connection() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS downloads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                skill_name TEXT NOT NULL,
-                version TEXT NOT NULL,
-                filename TEXT NOT NULL,
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                skill_name VARCHAR(255) NOT NULL,
+                version VARCHAR(50) NOT NULL,
+                filename VARCHAR(255) NOT NULL,
                 downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                ip_address TEXT,
-                user_agent TEXT
+                ip_address VARCHAR(255),
+                user_agent VARCHAR(255),
+                user_id INT
             )
         """)
 
@@ -56,12 +62,12 @@ def init_db():
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                employee_id TEXT UNIQUE NOT NULL,
-                api_key TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'user',
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                employee_id VARCHAR(20) UNIQUE NOT NULL,
+                api_key VARCHAR(255) NOT NULL,
+                role VARCHAR(20) NOT NULL DEFAULT 'user',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP
+                last_login TIMESTAMP NULL
             )
         """)
 
@@ -73,16 +79,16 @@ def init_db():
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS skills (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                skill_name TEXT NOT NULL,
-                version TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                uploader_id INTEGER NOT NULL,
-                status TEXT,
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                skill_name VARCHAR(255) NOT NULL,
+                version VARCHAR(50) NOT NULL,
+                filename VARCHAR(255) NOT NULL,
+                uploader_id INT NOT NULL,
+                status VARCHAR(20),
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                reviewed_at TIMESTAMP,
-                reviewer_id INTEGER,
-                review_comment TEXT,
+                reviewed_at TIMESTAMP NULL,
+                reviewer_id INT,
+                review_comment VARCHAR(255),
                 FOREIGN KEY (uploader_id) REFERENCES users(id),
                 FOREIGN KEY (reviewer_id) REFERENCES users(id)
             )
@@ -109,8 +115,7 @@ def init_db():
 @contextmanager
 def get_connection():
     """Get database connection context manager."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = pymysql.connect(**DB_CONFIG)
     try:
         yield conn
     finally:
@@ -142,7 +147,7 @@ def record_download(
         cursor = conn.execute(
             """
             INSERT INTO downloads (skill_name, version, filename, ip_address, user_agent, user_id)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (skill_name, version, filename, ip_address, user_agent, user_id)
         )
@@ -176,7 +181,7 @@ def get_download_stats(
         total_row = conn.execute(
             """
             SELECT COUNT(*) as total FROM downloads
-            WHERE date(downloaded_at) BETWEEN ? AND ?
+            WHERE DATE(downloaded_at) BETWEEN %s AND %s
             """,
             (start_date.isoformat(), end_date.isoformat())
         ).fetchone()
@@ -191,7 +196,7 @@ def get_download_stats(
                 skill_name,
                 COUNT(*) as download_count
             FROM downloads
-            WHERE date(downloaded_at) BETWEEN ? AND ?
+            WHERE DATE(downloaded_at) BETWEEN %s AND %s
             GROUP BY skill_name
             ORDER BY download_count DESC
             """,
@@ -259,7 +264,7 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
             """
             SELECT id, employee_id, api_key, role, created_at, last_login
             FROM users
-            WHERE employee_id = ? AND api_key = ?
+            WHERE employee_id = %s AND api_key = %s
             """,
             (employee_id, api_key)
         ).fetchone()
@@ -290,7 +295,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
             """
             SELECT id, employee_id, api_key, role, created_at, last_login
             FROM users
-            WHERE id = ?
+            WHERE id = %s
             """,
             (user_id,)
         ).fetchone()
@@ -318,7 +323,7 @@ def update_last_login(user_id: int) -> None:
             """
             UPDATE users
             SET last_login = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE id = %s
             """,
             (user_id,)
         )
@@ -348,7 +353,7 @@ def create_skill_record(
         cursor = conn.execute(
             """
             INSERT INTO skills (skill_name, version, filename, uploader_id, status)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (skill_name, version, filename, uploader_id, status)
         )
@@ -426,7 +431,7 @@ def get_skill_by_id(skill_id: int) -> Optional[Dict[str, Any]]:
                 reviewer_id,
                 review_comment
             FROM skills
-            WHERE id = ?
+            WHERE id = %s
             """,
             (skill_id,)
         ).fetchone()
@@ -465,11 +470,11 @@ def update_skill_status(
         conn.execute(
             """
             UPDATE skills
-            SET status = ?,
+            SET status = %s,
                 reviewed_at = CURRENT_TIMESTAMP,
-                reviewer_id = ?,
-                review_comment = ?
-            WHERE id = ?
+                reviewer_id = %s,
+                review_comment = %s
+            WHERE id = %s
             """,
             (status, reviewer_id, comment, skill_id)
         )
@@ -500,7 +505,7 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
                 reviewer_id,
                 review_comment
             FROM skills
-            WHERE uploader_id = ?
+            WHERE uploader_id = %s
             """,
             (user_id,)
         ).fetchall()
@@ -557,8 +562,8 @@ def get_user_downloads(
         total_row = conn.execute(
             """
             SELECT COUNT(*) as total FROM downloads
-            WHERE user_id = ?
-              AND date(downloaded_at) BETWEEN ? AND ?
+            WHERE user_id = %s
+              AND DATE(downloaded_at) BETWEEN %s AND %s
             """,
             (user_id, start_date.isoformat(), end_date.isoformat())
         ).fetchone()
@@ -577,10 +582,10 @@ def get_user_downloads(
                 ip_address,
                 user_agent
             FROM downloads
-            WHERE user_id = ?
-              AND date(downloaded_at) BETWEEN ? AND ?
+            WHERE user_id = %s
+              AND DATE(downloaded_at) BETWEEN %s AND %s
             ORDER BY downloaded_at DESC
-            LIMIT ? OFFSET ?
+            LIMIT %s OFFSET %s
             """,
             (user_id, start_date.isoformat(), end_date.isoformat(), limit, offset)
         ).fetchall()
@@ -627,7 +632,7 @@ def get_skills_count_by_status(status: str) -> int:
     """
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT COUNT(*) as count FROM skills WHERE status = ?",
+            "SELECT COUNT(*) as count FROM skills WHERE status = %s",
             (status,)
         ).fetchone()
         return row["count"] if row else 0
@@ -643,7 +648,7 @@ def get_today_downloads_count() -> int:
         row = conn.execute(
             """
             SELECT COUNT(*) as count FROM downloads
-            WHERE date(downloaded_at) = date('now')
+            WHERE DATE(downloaded_at) = CURDATE()
             """
         ).fetchone()
         return row["count"] if row else 0
@@ -667,7 +672,7 @@ def get_top_skills_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
             FROM downloads
             GROUP BY skill_name
             ORDER BY download_count DESC
-            LIMIT ?
+            LIMIT %s
             """,
             (limit,)
         ).fetchall()
@@ -702,7 +707,7 @@ def get_top_users_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
             LEFT JOIN downloads d ON u.id = d.user_id
             GROUP BY u.id
             ORDER BY download_count DESC
-            LIMIT ?
+            LIMIT %s
             """,
             (limit,)
         ).fetchall()
@@ -733,7 +738,7 @@ def create_user(employee_id: str, api_key: str, role: str = "user") -> int:
         cursor = conn.execute(
             """
             INSERT INTO users (employee_id, api_key, role)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
             """,
             (employee_id, api_key, role)
         )
