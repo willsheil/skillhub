@@ -59,7 +59,7 @@ def init_db():
                 version TEXT NOT NULL,
                 filename TEXT NOT NULL,
                 uploader_id INTEGER NOT NULL,
-                status TEXT DEFAULT 'pending',
+                status TEXT,
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 reviewed_at TIMESTAMP,
                 reviewer_id INTEGER,
@@ -299,7 +299,7 @@ def create_skill_record(
     version: str,
     filename: str,
     uploader_id: int,
-    status: str = 'pending'
+    status: str
 ) -> int:
     """Create a skill record.
 
@@ -308,7 +308,7 @@ def create_skill_record(
         version: The version of the skill
         filename: The filename of the skill
         uploader_id: The ID of the user uploading the skill
-        status: The status of the skill (default: 'pending')
+        status: The status of the skill
 
     Returns:
         The ID of the inserted record
@@ -349,7 +349,6 @@ def get_pending_skills() -> List[Dict[str, Any]]:
             FROM skills s
             JOIN users u ON s.uploader_id = u.id
             WHERE s.status = 'pending'
-            ORDER BY s.uploaded_at DESC
             """
         ).fetchall()
 
@@ -471,7 +470,6 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
                 review_comment
             FROM skills
             WHERE uploader_id = ?
-            ORDER BY uploaded_at DESC
             """,
             (user_id,)
         ).fetchall()
