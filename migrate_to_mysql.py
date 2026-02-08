@@ -88,26 +88,50 @@ def create_mysql_tables():
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             """)
 
-            # Create indexes
+            # Create indexes (check if exists first)
+            # Check and create idx_users_employee_id
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_users_employee_id
-                ON users(employee_id)
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'users' AND index_name = 'idx_users_employee_id'
             """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_users_employee_id
+                    ON users(employee_id)
+                """)
 
+            # Check and create idx_downloads_skill_date
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_downloads_skill_date
-                ON downloads(skill_name, downloaded_at)
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'downloads' AND index_name = 'idx_downloads_skill_date'
             """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_downloads_skill_date
+                    ON downloads(skill_name, downloaded_at)
+                """)
 
+            # Check and create idx_skills_status
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_skills_status
-                ON skills(status)
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'skills' AND index_name = 'idx_skills_status'
             """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_skills_status
+                    ON skills(status)
+                """)
 
+            # Check and create idx_skills_uploader
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_skills_uploader
-                ON skills(uploader_id)
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'skills' AND index_name = 'idx_skills_uploader'
             """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_skills_uploader
+                    ON skills(uploader_id)
+                """)
 
         conn.commit()
         print("  Tables created successfully!")
