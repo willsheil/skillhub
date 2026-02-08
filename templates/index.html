@@ -118,6 +118,12 @@
             z-index: 99;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
         .header-title {
             font-size: 16px;
             font-weight: 500;
@@ -127,6 +133,59 @@
         .header-stats {
             font-size: 14px;
             color: #64748b;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-welcome {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .user-welcome strong {
+            color: #171717;
+            font-weight: 500;
+        }
+
+        .nav-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.15s ease;
+        }
+
+        .nav-link:hover {
+            background: #f3f4f6;
+        }
+
+        .login-prompt {
+            font-size: 14px;
+            color: #64748b;
+            padding: 6px 12px;
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+
+        .login-prompt a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .login-prompt a:hover {
+            text-decoration: underline;
         }
 
         /* Fixed Toolbar (shown when items selected) */
@@ -596,9 +655,27 @@
     <div class="main-wrapper">
         <!-- Fixed Header -->
         <div class="fixed-header">
-            <div class="header-title">技能列表</div>
-            <div class="header-stats">
-                <span id="headerStats">{{ plugin_count }} 个技能</span>
+            <div class="header-left">
+                <div class="header-title">技能列表</div>
+                <div class="header-stats">
+                    <span id="headerStats">{{ plugin_count }} 个技能</span>
+                </div>
+            </div>
+            <div class="header-right">
+                {% if user %}
+                <div class="user-info">
+                    <span class="user-welcome">欢迎, <strong>{{ user.employee_id }}</strong></span>
+                    {% if user.role == 'admin' %}
+                    <a href="/admin" class="nav-link">管理后台</a>
+                    {% endif %}
+                    <a href="/upload" class="nav-link">上传</a>
+                    <a href="/logout" class="nav-link">退出</a>
+                </div>
+                {% else %}
+                <div class="login-prompt">
+                    <a href="/login">登录后下载</a>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -815,7 +892,8 @@
             filteredSkills = allSkills.filter(skill => {
                 const name = (skill.metadata?.name || skill.name).toLowerCase();
                 const description = (skill.metadata?.description || '').toLowerCase();
-                const author = (skill.metadata?.author?.name || '').toLowerCase();
+                // Author is now in metadata.metadata.author per Agent Skills spec
+                const author = (skill.metadata?.metadata?.author || '').toLowerCase();
 
                 return name.includes(query) ||
                        description.includes(query) ||
@@ -875,7 +953,7 @@
                         </div>
                     </td>
                     <td>
-                        <div class="author">${skill.metadata?.author?.name || '未知'}</div>
+                        <div class="author">${skill.metadata?.metadata?.author || '未知'}</div>
                     </td>
                 </tr>
             `).join('');

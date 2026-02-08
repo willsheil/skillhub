@@ -485,11 +485,15 @@ async def index(request: Request):
     """Web UI - Display all skills."""
     plugins = scan_plugins()
 
+    # Get current user if authenticated
+    user = get_current_user(request)
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "plugins": plugins,
         "registry_name": "Private Skill Registry",
-        "plugin_count": len(plugins)
+        "plugin_count": len(plugins),
+        "user": user
     })
 
 
@@ -633,13 +637,23 @@ async def api_skills(page: int = 1, per_page: int = 1000):
     }
 
 
-@app.get("/admin/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: str = None):
-    """Display login page."""
+@app.get("/login", response_class=HTMLResponse)
+async def user_login_page(request: Request, error: str = None):
+    """Display user login page."""
+    error_msg = None
+    if error == "invalid":
+        error_msg = "工号或 API 密钥错误"
+
     return templates.TemplateResponse("login.html", {
         "request": request,
-        "error": error
+        "error": error_msg
     })
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: str = None):
+    """Display admin login page (legacy, redirects to user login)."""
+    return RedirectResponse(url="/login", status_code=302)
 
 
 @app.post("/admin/login")
@@ -676,18 +690,14 @@ async def api_login(
         # Update last login
         update_last_login(user["id"])
 
-        return {
-            "success": True,
-            "message": "Login successful",
-            "user": {
-                "id": user["id"],
-                "employee_id": user["employee_id"],
-                "role": user["role"]
-            }
-        }
+        # Redirect based on role
+        if user["role"] == "admin":
+            return RedirectResponse(url="/admin", status_code=302)
+        else:
+            return RedirectResponse(url="/upload", status_code=302)
     else:
         return RedirectResponse(
-            url="/admin/login?error=invalid",
+            url="/login?error=invalid",
             status_code=302
         )
 
@@ -723,13 +733,53 @@ async def api_me(request: Request):
     }
 
 
-@app.get("/admin/upload", response_class=HTMLResponse)
-async def upload_page(request: Request, _: bool = Depends(require_auth)):
-    """Display upload page (requires auth)."""
-    return templates.TemplateResponse("admin_upload.html", {
+@app.get("/upload", response_class=HTMLResponse)
+async def user_upload_page(request: Request):
+    """Display user upload page (requires auth)."""
+    # Get current user
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    return templates.TemplateResponse("upload.html", {
         "request": request,
+        "user": user,
         "success": None,
         "error": None
+    })
+
+
+@app.get("/admin/upload", response_class=HTMLResponse)
+async def upload_page(request: Request, _: bool = Depends(require_auth)):
+    """Display admin upload page (requires auth)."""
+    user = get_current_user(request)
+
+    return templates.TemplateResponse("admin_upload.html", {
+        "request": request,
+        "user": user,
+        "success": None,
+        "error": None
+    })
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    """Display admin dashboard (requires admin)."""
+    # Get current user
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Check admin role
+    if user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "user": user
     })
 
 
@@ -1165,11 +1215,10 @@ async def upload_plugin(
 
     # Validate file extension
     if not file.filename or not file.filename.endswith('.zip'):
-        return templates.TemplateResponse("admin_upload.html", {
-            "request": request,
-            "success": None,
-            "error": "Only ZIP files are allowed"
-        })
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only ZIP files are allowed"
+        )
 
     # Save uploaded file to temp location
     temp_dir = tempfile.mkdtemp()
@@ -1183,11 +1232,19 @@ async def upload_plugin(
         is_valid, result = validate_skill_zip(temp_zip)
 
         if not is_valid:
-            return templates.TemplateResponse("admin_upload.html", {
-                "request": request,
-                "success": None,
-                "error": f"Validation failed: {result.get('error', 'Unknown error')}"
-            })
+            error_msg = result.get('error', 'Unknown error')
+            # Return HTML error for admin_upload page
+            if "admin" in request.headers.get("referer", ""):
+                return templates.TemplateResponse("admin_upload.html", {
+                    "request": request,
+                    "success": None,
+                    "error": f"Validation failed: {error_msg}"
+                })
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Validation failed: {error_msg}"
+                )
 
         # Save the skill ZIP to pending directory
         skill_name = result["name"]
@@ -1208,18 +1265,45 @@ async def upload_plugin(
             status='pending'
         )
 
-        return templates.TemplateResponse("admin_upload.html", {
-            "request": request,
-            "success": f"Successfully uploaded {result['name']}@{result['version']} (pending approval)",
-            "error": None
-        })
+        # Return HTML success for admin_upload page
+        if "admin" in request.headers.get("referer", ""):
+            return templates.TemplateResponse("admin_upload.html", {
+                "request": request,
+                "success": f"Successfully uploaded {result['name']}@{result['version']} (pending approval)",
+                "error": None
+            })
+        else:
+            # For AJAX requests from upload page, return simple HTML that can be parsed
+            success_msg = f"Successfully uploaded {result['name']}@{result['version']} (pending approval)"
+            html_response = f"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body>
+                <div class="message success">{success_msg}</div>
+                <script>
+                    setTimeout(function() {{ window.location.href = '/upload'; }}, 2000);
+                </script>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_response)
 
+    except HTTPException:
+        raise
     except Exception as e:
-        return templates.TemplateResponse("admin_upload.html", {
-            "request": request,
-            "success": None,
-            "error": f"Upload failed: {str(e)}"
-        })
+        error_msg = f"Upload failed: {str(e)}"
+        if "admin" in request.headers.get("referer", ""):
+            return templates.TemplateResponse("admin_upload.html", {
+                "request": request,
+                "success": None,
+                "error": error_msg
+            })
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=error_msg
+            )
 
     finally:
         # Cleanup
