@@ -3,170 +3,861 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Upload - Skill Registry</title>
+    <title>上传 Skill - Skill Registry</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --background: #fafafa;
+            --foreground: #171717;
+            --card: #ffffff;
+            --card-foreground: #171717;
+            --primary: #f97316;
+            --primary-foreground: #ffffff;
+            --secondary: #f5f5f5;
+            --muted: #f5f5f5;
+            --muted-foreground: #737373;
+            --border: #171717;
+            --ring: #f97316;
+            --radius: 0.75rem;
         }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f7fa;
-            min-height: 100vh;
-            padding: 40px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            line-height: 1.5;
+            font-size: 14px;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 260px;
+            height: 100vh;
+            background: var(--card);
+            border-right: 2px solid var(--border);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
         }
-        h1 {
-            color: #333;
-            margin-bottom: 30px;
-            text-align: center;
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 2px solid var(--border);
         }
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+
+        .sidebar-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.02em;
         }
-        .form-group {
-            margin-bottom: 20px;
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
         }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted-foreground);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            margin: 2px 0;
+            color: var(--foreground);
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.15s ease;
+            font-size: 14px;
             font-weight: 500;
         }
-        input[type="text"],
-        input[type="file"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 5px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+
+        .nav-item:hover {
+            background: var(--secondary);
         }
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
+
+        .nav-item.active {
+            background: var(--primary);
+            color: var(--primary-foreground);
             font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
         }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .success {
-            background: #efe;
-            color: #3c3;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            text-align: center;
+
+        /* Main Content */
+        .main-wrapper {
+            margin-left: 260px;
+            min-height: 100vh;
         }
-        .error {
-            background: #fee;
-            color: #c33;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            text-align: center;
+
+        /* Header */
+        .header {
+            height: 64px;
+            background: var(--card);
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            position: sticky;
+            top: 0;
+            z-index: 40;
         }
-        .nav {
-            text-align: center;
-            margin-top: 20px;
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--foreground);
         }
-        .nav a {
-            color: #667eea;
-            text-decoration: none;
-            margin: 0 10px;
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        .nav a:hover {
-            text-decoration: underline;
+
+        /* Page Content */
+        .page-content {
+            padding: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
-        .info {
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--foreground);
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .page-header p {
+            color: var(--muted-foreground);
+            font-size: 15px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            padding: 24px 24px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-foreground);
+            font-size: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .card-description {
+            color: var(--muted-foreground);
             font-size: 14px;
+            margin-top: 2px;
+        }
+
+        .card-content {
+            padding: 24px;
+        }
+
+        /* Mode Selector */
+        .mode-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            padding: 4px;
+            background: var(--muted);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            width: fit-content;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            border: 2px solid transparent;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--muted-foreground);
+        }
+
+        .mode-btn:hover {
+            color: var(--foreground);
+        }
+
+        .mode-btn.active {
+            background: var(--card);
+            border-color: var(--border);
+            color: var(--foreground);
+            box-shadow: 2px 2px 0 var(--border);
+        }
+
+        /* Upload Section */
+        .upload-section {
+            display: none;
+        }
+
+        .upload-section.active {
+            display: block;
+        }
+
+        /* Dropzone */
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 48px 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 16px;
+            cursor: pointer;
+            background: var(--muted);
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .dropzone:hover {
+            border-color: var(--primary);
+            background: rgba(249, 115, 22, 0.05);
+        }
+
+        .dropzone.dragover {
+            border-color: var(--primary);
+            background: rgba(249, 115, 22, 0.1);
+            border-style: solid;
+        }
+
+        .dropzone-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--primary);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--primary-foreground);
+        }
+
+        .dropzone-text h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .dropzone-text p {
+            font-size: 13px;
+            color: var(--muted-foreground);
+        }
+
+        .dropzone-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* File List */
+        .file-list {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .file-list.show {
+            display: block;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--muted);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: var(--muted-foreground);
+        }
+
+        .file-remove {
+            padding: 6px 12px;
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.15s ease;
+        }
+
+        .file-remove:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 14px 24px;
+            margin-top: 24px;
+            background: var(--foreground);
+            color: var(--background);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background: var(--background);
+            color: var(--foreground);
+            box-shadow: 4px 4px 0 var(--border);
+            transform: translate(-2px, -2px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: #eff6ff;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+
+        .info-box-title {
+            font-weight: 700;
+            color: #1d4ed8;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-box ul {
+            margin-left: 24px;
+            font-size: 13px;
+            color: #1e40af;
+            line-height: 1.8;
+        }
+
+        .info-box code {
+            background: rgba(255,255,255,0.8);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 16px 20px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .alert-icon {
+            font-size: 20px;
+        }
+
+        /* Requirements Grid */
+        .requirements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .requirement-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            background: var(--muted);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .requirement-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .requirement-text h4 {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .requirement-text p {
+            font-size: 13px;
+            color: var(--muted-foreground);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-wrapper {
+                margin-left: 0;
+            }
+
+            .page-content {
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Upload Plugin</h1>
-        <div class="card">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Skill应用商店</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">导航</div>
+                <a href="/" class="nav-item">
+                    <span class="nav-icon">🏠</span>
+                    <span>首页</span>
+                </a>
+                <a href="/install-guide" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>安装指南</span>
+                </a>
+                <a href="/stats" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span>下载统计</span>
+                </a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">管理</div>
+                <a href="/admin/upload" class="nav-item active">
+                    <span class="nav-icon">⬆️</span>
+                    <span>上传 Skill</span>
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-title">上传 Skill</div>
+            <div class="header-actions">
+                <a href="/" style="text-decoration: none; color: var(--foreground); font-weight: 500; font-size: 14px;">← 返回首页</a>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="page-content">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1>上传 Skills</h1>
+                <p>上传新的 Claude Code Skill 到应用商店</p>
+            </div>
+
+            <!-- Alerts -->
             {% if success %}
-            <div class="success">{{ success }}</div>
-            {% endif %}
-            {% if error %}
-            <div class="error">{{ error }}</div>
+            <div class="alert alert-success">
+                <span class="alert-icon">✓</span>
+                <span>{{ success }}</span>
+            </div>
             {% endif %}
 
-            <div class="info">
-                <strong>上传类型：</strong>
-                <ul style="margin: 10px 0 0 20px;">
-                    <li><strong>Skill 集</strong>：包含多个技能的 ZIP 文件（系统会自动提取其中的每个技能）</li>
-                    <li><strong>单个 Skill</strong>：单个技能的 ZIP 文件（需要填写名称和版本）</li>
+            {% if error %}
+            <div class="alert alert-error">
+                <span class="alert-icon">✗</span>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Info Box -->
+            <div class="info-box">
+                <div class="info-box-title">
+                    <span>ℹ️</span>
+                    <span>上传要求 (已更新)</span>
+                </div>
+                <ul>
+                    <li>ZIP 内必须包含 <code>SKILL.md</code>，且包含 YAML 前置内容（<code>name</code>, <code>description</code>）</li>
+                    <li><code>name</code>: 小写字母、数字、连字符，1-64字符（如: <code>pdf-processing</code>）</li>
+                    <li><code>description</code>: 1-1024字符，描述技能功能和何时使用</li>
+                    <li><strong>必填</strong> <code>metadata.version</code>: 版本号（如: <code>1.0.0</code>）</li>
+                    <li><strong>必填</strong> <code>metadata.author</code>: 作者ID，格式为小写字母 + 8位数字（如: <code>w00545471</code>）</li>
+                    <li>文件名格式: <code>{skill-name}.zip</code>（如: <code>my-skill.zip</code>），版本号由 metadata.version 决定</li>
                 </ul>
             </div>
 
-            <form method="post" action="/admin/upload" enctype="multipart/form-data">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="organization">Organization *</label>
-                        <input type="text" id="organization" name="organization" value="default" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="collection">Collection *</label>
-                        <input type="text" id="collection" name="collection" value="default" required>
+            <!-- Upload Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📦</div>
+                    <div>
+                        <div class="card-title">选择上传方式</div>
+                        <div class="card-description">支持单个 Skill 或批量上传多个 Skills</div>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="name">Plugin Name <small style="color: #999; font-weight: normal;">(单个 Skill 时必填)</small></label>
-                        <input type="text" id="name" name="name" placeholder="my-skill">
+                <div class="card-content">
+                    <!-- Mode Selector -->
+                    <div class="mode-selector">
+                        <button type="button" class="mode-btn active" onclick="switchMode('single')">
+                            单个上传
+                        </button>
+                        <button type="button" class="mode-btn" onclick="switchMode('batch')">
+                            批量上传
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label for="version">Version <small style="color: #999; font-weight: normal;">(单个 Skill 时必填)</small></label>
-                        <input type="text" id="version" name="version" placeholder="1.0.0">
+
+                    <!-- Single Upload -->
+                    <div id="single-section" class="upload-section active">
+                        <form method="post" action="/admin/upload" enctype="multipart/form-data" id="single-form">
+                            <div class="dropzone" id="single-dropzone">
+                                <div class="dropzone-icon">📁</div>
+                                <div class="dropzone-text">
+                                    <h3>点击或拖拽文件到这里</h3>
+                                    <p>支持 .zip 格式的 Skill 文件</p>
+                                </div>
+                                <input type="file" name="file" accept=".zip" class="dropzone-input" id="single-file" required>
+                            </div>
+
+                            <div class="file-list" id="single-file-list">
+                                <!-- File will be shown here -->
+                            </div>
+
+                            <button type="submit" class="submit-btn" id="single-submit" disabled>
+                                <span>⬆️</span>
+                                <span>上传 Skill</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Batch Upload -->
+                    <div id="batch-section" class="upload-section">
+                        <form method="post" action="/admin/upload-batch" enctype="multipart/form-data" id="batch-form">
+                            <div class="dropzone" id="batch-dropzone">
+                                <div class="dropzone-icon">📁</div>
+                                <div class="dropzone-text">
+                                    <h3>点击或拖拽多个文件到这里</h3>
+                                    <p>支持批量上传多个 .zip 文件</p>
+                                </div>
+                                <input type="file" name="files" accept=".zip" multiple class="dropzone-input" id="batch-files" required>
+                            </div>
+
+                            <div class="file-list" id="batch-file-list">
+                                <!-- Files will be shown here -->
+                            </div>
+
+                            <button type="submit" class="submit-btn" id="batch-submit" disabled>
+                                <span>⬆️</span>
+                                <span>批量上传 (<span id="file-count">0</span> 个文件)</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
+            </div>
 
-                <div class="form-group">
-                    <label for="file">Plugin File (.zip) *</label>
-                    <input type="file" id="file" name="file" accept=".zip" required>
+            <!-- Requirements Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: #3b82f6;">📋</div>
+                    <div>
+                        <div class="card-title">文件要求</div>
+                        <div class="card-description">确保你的 Skill 包符合以下要求</div>
+                    </div>
                 </div>
-
-                <button type="submit">Upload Plugin / Skill Collection</button>
-            </form>
-        </div>
-
-        <div class="nav">
-            <a href="/">Home</a> |
-            <a href="/admin/logout">Logout</a>
-        </div>
+                <div class="card-content">
+                    <div class="requirements-grid">
+    <div class="requirement-item">
+                            <div class="requirement-icon">📄</div>
+                            <div class="requirement-text">
+                                <h4>SKILL.md</h4>
+                                <p>必须包含 name、description、metadata.version、metadata.author 字段</p>
+                            </div>
+                        </div>
+                        <div class="requirement-item">
+                            <div class="requirement-icon">📦</div>
+                            <div class="requirement-text">
+                                <h4>ZIP 格式</h4>
+                                <p>仅支持 .zip 压缩格式</p>
+                            </div>
+                        </div>
+                        <div class="requirement-item">
+                            <div class="requirement-icon">🏷️</div>
+                            <div class="requirement-text">
+                                <h4>版本与作者</h4>
+                                <p>metadata.version 和 metadata.author 为必填字段，author 格式：字母+8位数字</p>
+                            </div>
+                        </div>
+                        <div class="requirement-item">
+                            <div class="requirement-icon">🔒</div>
+                            <div class="requirement-text">
+                                <h4>文件安全</h4>
+                                <p>不包含恶意代码或敏感信息</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
+
+    <script>
+        // Mode switching
+        function switchMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.upload-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(mode + '-section').classList.add('active');
+        }
+
+        // File size formatter
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Single file handling
+        const singleFile = document.getElementById('single-file');
+        const singleFileList = document.getElementById('single-file-list');
+        const singleSubmit = document.getElementById('single-submit');
+
+        singleFile.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const file = this.files[0];
+                singleFileList.innerHTML = `
+                    <div class="file-item">
+                        <div class="file-icon">📦</div>
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-size">${formatFileSize(file.size)}</div>
+                        </div>
+                        <button type="button" class="file-remove" onclick="clearSingleFile()">移除</button>
+                    </div>
+                `;
+                singleFileList.classList.add('show');
+                singleSubmit.disabled = false;
+            }
+        });
+
+        function clearSingleFile() {
+            singleFile.value = '';
+            singleFileList.innerHTML = '';
+            singleFileList.classList.remove('show');
+            singleSubmit.disabled = true;
+        }
+
+        // Batch files handling
+        const batchFiles = document.getElementById('batch-files');
+        const batchFileList = document.getElementById('batch-file-list');
+        const batchSubmit = document.getElementById('batch-submit');
+        const fileCount = document.getElementById('file-count');
+        let selectedFiles = [];
+
+        batchFiles.addEventListener('change', function() {
+            selectedFiles = Array.from(this.files);
+            updateBatchFileList();
+        });
+
+        function updateBatchFileList() {
+            fileCount.textContent = selectedFiles.length;
+
+            if (selectedFiles.length === 0) {
+                batchFileList.innerHTML = '';
+                batchFileList.classList.remove('show');
+                batchSubmit.disabled = true;
+                return;
+            }
+
+            batchFileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-icon">📦</div>
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                    <button type="button" class="file-remove" onclick="removeBatchFile(${index})">移除</button>
+                </div>
+            `).join('');
+
+            batchFileList.classList.add('show');
+            batchSubmit.disabled = false;
+        }
+
+        function removeBatchFile(index) {
+            selectedFiles.splice(index, 1);
+
+            // Create new FileList
+            const dt = new DataTransfer();
+            selectedFiles.forEach(file => dt.items.add(file));
+            batchFiles.files = dt.files;
+
+            updateBatchFileList();
+        }
+
+        // Drag and drop handling
+        ['single-dropzone', 'batch-dropzone'].forEach(id => {
+            const dropzone = document.getElementById(id);
+
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('dragover');
+            });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('dragover');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+            });
+        });
+
+        // Form validation
+        document.getElementById('single-form').addEventListener('submit', function(e) {
+            if (!singleFile.files.length) {
+                e.preventDefault();
+                alert('请选择一个 ZIP 文件');
+            }
+        });
+
+        document.getElementById('batch-form').addEventListener('submit', function(e) {
+            if (!batchFiles.files.length) {
+                e.preventDefault();
+                alert('请至少选择一个 ZIP 文件');
+                return;
+            }
+
+            for (let file of batchFiles.files) {
+                if (!file.name.endsWith('.zip')) {
+                    e.preventDefault();
+                    alert('所有文件必须是 .zip 格式: ' + file.name);
+                    return;
+                }
+            }
+        });
+    </script>
 </body>
 </html>

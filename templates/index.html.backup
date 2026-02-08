@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ registry_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.2);
+            padding: 15px 25px;
+            border-radius: 8px;
+        }
+
+        .stat-card .number {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .stat-card .label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .usage-info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #667eea;
+        }
+
+        .usage-info h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .usage-info code {
+            background: #f4f4f4;
+            padding: 12px 16px;
+            border-radius: 4px;
+            display: block;
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 10px 0;
+            color: #333;
+        }
+
+        /* Filter section */
+        .filter-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .filter-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-controls select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .filter-controls button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .filter-controls button:hover {
+            background: #5a6fd6;
+        }
+
+        /* Collection section styles */
+        .collection-section {
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .collection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .collection-header h3 {
+            margin: 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .collection-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .collection-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .skill-count {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .install-collection-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .install-collection-btn:hover {
+            background: #5a6fd6;
+        }
+
+        .plugins-table-container {
+            overflow-x: auto;
+        }
+
+        .plugins-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+
+        .plugins-table thead {
+            background: #f8f9fa;
+        }
+
+        .plugins-table th {
+            padding: 14px 20px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 1px solid #e0e0e0;
+            white-space: nowrap;
+        }
+
+        .plugins-table td {
+            padding: 14px 20px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .plugins-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .plugins-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .plugins-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .plugin-collection {
+            display: inline-block;
+            background: #f3e5f5;
+            color: #7b1fa2;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .plugin-name {
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+        }
+
+        .plugin-version {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .plugin-description {
+            color: #666;
+            line-height: 1.5;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .plugin-author {
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .plugin-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-width: 200px;
+        }
+
+        .version-tag {
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: #555;
+            text-decoration: none;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .version-tag:hover {
+            background: #e0e0e0;
+        }
+
+        .version-tag.latest {
+            background: #667eea;
+            color: white;
+        }
+
+        .version-tag.latest:hover {
+            background: #5a6fd6;
+        }
+
+        .install-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .install-btn:hover {
+            background: #45a049;
+        }
+
+        .download-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+            white-space: nowrap;
+            display: inline-block;
+            padding: 6px 12px;
+            background: #f0f4ff;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .download-link:hover {
+            background: #e0e9ff;
+            text-decoration: none;
+        }
+
+        /* Batch operations toolbar */
+        .batch-toolbar {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .batch-toolbar.active {
+            display: flex;
+        }
+
+        .batch-toolbar .selection-info {
+            flex: 1;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .batch-toolbar .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .batch-toolbar .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .batch-toolbar .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .batch-toolbar .btn-secondary {
+            background: #667eea;
+            color: white;
+        }
+
+        .batch-toolbar .btn-secondary:hover {
+            background: #5a6fd6;
+        }
+
+        .batch-toolbar .btn-outline {
+            background: transparent;
+            border: 1px solid #ddd;
+            color: #555;
+        }
+
+        .batch-toolbar .btn-outline:hover {
+            background: #f5f5f5;
+        }
+
+        /* Checkbox styling */
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
+
+        .checkbox-cell input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .plugins-table th:first-child,
+        .plugins-table td:first-child {
+            width: 40px;
+            text-align: center;
+        }
+
+        .no-plugins {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .no-plugins h2 {
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .modal-btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: #5a6fd6;
+        }
+
+        .modal-btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .modal-btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .skill-list {
+            list-style: none;
+        }
+
+        .skill-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .skill-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .skill-list-item input[type="checkbox"] {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .skill-list-item label {
+            flex: 1;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skill-list-item .skill-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .skill-list-item .skill-desc {
+            font-size: 13px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .stats {
+                flex-direction: column;
+            }
+
+            .collection-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+
+            .filter-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-controls select {
+                width: 100%;
+            }
+
+            .plugins-table th,
+            .plugins-table td {
+                padding: 12px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ registry_name }}</h1>
+            <p>内部 Claude Code Skill Registry - 管理和发现团队技能插件</p>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="number">{{ plugin_count }}</div>
+                    <div class="label">可用技能</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">{{ collection_count | default(plugins | map(attribute='collection') | unique | list | length) }}</div>
+                    <div class="label">技能集合</div>
+                </div>
+                <div class="stat-card" style="background: rgba(102, 126, 234, 0.15);">
+                    <div class="number" style="font-size: 1.2em;">
+                        <a href="/install-guide" style="color: white; text-decoration: none;">📖 安装指南</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="usage-info">
+            <h3>安装方法</h3>
+            <p><strong>方式一：单个下载安装</strong></p>
+            <ol style="margin-left: 20px; line-height: 1.8;">
+                <li>勾选需要的技能</li>
+                <li>点击"下载选中技能"或"生成安装脚本"</li>
+            </ol>
+
+            <p style="margin-top: 20px;"><strong>方式二：直接下载安装</strong></p>
+            <ol style="margin-left: 20px; line-height: 1.8;">
+                <li>点击下方表格中的版本号下载 ZIP 文件</li>
+                <li>解压 ZIP 文件到 Claude Code 插件目录：</li>
+            </ol>
+            <code>unzip skill-name-version.zip -d ~/.claude/plugins/skill-name/</code>
+
+            <p style="margin-top: 20px;"><strong>安装后验证</strong></p>
+            <code>/plugin list</code>
+        </div>
+
+        <!-- Batch Operations Toolbar -->
+        <div class="batch-toolbar" id="batchToolbar">
+            <span class="selection-info">已选择 <strong id="selectedCount">0</strong> 个技能</span>
+            <button class="btn btn-primary" onclick="downloadSelected()">⬇️ 下载选中技能</button>
+            <button class="btn btn-outline" onclick="clearSelection()">清除选择</button>
+        </div>
+
+        {% set desc_map = {
+            "No description available": "暂无描述",
+            "No description provided": "暂无描述",
+            "Security audit skill for Python code": "Python代码安全审计技能",
+            "Security audit skill": "安全审计技能",
+            "Code review skill": "代码审查技能",
+            "Code review skill for Python": "Python代码审查技能",
+            "Documentation skill": "文档生成技能",
+            "Testing skill": "测试技能",
+            "Linting skill": "代码检查技能",
+            "Formatting skill": "代码格式化技能",
+            "Git skill": "Git版本控制技能",
+            "CI/CD skill": "持续集成/持续部署技能",
+            "Docker skill": "Docker容器技能",
+            "Kubernetes skill": "Kubernetes编排技能",
+            "Database skill": "数据库技能",
+            "API testing skill": "API测试技能",
+            "Performance testing skill": "性能测试技能"
+        } %}
+
+        {% if plugins %}
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <h3>筛选技能</h3>
+            <div class="filter-controls">
+                <select id="collectionFilter" onchange="filterSkills()">
+                    <option value="">所有集合</option>
+                    {% for coll in plugins | map(attribute='collection') | unique | sort %}
+                    <option value="{{ coll }}">{{ coll }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="clearFilters()">清除筛选</button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Skills grouped by Collection -->
+        {% if not plugins %}
+        <div class="no-plugins">
+            <h2>暂无技能插件</h2>
+            <p>请使用 <a href="/admin/upload">上传页面</a> 添加技能插件</p>
+        </div>
+        {% else %}
+        {% for coll in plugins|map(attribute='collection')|unique|sort %}
+        {% set skills_in_collection = plugins|selectattr('collection', 'equalto', coll)|list %}
+        {% if skills_in_collection %}
+        <div class="collection-section" data-collection="{{ coll }}">
+            <div class="collection-header">
+                <h3>
+                    <span class="collection-name">{{ coll }}</span>
+                </h3>
+                <div class="collection-actions">
+                    <span class="skill-count">{{ skills_in_collection|length }} 个技能</span>
+                </div>
+            </div>
+            <div class="plugins-table-container">
+                <table class="plugins-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAll_{{ coll }}" onchange="toggleSelectAll('{{ coll }}')" style="width: 18px; height: 18px; cursor: pointer;"></th>
+                            <th>集合</th>
+                            <th>技能名称</th>
+                            <th>版本</th>
+                            <th>描述</th>
+                            <th>作者</th>
+                            <th>下载</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plugin in skills_in_collection %}
+                        {% set raw_desc = plugin.metadata.description or "暂无描述" %}
+                        {% set translated_desc = desc_map.get(raw_desc, raw_desc) %}
+                        {% set latest = plugin.versions[-1] %}
+                        <tr data-plugin-name="{{ plugin.name }}" data-collection="{{ plugin.collection }}" data-version="{{ latest.version }}" data-url="/plugins/{{ plugin.collection }}/{{ plugin.name }}/{{ latest.filename }}">
+                            <td class="checkbox-cell">
+                                <input type="checkbox" class="plugin-checkbox" data-collection="{{ coll }}" onchange="updateSelection()">
+                            </td>
+                            <td><span class="plugin-collection">{{ plugin.collection }}</span></td>
+                            <td class="plugin-name">{{ plugin.metadata.name or plugin.name }}</td>
+                            <td><span class="plugin-version">v{{ plugin.latest_version }}</span></td>
+                            <td class="plugin-description" title="{{ raw_desc }}">{{ translated_desc }}</td>
+                            <td class="plugin-author">{{ plugin.metadata.author.name or "未知" }}</td>
+                            <td>
+                                <div class="plugin-actions">
+                                    {% for ver in plugin.versions %}
+                                    <a href="/plugins/{{ plugin.collection }}/{{ plugin.name }}/{{ ver.filename }}"
+                                       class="download-link"
+                                       title="下载 {{ ver.version }} ({{ (ver.size / 1024)|round(1) }} KB)"
+                                       download>
+                                        v{{ ver.version }}
+                                    </a>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+
+        <footer>
+            <p>Private Claude Code Skill Registry | Built with FastAPI</p>
+        </footer>
+    </div>
+
+    <script>
+        // Store all plugins data for JavaScript access
+        const allPlugins = {{ plugins | tojson | safe }};
+
+        function filterSkills() {
+            const collFilter = document.getElementById('collectionFilter').value;
+
+            const sections = document.querySelectorAll('.collection-section');
+            sections.forEach(section => {
+                const coll = section.getAttribute('data-collection');
+
+                const collMatch = !collFilter || coll === collFilter;
+
+                if (collMatch) {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        }
+
+        function clearFilters() {
+            document.getElementById('collectionFilter').value = '';
+            filterSkills();
+        }
+
+        // Toggle all checkboxes in a collection
+        function toggleSelectAll(collection) {
+            const checkbox = document.getElementById('selectAll_' + collection);
+            const checkboxes = document.querySelectorAll(`.plugin-checkbox[data-collection="${collection}"]`);
+
+            checkboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+
+            updateSelection();
+        }
+
+        // Update selection count and show/hide toolbar
+        function updateSelection() {
+            const checkboxes = document.querySelectorAll('.plugin-checkbox:checked');
+            const count = checkboxes.length;
+            const toolbar = document.getElementById('batchToolbar');
+            const countDisplay = document.getElementById('selectedCount');
+
+            countDisplay.textContent = count;
+
+            if (count > 0) {
+                toolbar.classList.add('active');
+            } else {
+                toolbar.classList.remove('active');
+            }
+
+            // Update select all checkboxes state
+            document.querySelectorAll('[id^="selectAll_"]').forEach(selectAll => {
+                const collection = selectAll.id.replace('selectAll_', '');
+                const collectionCheckboxes = document.querySelectorAll(`.plugin-checkbox[data-collection="${collection}"]`);
+                const allChecked = Array.from(collectionCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(collectionCheckboxes).some(cb => cb.checked);
+
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = someChecked && !allChecked;
+            });
+        }
+
+        // Clear all selections
+        function clearSelection() {
+            document.querySelectorAll('.plugin-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+            document.querySelectorAll('[id^="selectAll_"]').forEach(selectAll => {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            });
+            updateSelection();
+        }
+
+        // Get selected plugins
+        function getSelectedPlugins() {
+            const checkboxes = document.querySelectorAll('.plugin-checkbox:checked');
+            const selected = [];
+
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                const plugin = {
+                    name: row.dataset.pluginName,
+                    collection: row.dataset.collection,
+                    version: row.dataset.version,
+                    url: row.dataset.url
+                };
+
+                // Validate required fields
+                if (!plugin.name || !plugin.collection) {
+                    console.error('Invalid plugin data:', plugin);
+                    return;
+                }
+
+                selected.push(plugin);
+            });
+
+            console.log('Selected plugins:', selected);
+            return selected;
+        }
+
+        // Download selected plugins
+        async function downloadSelected() {
+            const selected = getSelectedPlugins();
+
+            if (selected.length === 0) {
+                alert('请先选择要下载的技能');
+                return;
+            }
+
+            const choice = confirm(
+                `已选择 ${selected.length} 个技能\n\n` +
+                `选择下载方式：\n` +
+                `• 确定：打包下载（单个 ZIP 包含所有技能 + 安装脚本）\n` +
+                `• 取消：逐个下载（多个 ZIP 文件）`
+            );
+
+            if (choice) {
+                // Batch download - pack all skills into one ZIP
+                try {
+                    console.log('Sending batch download request:', { skills: selected });
+
+                    const response = await fetch('/api/batch-download', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ skills: selected })
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Server error:', response.status, errorText);
+                        throw new Error(`服务器错误 (${response.status}): ${errorText}`);
+                    }
+
+                    // Download the batch ZIP
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+
+                    // Extract filename from Content-Disposition header or use default
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'skills-batch.zip';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    alert(`✓ 已打包下载 ${selected.length} 个技能\n\n包含：\n• 所有技能的 ZIP 文件\n• 自动安装脚本 install.sh\n• README 说明文档`);
+                } catch (error) {
+                    console.error('Batch download failed:', error);
+                    alert(`打包下载失败：${error.message}\n\n请尝试：\n1. 检查服务器是否运行\n2. 使用"生成安装脚本"功能\n3. 逐个下载`);
+                }
+            } else {
+                // Individual downloads
+                selected.forEach((plugin, index) => {
+                    setTimeout(() => {
+                        const link = document.createElement('a');
+                        link.href = plugin.url;
+                        link.download = `${plugin.name}-${plugin.version}.zip`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }, index * 300); // Delay between downloads
+                });
+
+                alert(`开始下载 ${selected.length} 个技能\n\n请允许浏览器的多文件下载`);
+            }
+        }
+    </script>
+</body>
+</html>

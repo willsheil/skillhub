@@ -1,0 +1,262 @@
+{
+  "name": "private-registry",
+  "owner": {
+    "name": "Internal Registry",
+    "email": "admin@company.local"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Internal Claude Code Skill Registry",
+    "updated_at": "2026-02-02T21:44:14.851762"
+  },
+  "plugins": [
+    {
+      "name": "ask-questions-if-underspecified",
+      "version": "1.0.1",
+      "description": "Clarify requirements before implementing. Do not use automatically, only when invoked explicitly.",
+      "author": {
+        "name": "Kevin Valerio",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/ask-questions-if-underspecified/1.0.1.zip"
+    },
+    {
+      "name": "audit-context-building",
+      "version": "1.0.0",
+      "description": "Build deep architectural context through ultra-granular code analysis before vulnerability hunting",
+      "author": {
+        "name": "Omar Inuwa",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/audit-context-building/1.0.0.zip"
+    },
+    {
+      "name": "auditing-python-security",
+      "version": "1.0.0",
+      "description": "Audits Python code for security vulnerabilities using Bandit, pip-audit, Safety, and detect-secrets. Identifies SQL injection, command injection, hardcoded credentials, weak cryptography, and insecure deserialization.",
+      "author": {
+        "name": "Will McGinnis",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/wdm0006/python-skills"
+      },
+      "source": "/plugins/ICSLBASE/auditing-python-security/1.0.0.zip"
+    },
+    {
+      "name": "building-secure-contracts",
+      "version": "1.0.1",
+      "description": "Comprehensive smart contract security toolkit based on Trail of Bits' Building Secure Contracts framework. Includes vulnerability scanners for 6 blockchains and 5 development guideline assistants.",
+      "author": {
+        "name": "Omar Inuwa",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/building-secure-contracts/1.0.1.zip"
+    },
+    {
+      "name": "burpsuite-project-parser",
+      "version": "1.0.0",
+      "description": "Search and extract data from Burp Suite project files (.burp) directly from the command line for use in Claude",
+      "author": {
+        "name": "Will Vandevanter",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/burpsuite-project-parser/1.0.0.zip"
+    },
+    {
+      "name": "claude-in-chrome-troubleshooting",
+      "version": "1.0.0",
+      "description": "Diagnose and fix Claude in Chrome MCP extension connectivity issues",
+      "author": {
+        "name": "Dan Guido"
+      },
+      "source": "/plugins/ICSLBASE/claude-in-chrome-troubleshooting/1.0.0.zip"
+    },
+    {
+      "name": "constant-time-analysis",
+      "version": "0.1.0",
+      "description": "Detect compiler-induced timing side-channels in cryptographic code",
+      "author": {
+        "name": "Scott Arciszewski",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/constant-time-analysis/0.1.0.zip"
+    },
+    {
+      "name": "culture-index",
+      "version": "1.0.0",
+      "description": "Interprets Culture Index survey results for individuals and teams",
+      "author": {
+        "name": "Dan Guido"
+      },
+      "source": "/plugins/ICSLBASE/culture-index/1.0.0.zip"
+    },
+    {
+      "name": "differential-review",
+      "version": "1.0.0",
+      "description": "Security-focused differential review of code changes with git history analysis and blast radius estimation",
+      "author": {
+        "name": "Omar Inuwa",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/differential-review/1.0.0.zip"
+    },
+    {
+      "name": "dwarf-expert",
+      "version": "1.0.0",
+      "description": "Interact with and understand the DWARF debugging format",
+      "author": {
+        "name": "Evan Hellman",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/dwarf-expert/1.0.0.zip"
+    },
+    {
+      "name": "entry-point-analyzer",
+      "version": "1.0.0",
+      "description": "Analyzes smart contract codebases to identify state-changing entry points for security auditing. Detects externally callable functions that modify state, categorizes them by access level, and generates structured audit reports.",
+      "author": {
+        "name": "Nicolas Donboly",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/entry-point-analyzer/1.0.0.zip"
+    },
+    {
+      "name": "firebase-apk-scanner",
+      "version": "2.1.0",
+      "description": "Scan Android APKs for Firebase security misconfigurations including open databases, storage buckets, authentication issues, and exposed cloud functions. For authorized security research only.",
+      "author": {
+        "name": "Nick Sellier",
+        "email": "",
+        "url": ""
+      },
+      "source": "/plugins/ICSLBASE/firebase-apk-scanner/2.1.0.zip"
+    },
+    {
+      "name": "fix-review",
+      "version": "0.1.0",
+      "description": "Verifies that code changes address security audit findings without introducing bugs",
+      "author": {
+        "name": "Trail of Bits",
+        "email": "opensource@trailofbits.com",
+        "url": "https://www.trailofbits.com"
+      },
+      "source": "/plugins/ICSLBASE/fix-review/0.1.0.zip"
+    },
+    {
+      "name": "insecure-defaults",
+      "version": "1.0.0",
+      "description": "Detects and verifies insecure default configurations",
+      "author": {
+        "name": "Trail of Bits",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/insecure-defaults/1.0.0.zip"
+    },
+    {
+      "name": "modern-python",
+      "version": "1.3.0",
+      "description": "Modern Python best practices. Use when creating new Python projects, and writing Python scripts, or migrating existing projects from legacy tools.",
+      "author": {
+        "name": "William Tan",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/modern-python/1.3.0.zip"
+    },
+    {
+      "name": "property-based-testing",
+      "version": "1.0.0",
+      "description": "Property-based testing guidance for multiple languages and smart contracts",
+      "author": {
+        "name": "Henrik Brodin",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/property-based-testing/1.0.0.zip"
+    },
+    {
+      "name": "semgrep-rule-creator",
+      "version": "1.1.0",
+      "description": "Create custom Semgrep rules for detecting bug patterns and security vulnerabilities",
+      "author": {
+        "name": "Maciej Domanski"
+      },
+      "source": "/plugins/ICSLBASE/semgrep-rule-creator/1.1.0.zip"
+    },
+    {
+      "name": "semgrep-rule-variant-creator",
+      "version": "1.0.0",
+      "description": "Creates language variants of existing Semgrep rules with proper applicability analysis and test-driven validation",
+      "author": {
+        "name": "Maciej Domanski",
+        "email": "opensource@trailofbits.com"
+      },
+      "source": "/plugins/ICSLBASE/semgrep-rule-variant-creator/1.0.0.zip"
+    },
+    {
+      "name": "sharp-edges",
+      "version": "1.0.0",
+      "description": "Identify error-prone APIs, dangerous configurations, and footgun designs that enable security mistakes",
+      "author": {
+        "name": "Trail of Bits",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/sharp-edges/1.0.0.zip"
+    },
+    {
+      "name": "spec-to-code-compliance",
+      "version": "1.0.0",
+      "description": "Specification-to-code compliance checker for blockchain audits with evidence-based alignment analysis",
+      "author": {
+        "name": "Omar Inuwa",
+        "email": "opensource@trailofbits.com",
+        "url": "https://github.com/trailofbits"
+      },
+      "source": "/plugins/ICSLBASE/spec-to-code-compliance/1.0.0.zip"
+    },
+    {
+      "name": "static-analysis",
+      "version": "1.0.1",
+      "description": "Static analysis toolkit with CodeQL, Semgrep, and SARIF parsing for security vulnerability detection",
+      "author": {
+        "name": "Axel Mierczuk"
+      },
+      "source": "/plugins/ICSLBASE/static-analysis/1.0.1.zip"
+    },
+    {
+      "name": "testing-handbook-skills",
+      "version": "1.0.0",
+      "description": "Skills from the Trail of Bits Application Security Testing Handbook (appsec.guide)",
+      "author": {
+        "name": "Paweł Płatek"
+      },
+      "source": "/plugins/ICSLBASE/testing-handbook-skills/1.0.0.zip"
+    },
+    {
+      "name": "variant-analysis",
+      "version": "1.0.0",
+      "description": "Find similar vulnerabilities and bugs across codebases using pattern-based analysis",
+      "author": {
+        "name": "Axel Mierczuk"
+      },
+      "source": "/plugins/ICSLBASE/variant-analysis/1.0.0.zip"
+    },
+    {
+      "name": "yara-authoring",
+      "version": "2.0.0",
+      "description": "YARA-X detection rule authoring with linting and quality analysis",
+      "author": {
+        "name": "Trail of Bits",
+        "email": "opensource@trailofbits.com"
+      },
+      "source": "/plugins/ICSLBASE/yara-authoring/2.0.0.zip"
+    }
+  ]
+}

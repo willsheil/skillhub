@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下载统计 - Skill Registry</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fafafa;
+            color: #171717;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 220px;
+            height: 100vh;
+            background: #ffffff;
+            border-right: 1px solid #eaeaea;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 0;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #64748b;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: #f8f9fa;
+            color: #171717;
+        }
+
+        .nav-item.active {
+            background: #f0f3ff;
+            color: #667eea;
+            border-left-color: #667eea;
+        }
+
+        .nav-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .nav-text {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .nav-divider {
+            margin: 16px 20px;
+            border-top: 1px solid #eaeaea;
+        }
+
+        .nav-section-title {
+            padding: 8px 20px;
+            font-size: 12px;
+            color: #a1a1aa;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Main Content Area */
+        .main-wrapper {
+            margin-left: 220px;
+            min-height: 100vh;
+        }
+
+        /* Fixed Header */
+        .fixed-header {
+            position: fixed;
+            top: 0;
+            left: 220px;
+            right: 0;
+            height: 60px;
+            background: #ffffff;
+            border-bottom: 1px solid #eaeaea;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 99;
+        }
+
+        .header-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #171717;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 60px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="date"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .summary {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .summary-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .summary-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+        }
+
+        .downloads {
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">Skill应用商店</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">首页</span>
+            </a>
+
+            <a href="/install-guide" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span class="nav-text">安装指南</span>
+            </a>
+
+            <a href="/stats" class="nav-item active">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">下载统计</span>
+            </a>
+
+            <div class="nav-divider"></div>
+
+            <div class="nav-section-title">管理</div>
+
+            <a href="/admin/upload" class="nav-item">
+                <span class="nav-icon">⬆️</span>
+                <span class="nav-text">上传 Skill</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+        <!-- Fixed Header -->
+        <div class="fixed-header">
+            <div class="header-title">下载统计</div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="container">
+                <div class="card">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startDate">开始日期</label>
+                            <input type="date" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate">结束日期</label>
+                            <input type="date" id="endDate">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="queryStats()">查询</button>
+                            <button class="btn btn-secondary" onclick="exportExcel()">导出 Excel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="results">
+                    <div class="card empty-state">
+                        选择日期范围并点击"查询"查看统计数据
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set default date range (last 30 days)
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+
+        document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+        document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+
+        async function queryStats() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="card loading">加载中...</div>';
+
+            try {
+                const params = new URLSearchParams();
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
+
+                const response = await fetch(`/api/stats/top?${params}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || '查询失败');
+                }
+
+                renderResults(data, startDate, endDate);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="card error">错误: ${error.message}</div>`;
+            }
+        }
+
+        function renderResults(data, startDate, endDate) {
+            const resultsDiv = document.getElementById('results');
+
+            if (data.rankings.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="card empty-state">
+                        该时间段内没有下载记录
+                    </div>
+                `;
+                return;
+            }
+
+            const rows = data.rankings.map((item, index) => `
+                <tr>
+                    <td class="rank">${index + 1}</td>
+                    <td>${item.skill_name}</td>
+                    <td>${item.author}</td>
+                    <td class="downloads">${item.downloads}</td>
+                </tr>
+            `).join('');
+
+            resultsDiv.innerHTML = `
+                <div class="card">
+                    <div class="summary">
+                        <div class="summary-number">${data.total_downloads}</div>
+                        <div class="summary-label">总下载次数</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 80px; text-align: center;">排名</th>
+                                <th>Skill 名称</th>
+                                <th>作者</th>
+                                <th style="width: 120px; text-align: center;">下载次数</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function exportExcel() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            const params = new URLSearchParams();
+            if (startDate) params.append('start_date', startDate);
+            if (endDate) params.append('end_date', endDate);
+
+            window.location.href = `/api/stats/export?${params}`;
+        }
+
+        // Auto query on page load
+        queryStats();
+    </script>
+</body>
+</html>
