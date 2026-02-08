@@ -697,11 +697,8 @@ async def api_login(
         # Update last login
         update_last_login(user["id"])
 
-        # Redirect based on role
-        if user["role"] == "admin":
-            return RedirectResponse(url="/admin", status_code=302)
-        else:
-            return RedirectResponse(url="/upload", status_code=302)
+        # Redirect to homepage after login
+        return RedirectResponse(url="/", status_code=302)
     else:
         return RedirectResponse(
             url="/login?error=invalid",
