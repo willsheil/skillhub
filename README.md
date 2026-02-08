@@ -318,3 +318,159 @@ curl http://localhost:8000/api/collections/ICSL/Base
 2. **自动发现**: 上传 ZIP 后无需重启，页面会自动刷新
 3. **版本管理**: 支持同一插件的多个版本，最新版会标记
 4. **Skill 集**: 上传包含多个技能的 ZIP 时，系统会自动提取每个技能的元数据
+
+## 用户管理
+
+### 用户角色
+
+系统支持两种用户角色：
+
+- **普通用户 (user)**: 可以登录、浏览技能、下载技能和上传技能（需管理员审批）
+- **管理员 (admin)**: 拥有所有用户权限， additionally 可以审批待审核的技能、查看系统统计信息
+
+### 登录流程
+
+1. 访问登录页面：`http://localhost:28000/login`
+2. 输入工号（employee_id）和 API 密钥（api_key）
+3. 点击登录按钮
+4. 系统验证后根据用户角色跳转：
+   - 管理员跳转到 `/admin` 管理后台
+   - 普通用户跳转到 `/upload` 上传页面
+
+### 上传工作流程
+
+1. **用户登录**
+   - 使用工号和 API 密钥登录系统
+
+2. **上传技能**
+   - 访问上传页面 `/upload` 或 `/admin/upload`
+   - 选择符合规范的技能 ZIP 文件
+   - 点击上传
+
+3. **技能验证**
+   - 系统自动验证 ZIP 文件结构
+   - 检查 SKILL.md 文件和必需字段
+   - 验证技能名称格式（小写字母、数字、连字符）
+   - 验证作者格式（小写字母 + 8 位数字）
+
+4. **待审核状态**
+   - 验证通过的技能保存到 `data/pending/` 目录
+   - 数据库记录状态为 `pending`
+   - 等待管理员审批
+
+### 审批流程
+
+管理员审批流程：
+
+1. **查看待审核技能**
+   - 访问管理后台 `/admin`
+   - 查看"待审核技能"列表
+   - 每个技能显示：名称、版本、上传者、上传时间
+
+2. **审核技能**
+   - 点击"审核"按钮查看详情
+   - 可选填写审核意见
+
+3. **审批操作**
+   - **通过**: 技能文件移动到 `plugins/` 目录，状态更新为 `approved`
+   - **拒绝**: 删除待审核文件，状态更新为 `rejected`，记录拒绝原因
+
+4. **审批结果**
+   - 通过的技能立即在市场中可见
+   - 上传者可在自己的上传历史中查看审批结果
+
+### 初始化用户
+
+首次部署时需要创建用户账户。可以通过以下方式初始化：
+
+#### 方法 1: 使用 Python 脚本
+
+```python
+from database import init_db, create_user
+
+# 初始化数据库
+init_db()
+
+# 创建管理员用户
+create_user("admin001", "admin_api_key_123", role="admin")
+
+# 创建普通用户
+create_user("user001", "user_api_key_456", role="user")
+create_user("user002", "user_api_key_789", role="user")
+```
+
+#### 方法 2: 直接操作数据库
+
+```bash
+# 使用 sqlite3 命令行工具
+sqlite3 data/registry.db
+
+# 插入管理员用户
+INSERT INTO users (employee_id, api_key, role)
+VALUES ('admin001', 'admin_api_key_123', 'admin');
+
+# 插入普通用户
+INSERT INTO users (employee_id, api_key, role)
+VALUES ('user001', 'user_api_key_456', 'user');
+```
+
+#### 方法 3: 使用测试脚本
+
+```bash
+# 运行测试脚本创建测试用户
+python -c "
+from database import init_db, create_user
+init_db()
+create_user('test001', 'test_key_001', 'user')
+create_user('admin001', 'admin_key_001', 'admin')
+print('Test users created')
+"
+```
+
+### 测试凭据
+
+开发和测试环境可使用以下测试凭据：
+
+**管理员账户:**
+- 工号: `admin001`
+- API 密钥: `admin_key_001`
+- 角色: 管理员
+
+**普通用户账户:**
+- 工号: `test001`
+- API 密钥: `test_key_001`
+- 角色: 普通用户
+
+⚠️ **安全提示**: 生产环境部署前必须修改默认凭据和 API 密钥！
+
+### API 密钥管理
+
+建议的 API 密钥生成策略：
+
+- 使用至少 16 位的随机字符串
+- 包含大小写字母、数字和特殊字符
+- 定期轮换 API 密钥
+- 为不同用户分配唯一密钥
+
+生成安全 API 密钥示例：
+
+```python
+import secrets
+api_key = secrets.token_urlsafe(24)  # 生成 32 字符的安全密钥
+print(api_key)
+```
+
+### 用户管理 API
+
+系统提供以下用户管理相关的 API 端点：
+
+| 端点 | 方法 | 权限 | 说明 |
+|------|------|------|------|
+| `/api/login` | POST | 公开 | 用户登录 |
+| `/api/me` | GET | 需登录 | 获取当前用户信息 |
+| `/api/upload` | POST | 需登录 | 上传技能（需要审批） |
+| `/api/pending` | GET | 管理员 | 获取待审核技能列表 |
+| `/api/review/{skill_id}` | POST | 管理员 | 审批技能（通过/拒绝） |
+| `/api/user/uploads` | GET | 需登录 | 获取当前用户的上传历史 |
+| `/api/user/downloads` | GET | 需登录 | 获取当前用户的下载历史 |
+| `/api/admin/stats` | GET | 管理员 | 获取系统统计信息 |
