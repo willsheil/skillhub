@@ -2299,6 +2299,66 @@ async def api_admin_stats(
         )
 
 
+@app.get("/api/admin/gitea-tasks")
+async def api_get_gitea_tasks(
+    status: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    _: bool = Depends(require_admin)
+):
+    """Get Gitea push tasks with optional status filter.
+
+    Args:
+        status: Filter by status (pending/pushing/success/failed)
+        limit: Maximum number of tasks to return
+
+    Returns:
+        List of push tasks with skill info
+    """
+    try:
+        from database import get_connection
+
+        with get_connection() as conn:
+            if status:
+                rows = conn.execute("""
+                    SELECT t.*, s.skill_name, s.uploader_id, u.employee_id as uploader_name
+                    FROM gitea_push_tasks t
+                    JOIN skills s ON t.skill_id = s.id
+                    LEFT JOIN users u ON s.uploader_id = u.id
+                    WHERE t.status = %s
+                    ORDER BY t.created_at DESC
+                    LIMIT %s
+                """, (status, limit)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT t.*, s.skill_name, s.uploader_id, u.employee_id as uploader_name
+                    FROM gitea_push_tasks t
+                    JOIN skills s ON t.skill_id = s.id
+                    LEFT JOIN users u ON s.uploader_id = u.id
+                    ORDER BY t.created_at DESC
+                    LIMIT %s
+                """, (limit,)).fetchall()
+
+            return {
+                "success": True,
+                "data": rows,
+                "count": len(rows)
+            }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch tasks: {str(e)}"
+        )
+
+
+@app.get("/admin/gitea-tasks", response_class=HTMLResponse)
+async def gitea_tasks_page(request: Request):
+    """Display Gitea push tasks status page."""
+    return templates.TemplateResponse("gitea_tasks.html", {
+        "request": request
+    })
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=28000)

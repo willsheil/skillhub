@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gitea Push Tasks</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .task-list { margin-top: 20px; }
+        .task { border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status-pending { background: #fff3cd; }
+        .status-pushing { background: #d1ecf1; }
+        .status-success { background: #d4edda; }
+        .status-failed { background: #f8d7da; }
+        .filters { margin: 20px 0; }
+        button { padding: 10px 20px; margin-right: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Gitea Push Tasks</h1>
+
+    <div class="filters">
+        <button onclick="filterTasks('all')">All</button>
+        <button onclick="filterTasks('pending')">Pending</button>
+        <button onclick="filterTasks('pushing')">Pushing</button>
+        <button onclick="filterTasks('success')">Success</button>
+        <button onclick="filterTasks('failed')">Failed</button>
+    </div>
+
+    <div id="tasks" class="task-list">Loading...</div>
+
+    <script>
+        async function loadTasks(status = null) {
+            let url = '/api/admin/gitea-tasks?limit=50';
+            if (status) url += '&status=' + status;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            const container = document.getElementById('tasks');
+            container.innerHTML = data.data.map(task => `
+                <div class="task status-${task.status}">
+                    <h3>${task.skill_name}-${task.version}</h3>
+                    <p>Status: ${task.status}</p>
+                    <p>Created: ${task.created_at}</p>
+                    ${task.error_message ? `<p>Error: ${task.error_message}</p>` : ''}
+                    ${task.commit_hash ? `<p>Commit: <a href="#">${task.commit_hash.substring(0, 8)}</a></p>` : ''}
+                    ${task.retry_count > 0 ? `<p>Retries: ${task.retry_count}</p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function filterTasks(status) {
+            loadTasks(status === 'all' ? null : status);
+        }
+
+        // Load on page ready
+        loadTasks();
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => loadTasks(), 30000);
+    </script>
+</body>
+</html>
