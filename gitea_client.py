@@ -201,3 +201,110 @@ class GiteaClient:
             raise GiteaError(f"Failed to extract skill ZIP to {target_path}")
 
         return folder_name
+
+    def commit_and_push(self, repo_path: Path, message: str) -> str:
+        """Commit and push changes to remote repository.
+
+        Args:
+            repo_path: Path to local git repository
+            message: Commit message
+
+        Returns:
+            Commit hash (40-character SHA-1)
+
+        Raises:
+            GiteaError: If add, commit, or push operations fail
+        """
+        # Stage all changes
+        self._git_add_all(repo_path)
+
+        # Create commit and get hash
+        commit_hash = self._git_commit(repo_path, message)
+
+        # Push to remote
+        self._git_push(repo_path)
+
+        return commit_hash
+
+    def _git_add_all(self, path: Path):
+        """Stage all changes for commit.
+
+        Args:
+            path: Path to git repository
+
+        Raises:
+            GiteaError: If git add fails
+        """
+        stdout, stderr, returncode = self._run_git_command(
+            path,
+            ["add", "-A"]
+        )
+
+        if returncode != 0:
+            raise GiteaError(f"Git add failed: {stderr}")
+
+    def _git_commit(self, path: Path, message: str) -> str:
+        """Create commit and return commit hash.
+
+        Args:
+            path: Path to git repository
+            message: Commit message
+
+        Returns:
+            Commit hash (40-character SHA-1)
+
+        Raises:
+            GitConflictError: If commit fails due to conflicts
+            GiteaError: If commit fails and hash cannot be retrieved
+        """
+        import re
+
+        stdout, stderr, returncode = self._run_git_command(
+            path,
+            ["commit", "-m", message]
+        )
+
+        if returncode != 0:
+            raise GitConflictError(f"Git commit failed: {stderr}")
+
+        # Extract commit hash from stdout
+        # Format: [master abc123...] message
+        hash_match = re.search(r'\b([a-f0-9]{40})\b', stdout)
+
+        if hash_match:
+            return hash_match.group(1)
+
+        # Fallback: get hash from git log
+        stdout, stderr, returncode = self._run_git_command(
+            path,
+            ["log", "-1", "--format=%H"]
+        )
+
+        if returncode == 0 and stdout.strip():
+            return stdout.strip()
+
+        raise GiteaError("Git commit succeeded but could not retrieve commit hash")
+
+    def _git_push(self, path: Path):
+        """Push commits to remote repository.
+
+        Args:
+            path: Path to git repository
+
+        Raises:
+            AuthenticationError: If authentication fails
+            NetworkError: If network or timeout errors occur
+            GiteaError: For other failures
+        """
+        stdout, stderr, returncode = self._run_git_command(
+            path,
+            ["push", "origin", "master"]
+        )
+
+        if returncode != 0:
+            if "Authentication failed" in stderr:
+                raise AuthenticationError(f"Git push authentication failed: {stderr}")
+            elif "network" in stderr.lower() or "timeout" in stderr.lower():
+                raise NetworkError(f"Git push network error: {stderr}")
+            else:
+                raise GiteaError(f"Git push failed: {stderr}")

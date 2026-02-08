@@ -152,6 +152,42 @@ def test_add_skill_folder(monkeypatch):
         assert (skill_path / "script.py").exists()
 
 
+def test_commit_and_push(monkeypatch):
+    """Test commit_and_push orchestrates add, commit, and push operations."""
+    import tempfile
+    import subprocess
+
+    # Mock environment variables
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token")
+
+    client = GiteaClient()
+
+    # Mock subprocess.run to return success
+    call_count = [0]
+    def mock_run(*args, **kwargs):
+        call_count[0] += 1
+        class MockResult:
+            returncode = 0
+            stdout = f"[master abc123def456{call_count[0]}] feat: add test-skill-1.0.0"  # Mock commit output
+            stderr = ""
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        repo_path = Path(tmpdir)
+        repo_path.mkdir()
+
+        commit_hash = client.commit_and_push(
+            repo_path,
+            "feat: add test-skill-1.0.0"
+        )
+
+        assert commit_hash is not None
+        assert call_count[0] == 3  # add, commit, push
+
+
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])
