@@ -52,6 +52,35 @@ def init_db():
             ON users(employee_id)
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS skills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                skill_name TEXT NOT NULL,
+                version TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                uploader_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'pending',
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reviewed_at TIMESTAMP,
+                reviewer_id INTEGER,
+                review_comment TEXT,
+                FOREIGN KEY (uploader_id) REFERENCES users(id),
+                FOREIGN KEY (reviewer_id) REFERENCES users(id)
+            )
+        """)
+
+        # Index for status lookups
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_skills_status
+            ON skills(status)
+        """)
+
+        # Index for uploader lookups
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_skills_uploader
+            ON skills(uploader_id)
+        """)
+
         conn.commit()
 
 
@@ -263,3 +292,203 @@ def update_last_login(user_id: int) -> None:
             (user_id,)
         )
         conn.commit()
+
+
+def create_skill_record(
+    skill_name: str,
+    version: str,
+    filename: str,
+    uploader_id: int,
+    status: str = 'pending'
+) -> int:
+    """Create a skill record.
+
+    Args:
+        skill_name: The name of the skill
+        version: The version of the skill
+        filename: The filename of the skill
+        uploader_id: The ID of the user uploading the skill
+        status: The status of the skill (default: 'pending')
+
+    Returns:
+        The ID of the inserted record
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO skills (skill_name, version, filename, uploader_id, status)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (skill_name, version, filename, uploader_id, status)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_pending_skills() -> List[Dict[str, Any]]:
+    """Get all pending skills with uploader information.
+
+    Returns:
+        List of pending skill dictionaries with uploader info
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                s.id,
+                s.skill_name,
+                s.version,
+                s.filename,
+                s.uploader_id,
+                s.status,
+                s.uploaded_at,
+                s.reviewed_at,
+                s.reviewer_id,
+                s.review_comment,
+                u.employee_id as uploader_employee_id
+            FROM skills s
+            JOIN users u ON s.uploader_id = u.id
+            WHERE s.status = 'pending'
+            ORDER BY s.uploaded_at DESC
+            """
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            results.append({
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"],
+                "uploader_employee_id": row["uploader_employee_id"]
+            })
+
+        return results
+
+
+def get_skill_by_id(skill_id: int) -> Optional[Dict[str, Any]]:
+    """Get a skill by its ID.
+
+    Args:
+        skill_id: The skill's ID
+
+    Returns:
+        Skill dictionary if found, None otherwise
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                id,
+                skill_name,
+                version,
+                filename,
+                uploader_id,
+                status,
+                uploaded_at,
+                reviewed_at,
+                reviewer_id,
+                review_comment
+            FROM skills
+            WHERE id = ?
+            """,
+            (skill_id,)
+        ).fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"]
+            }
+        return None
+
+
+def update_skill_status(
+    skill_id: int,
+    status: str,
+    reviewer_id: Optional[int] = None,
+    comment: Optional[str] = None
+) -> None:
+    """Update the status of a skill.
+
+    Args:
+        skill_id: The skill's ID
+        status: The new status (e.g., 'approved', 'rejected')
+        reviewer_id: The ID of the reviewer (optional)
+        comment: Review comment (optional)
+    """
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE skills
+            SET status = ?,
+                reviewed_at = CURRENT_TIMESTAMP,
+                reviewer_id = ?,
+                review_comment = ?
+            WHERE id = ?
+            """,
+            (status, reviewer_id, comment, skill_id)
+        )
+        conn.commit()
+
+
+def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
+    """Get all uploads by a specific user.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        List of skill dictionaries uploaded by the user
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id,
+                skill_name,
+                version,
+                filename,
+                uploader_id,
+                status,
+                uploaded_at,
+                reviewed_at,
+                reviewer_id,
+                review_comment
+            FROM skills
+            WHERE uploader_id = ?
+            ORDER BY uploaded_at DESC
+            """,
+            (user_id,)
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            results.append({
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"]
+            })
+
+        return results
