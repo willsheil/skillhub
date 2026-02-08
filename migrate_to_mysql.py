@@ -22,7 +22,8 @@ MYSQL_CONFIG = {
     'user': 'root',
     'password': 'root',
     'database': 'skills',
-    'charset': 'utf8mb4'
+    'charset': 'utf8mb4',
+    'cursorclass': pymysql.cursors.DictCursor
 }
 
 
