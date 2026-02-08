@@ -246,6 +246,7 @@ To enable automatic skill pushing to Gitea:
    ```bash
    GITEA_REPO_URL=http://your-gitea-server/owner/repo.git
    GITEA_TOKEN=your_access_token
+   GITEA_PUSH_INTERVAL=30
    ```
 
 Skills will be automatically pushed to Gitea when approved by admin.
