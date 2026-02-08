@@ -13,7 +13,11 @@ DB_PATH = Path("./data/registry.db")
 
 
 def migrate_add_user_id_to_downloads():
-    """Migrate downloads table to add user_id column if it doesn't exist."""
+    """Migrate downloads table to add user_id column if it doesn't exist.
+
+    This should be called AFTER the downloads table is created to ensure
+    the table exists before attempting to add the column.
+    """
     with get_connection() as conn:
         # Check if user_id column already exists
         cursor = conn.execute("PRAGMA table_info(downloads)")
@@ -30,9 +34,6 @@ def migrate_add_user_id_to_downloads():
 def init_db():
     """Initialize database and create tables."""
     DB_PATH.parent.mkdir(exist_ok=True)
-
-    # Run migrations first
-    migrate_add_user_id_to_downloads()
 
     with get_connection() as conn:
         conn.execute("""
@@ -100,6 +101,9 @@ def init_db():
         """)
 
         conn.commit()
+
+    # Run migrations after all tables are created
+    migrate_add_user_id_to_downloads()
 
 
 @contextmanager
