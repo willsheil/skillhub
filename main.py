@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -44,6 +45,9 @@ from database import (
 
 # Initialize database on startup
 init_db()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Admin credentials (can be overridden via environment variables)
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
@@ -1075,10 +1079,21 @@ async def api_review_skill(
             # Update with reviewer info
             update_skill_status(skill_id, "approved", reviewer_id=reviewer_id, comment=comment)
 
+            # NEW: Create Gitea push task
+            task_id = None
+            try:
+                from gitea_integration import create_push_task
+                task_id = create_push_task(skill_id)
+                logger.info(f"Created Gitea push task {task_id} for skill {skill_id}")
+            except Exception as e:
+                # Log error but don't block approval
+                logger.error(f"Failed to create Gitea push task: {e}")
+
             return {
                 "success": True,
                 "message": f"Skill {skill['skill_name']}@{skill['version']} approved",
-                "skill_id": skill_id
+                "skill_id": skill_id,
+                "push_task_id": task_id
             }
 
         else:  # reject
