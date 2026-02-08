@@ -166,3 +166,38 @@ class GiteaClient:
                 raise AuthenticationError(f"Git authentication failed: {stderr}")
             else:
                 raise NetworkError(f"Git pull failed: {stderr}")
+
+    def add_skill_folder(self, repo_path: Path, skill_zip: Path,
+                        skill_name: str, version: str) -> str:
+        """Extract skill ZIP to target folder in repository.
+
+        Args:
+            repo_path: Path to local git repository
+            skill_zip: Path to skill ZIP file
+            skill_name: Name of the skill
+            version: Version string
+
+        Returns:
+            Folder name created (format: {skill_name}-{version})
+        """
+        import shutil
+        import zipfile
+
+        folder_name = f"{skill_name}-{version}"
+        target_path = repo_path / folder_name
+
+        # Remove old version if exists
+        if target_path.exists():
+            logger.info(f"Removing old version: {folder_name}")
+            shutil.rmtree(target_path)
+
+        # Extract ZIP to target location
+        logger.info(f"Extracting skill to: {folder_name}")
+        with zipfile.ZipFile(skill_zip, 'r') as zf:
+            zf.extractall(target_path)
+
+        # Verify extraction
+        if not target_path.exists():
+            raise GiteaError(f"Failed to extract skill ZIP to {target_path}")
+
+        return folder_name

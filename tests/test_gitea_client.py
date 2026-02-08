@@ -115,6 +115,43 @@ def test_clone_or_pull_repo(monkeypatch):
     assert repo_path == client.temp_dir / "repo"
 
 
+def test_add_skill_folder(monkeypatch):
+    """Test add_skill_folder extracts ZIP to correct location."""
+    import zipfile
+    import tempfile
+
+    # Mock environment variables
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token")
+
+    client = GiteaClient()
+
+    # Create a test ZIP file
+    with tempfile.TemporaryDirectory() as tmpdir:
+        test_zip = Path(tmpdir) / "test-skill-1.0.0.zip"
+
+        with zipfile.ZipFile(test_zip, 'w') as zf:
+            zf.writestr("skill.md", "# Test Skill\n")
+            zf.writestr("script.py", "print('hello')")
+
+        # Create target directory
+        repo_path = Path(tmpdir) / "repo"
+        repo_path.mkdir()
+
+        folder_name = client.add_skill_folder(
+            repo_path,
+            test_zip,
+            "test-skill",
+            "1.0.0"
+        )
+
+        assert folder_name == "test-skill-1.0.0"
+        skill_path = repo_path / folder_name
+        assert skill_path.exists()
+        assert (skill_path / "skill.md").exists()
+        assert (skill_path / "script.py").exists()
+
+
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])
