@@ -68,6 +68,28 @@ class ConnectionWrapper:
         return getattr(self._conn, name)
 
 
+def create_index_if_not_exists(cursor, table_name, index_name, index_definition):
+    """Create an index if it doesn't exist.
+
+    This function provides MySQL-compatible index creation by checking
+    information_schema.statistics first, since MySQL doesn't support
+    CREATE INDEX IF NOT EXISTS syntax.
+
+    Args:
+        cursor: Database cursor object
+        table_name: Name of the table
+        index_name: Name of the index to create
+        index_definition: Full CREATE INDEX SQL statement
+    """
+    cursor.execute("""
+        SELECT COUNT(*) as count FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = %s AND index_name = %s
+    """, (table_name, index_name))
+
+    if cursor.fetchone()['count'] == 0:
+        cursor.execute(index_definition)
+
+
 def migrate_add_user_id_to_downloads():
     """Migrate downloads table to add user_id column if it doesn't exist.
 
@@ -104,10 +126,13 @@ def init_db():
         """)
 
         # Index for faster queries
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_downloads_skill_date
-            ON downloads(skill_name, downloaded_at)
-        """)
+        cursor = conn._conn.cursor()
+        create_index_if_not_exists(
+            cursor,
+            "downloads",
+            "idx_downloads_skill_date",
+            "CREATE INDEX idx_downloads_skill_date ON downloads(skill_name, downloaded_at)"
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -121,10 +146,13 @@ def init_db():
         """)
 
         # Index for employee_id lookups
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_users_employee_id
-            ON users(employee_id)
-        """)
+        cursor = conn._conn.cursor()
+        create_index_if_not_exists(
+            cursor,
+            "users",
+            "idx_users_employee_id",
+            "CREATE INDEX idx_users_employee_id ON users(employee_id)"
+        )
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS skills (
@@ -144,16 +172,22 @@ def init_db():
         """)
 
         # Index for status lookups
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_skills_status
-            ON skills(status)
-        """)
+        cursor = conn._conn.cursor()
+        create_index_if_not_exists(
+            cursor,
+            "skills",
+            "idx_skills_status",
+            "CREATE INDEX idx_skills_status ON skills(status)"
+        )
 
         # Index for uploader lookups
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_skills_uploader
-            ON skills(uploader_id)
-        """)
+        cursor = conn._conn.cursor()
+        create_index_if_not_exists(
+            cursor,
+            "skills",
+            "idx_skills_uploader",
+            "CREATE INDEX idx_skills_uploader ON skills(uploader_id)"
+        )
 
         conn.commit()
 
