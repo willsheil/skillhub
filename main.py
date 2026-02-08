@@ -28,10 +28,16 @@ from pydantic import BaseModel
 PLUGINS_DIR = Path(os.getenv("PLUGINS_DIR", "./plugins"))
 PLUGINS_DIR.mkdir(exist_ok=True)
 
+# Pending uploads directory
+PENDING_DIR = Path("./data/pending")
+PENDING_DIR.mkdir(parents=True, exist_ok=True)
+
 # Import database module
 from database import (
     init_db, record_download, get_download_stats, get_stats_with_author,
-    get_user_by_credentials, get_user_by_id, update_last_login
+    get_user_by_credentials, get_user_by_id, update_last_login,
+    create_skill_record, get_pending_skills, get_skill_by_id,
+    update_skill_status, get_user_uploads
 )
 
 # Initialize database on startup
@@ -860,14 +866,238 @@ def save_skill_zip(temp_zip: Path, metadata: dict) -> Path:
     return target_path
 
 
-@app.post("/admin/upload")
+def approve_skill_file(skill_id: int) -> bool:
+    """Approve a skill by moving it from pending to plugins directory.
+
+    Args:
+        skill_id: The ID of the skill to approve
+
+    Returns:
+        True if successful, False otherwise
+    """
+    # Get skill record
+    skill = get_skill_by_id(skill_id)
+    if not skill:
+        return False
+
+    if skill["status"] != "pending":
+        return False
+
+    # Move file from pending to plugins
+    pending_path = PENDING_DIR / skill["filename"]
+    plugins_path = PLUGINS_DIR / skill["filename"]
+
+    if not pending_path.exists():
+        return False
+
+    try:
+        shutil.move(str(pending_path), str(plugins_path))
+
+        # Update database status
+        update_skill_status(skill_id, "approved")
+
+        return True
+    except Exception as e:
+        print(f"Failed to approve skill {skill_id}: {e}")
+        return False
+
+
+def reject_skill_file(skill_id: int, comment: Optional[str] = None) -> bool:
+    """Reject a skill by deleting the pending file.
+
+    Args:
+        skill_id: The ID of the skill to reject
+        comment: Optional rejection comment
+
+    Returns:
+        True if successful, False otherwise
+    """
+    # Get skill record
+    skill = get_skill_by_id(skill_id)
+    if not skill:
+        return False
+
+    if skill["status"] != "pending":
+        return False
+
+    # Delete pending file
+    pending_path = PENDING_DIR / skill["filename"]
+
+    try:
+        if pending_path.exists():
+            pending_path.unlink()
+
+        # Update database status
+        update_skill_status(skill_id, "rejected", comment=comment)
+
+        return True
+    except Exception as e:
+        print(f"Failed to reject skill {skill_id}: {e}")
+        return False
+
+
+@app.get("/api/pending")
+async def api_pending_skills(
+    _: bool = Depends(require_admin)
+):
+    """Get all pending skills awaiting approval (admin only)."""
+    try:
+        pending = get_pending_skills()
+        return {
+            "success": True,
+            "data": pending,
+            "count": len(pending)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch pending skills: {str(e)}"
+        )
+
+
+@app.post("/api/review/{skill_id}")
+async def api_review_skill(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_admin)
+):
+    """Approve or reject a pending skill (admin only).
+
+    Expects JSON body with:
+    {
+        "action": "approve" | "reject",
+        "comment": "optional comment"
+    }
+    """
+    try:
+        # Get current user (reviewer)
+        reviewer_id = request.session.get("user_id")
+        if not reviewer_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Parse request body
+        data = await request.json()
+        action = data.get("action")
+        comment = data.get("comment")
+
+        if action not in ["approve", "reject"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid action. Must be 'approve' or 'reject'"
+            )
+
+        # Get skill record
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        if skill["status"] != "pending":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Skill {skill_id} is not in pending status"
+            )
+
+        # Perform action
+        if action == "approve":
+            success = approve_skill_file(skill_id)
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to approve skill {skill_id}"
+                )
+
+            # Update with reviewer info
+            update_skill_status(skill_id, "approved", reviewer_id=reviewer_id, comment=comment)
+
+            return {
+                "success": True,
+                "message": f"Skill {skill['skill_name']}@{skill['version']} approved",
+                "skill_id": skill_id
+            }
+
+        else:  # reject
+            success = reject_skill_file(skill_id, comment)
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to reject skill {skill_id}"
+                )
+
+            # Update with reviewer info
+            update_skill_status(skill_id, "rejected", reviewer_id=reviewer_id, comment=comment)
+
+            return {
+                "success": True,
+                "message": f"Skill {skill['skill_name']}@{skill['version']} rejected",
+                "skill_id": skill_id
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Review failed: {str(e)}"
+        )
+
+
+@app.get("/api/user/uploads")
+async def api_user_uploads(
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Get the current user's upload history."""
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        uploads = get_user_uploads(user_id)
+
+        return {
+            "success": True,
+            "data": uploads,
+            "count": len(uploads)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch uploads: {str(e)}"
+        )
+
+
+@app.post("/api/upload")
 async def upload_plugin(
     request: Request,
     file: UploadFile = File(...),
     _: bool = Depends(require_auth)
 ):
-    """Upload a single skill ZIP file (requires auth)."""
+    """Upload a single skill ZIP file (requires auth).
+
+    Saves to pending directory and creates database record with status='pending'.
+    Requires admin approval before being made available.
+    """
     import tempfile
+
+    # Get current user
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
 
     # Validate file extension
     if not file.filename or not file.filename.endswith('.zip'):
@@ -895,12 +1125,28 @@ async def upload_plugin(
                 "error": f"Validation failed: {result.get('error', 'Unknown error')}"
             })
 
-        # Save the skill ZIP
-        target_path = save_skill_zip(temp_zip, result)
+        # Save the skill ZIP to pending directory
+        skill_name = result["name"]
+        version = result.get("version", "1.0.0")
+        target_filename = f"{skill_name}-{version}.zip"
+        target_path = PENDING_DIR / target_filename
+
+        # Copy file to pending location
+        shutil.copy(temp_zip, target_path)
+
+        # Create database record with status='pending'
+        from database import create_skill_record
+        skill_id = create_skill_record(
+            skill_name=skill_name,
+            version=version,
+            filename=target_filename,
+            uploader_id=user_id,
+            status='pending'
+        )
 
         return templates.TemplateResponse("admin_upload.html", {
             "request": request,
-            "success": f"Successfully uploaded {result['name']}@{result['version']}",
+            "success": f"Successfully uploaded {result['name']}@{result['version']} (pending approval)",
             "error": None
         })
 
