@@ -37,7 +37,9 @@ from database import (
     init_db, record_download, get_download_stats, get_stats_with_author,
     get_user_by_credentials, get_user_by_id, update_last_login,
     create_skill_record, get_pending_skills, get_skill_by_id,
-    update_skill_status, get_user_uploads
+    update_skill_status, get_user_uploads, get_total_users_count,
+    get_skills_count_by_status, get_today_downloads_count,
+    get_top_skills_by_downloads, get_top_users_by_downloads
 )
 
 # Initialize database on startup
@@ -2089,6 +2091,50 @@ async def stats_page(request: Request):
     return templates.TemplateResponse("stats.html", {
         "request": request
     })
+
+
+@app.get("/api/admin/stats")
+async def api_admin_stats(
+    _: bool = Depends(require_admin)
+):
+    """Get admin statistics (admin only).
+
+    Returns comprehensive statistics about the registry including:
+    - Total users count
+    - Pending skills count
+    - Approved skills count
+    - Today's downloads count
+    - Top 10 skills by downloads
+    - Top 10 users by downloads
+    """
+    try:
+        # Get counts
+        total_users = get_total_users_count()
+        pending_skills = get_skills_count_by_status("pending")
+        approved_skills = get_skills_count_by_status("approved")
+        today_downloads = get_today_downloads_count()
+
+        # Get top rankings
+        top_skills = get_top_skills_by_downloads(10)
+        top_users = get_top_users_by_downloads(10)
+
+        return {
+            "success": True,
+            "data": {
+                "total_users": total_users,
+                "pending_skills": pending_skills,
+                "approved_skills": approved_skills,
+                "today_downloads": today_downloads,
+                "top_skills": top_skills,
+                "top_users": top_users
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch admin statistics: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

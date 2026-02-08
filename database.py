@@ -603,3 +603,139 @@ def get_user_downloads(
             "limit": limit,
             "offset": offset
         }
+
+
+def get_total_users_count() -> int:
+    """Get total count of users in the system.
+
+    Returns:
+        Total number of users
+    """
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) as count FROM users").fetchone()
+        return row["count"] if row else 0
+
+
+def get_skills_count_by_status(status: str) -> int:
+    """Get count of skills by status.
+
+    Args:
+        status: The status to filter by ('pending', 'approved', 'rejected')
+
+    Returns:
+        Count of skills with the given status
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as count FROM skills WHERE status = ?",
+            (status,)
+        ).fetchone()
+        return row["count"] if row else 0
+
+
+def get_today_downloads_count() -> int:
+    """Get count of downloads today.
+
+    Returns:
+        Number of downloads today
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) as count FROM downloads
+            WHERE date(downloaded_at) = date('now')
+            """
+        ).fetchone()
+        return row["count"] if row else 0
+
+
+def get_top_skills_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
+    """Get top skills by download count.
+
+    Args:
+        limit: Maximum number of skills to return
+
+    Returns:
+        List of skills with download counts
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                skill_name,
+                COUNT(*) as download_count
+            FROM downloads
+            GROUP BY skill_name
+            ORDER BY download_count DESC
+            LIMIT ?
+            """,
+            (limit,)
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            results.append({
+                "skill_name": row["skill_name"],
+                "downloads": row["download_count"]
+            })
+
+        return results
+
+
+def get_top_users_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
+    """Get top users by download count.
+
+    Args:
+        limit: Maximum number of users to return
+
+    Returns:
+        List of users with download counts
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                u.employee_id,
+                u.role,
+                COUNT(d.id) as download_count
+            FROM users u
+            LEFT JOIN downloads d ON u.id = d.user_id
+            GROUP BY u.id
+            ORDER BY download_count DESC
+            LIMIT ?
+            """,
+            (limit,)
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            results.append({
+                "employee_id": row["employee_id"],
+                "role": row["role"],
+                "downloads": row["download_count"]
+            })
+
+        return results
+
+
+def create_user(employee_id: str, api_key: str, role: str = "user") -> int:
+    """Create a new user in the system.
+
+    Args:
+        employee_id: The employee's unique ID
+        api_key: The API key for authentication
+        role: User role ('user' or 'admin')
+
+    Returns:
+        The ID of the created user
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO users (employee_id, api_key, role)
+            VALUES (?, ?, ?)
+            """,
+            (employee_id, api_key, role)
+        )
+        conn.commit()
+        return cursor.lastrowid
