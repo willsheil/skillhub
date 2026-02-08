@@ -28,25 +28,40 @@
     <div id="tasks" class="task-list">Loading...</div>
 
     <script>
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function loadTasks(status = null) {
             let url = '/api/admin/gitea-tasks?limit=50';
             if (status) url += '&status=' + status;
 
-            const response = await fetch(url);
-            const data = await response.json();
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
 
-            const container = document.getElementById('tasks');
-            container.innerHTML = data.data.map(task => `
-                <div class="task status-${task.status}">
-                    <h3>${task.skill_name}-${task.version}</h3>
-                    <p>Uploaded by: ${task.uploader_name || 'Unknown'}</p>
-                    <p>Status: ${task.status}</p>
-                    <p>Created: ${task.created_at}</p>
-                    ${task.error_message ? `<p>Error: ${task.error_message}</p>` : ''}
-                    ${task.commit_hash ? `<p>Commit: <a href="#">${task.commit_hash.substring(0, 8)}</a></p>` : ''}
-                    ${task.retry_count > 0 ? `<p>Retries: ${task.retry_count}</p>` : ''}
-                </div>
-            `).join('');
+                const container = document.getElementById('tasks');
+                container.innerHTML = data.data.map(task => `
+                    <div class="task status-${escapeHtml(task.status)}">
+                        <h3>${escapeHtml(task.skill_name)}-${escapeHtml(task.version)}</h3>
+                        <p>Uploaded by: ${escapeHtml(task.uploader_name || 'Unknown')}</p>
+                        <p>Status: ${escapeHtml(task.status)}</p>
+                        <p>Created: ${escapeHtml(task.created_at)}</p>
+                        ${task.error_message ? `<p>Error: ${escapeHtml(task.error_message)}</p>` : ''}
+                        ${task.commit_hash ? `<p>Commit: <a href="#">${escapeHtml(task.commit_hash.substring(0, 8))}</a></p>` : ''}
+                        ${task.retry_count > 0 ? `<p>Retries: ${task.retry_count}</p>` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('tasks').innerHTML = `<p class="error">Error loading tasks: ${escapeHtml(error.message)}</p>`;
+                console.error('Failed to load tasks:', error);
+            }
         }
 
         function filterTasks(status) {

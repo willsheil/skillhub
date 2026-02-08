@@ -14,7 +14,7 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
 
 import yaml
@@ -2304,7 +2304,7 @@ async def api_get_gitea_tasks(
     status: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     _: bool = Depends(require_admin)
-):
+) -> Dict[str, Any]:
     """Get Gitea push tasks with optional status filter.
 
     Args:
