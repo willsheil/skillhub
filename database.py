@@ -2,6 +2,7 @@
 Database module for download statistics.
 """
 
+import os
 import pymysql
 import json
 from pathlib import Path
@@ -10,11 +11,11 @@ from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
 
 DB_CONFIG = {
-    'host': '127.0.0.1',
-    'port': 3306,
-    'user': 'root',
-    'password': 'root',
-    'database': 'skills',
+    'host': os.getenv('DB_HOST', '127.0.0.1'),
+    'port': int(os.getenv('DB_PORT', '3306')),
+    'user': os.getenv('DB_USER', 'root'),
+    'password': os.getenv('DB_PASSWORD', 'root'),
+    'database': os.getenv('DB_DATABASE', 'skills'),
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }
