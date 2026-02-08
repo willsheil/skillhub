@@ -9,12 +9,13 @@ load_dotenv()
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime, date
-from typing import List, Optional
 
+import yaml
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status, Query
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -28,7 +29,10 @@ PLUGINS_DIR = Path(os.getenv("PLUGINS_DIR", "./plugins"))
 PLUGINS_DIR.mkdir(exist_ok=True)
 
 # Import database module
-from database import init_db, record_download, get_download_stats, get_stats_with_author
+from database import (
+    init_db, record_download, get_download_stats, get_stats_with_author,
+    get_user_by_credentials, get_user_by_id, update_last_login
+)
 
 # Initialize database on startup
 init_db()
@@ -51,13 +55,52 @@ templates = Jinja2Templates(directory="templates")
 
 
 def require_auth(request: Request):
-    """Check if user is logged in."""
-    if request.session.get("user") != ADMIN_USERNAME:
+    """Check if user is authenticated.
+
+    Raises HTTP 401 if user is not logged in.
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-            headers={"Location": "/admin/login"}
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
         )
     return True
+
+
+def require_admin(request: Request):
+    """Check if user is authenticated and has admin role.
+
+    Raises HTTP 401 if user is not logged in.
+    Raises HTTP 403 if user is not an admin.
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    role = request.session.get("role")
+    if role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return True
+
+
+def get_current_user(request: Request) -> Optional[dict]:
+    """Get the current authenticated user from session.
+
+    Returns:
+        User dictionary if authenticated, None otherwise
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return None
+
+    return get_user_by_id(user_id)
 
 
 def verify_credentials(username: str, password: str) -> bool:
@@ -80,6 +123,102 @@ def get_skill_dir_name(filename: str) -> str:
     Example: skill-name-1.0.0.zip -> skill-name-1.0.0
     """
     return filename[:-4] if filename.endswith('.zip') else filename
+
+
+def parse_skill_md(content: str) -> Tuple[Optional[dict], str]:
+    """Parse SKILL.md content to extract YAML frontmatter and markdown body.
+
+    Args:
+        content: Raw SKILL.md content
+
+    Returns:
+        Tuple of (yaml_metadata_dict, markdown_body)
+        If no YAML frontmatter found, returns (None, content)
+    """
+    # Pattern to match YAML frontmatter between --- markers
+    pattern = r'^---\s*\n(.*?)\n---\s*\n(.*)$'
+    match = re.match(pattern, content, re.DOTALL)
+
+    if match:
+        yaml_content = match.group(1)
+        markdown_body = match.group(2).strip()
+        try:
+            metadata = yaml.safe_load(yaml_content)
+            if not isinstance(metadata, dict):
+                metadata = {}
+            return metadata, markdown_body
+        except yaml.YAMLError:
+            return None, content
+
+    return None, content
+
+
+def extract_metadata_from_skill_md(zip_path: Path) -> Optional[dict]:
+    """Extract metadata from SKILL.md inside zip.
+
+    The ZIP should have structure:
+        skill-name/
+        └── SKILL.md
+
+    Args:
+        zip_path: Path to the skill ZIP file
+
+    Returns:
+        Metadata dict or None if parsing fails
+    """
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            namelist = zf.namelist()
+
+            # Find SKILL.md (may be in root or subdirectory)
+            skill_md_paths = [name for name in namelist
+                             if name.endswith('SKILL.md') or name == 'SKILL.md']
+
+            if not skill_md_paths:
+                return None
+
+            # Use the first SKILL.md found
+            skill_md_path = skill_md_paths[0]
+            content = zf.read(skill_md_path).decode('utf-8')
+
+            metadata, _ = parse_skill_md(content)
+            return metadata
+
+    except Exception as e:
+        print(f"Failed to extract metadata from {zip_path}: {e}")
+        return None
+
+
+def validate_skill_name(name: str) -> tuple[bool, str]:
+    """Validate skill name according to specification.
+
+    Requirements:
+    - Must be 1-64 characters
+    - May only contain lowercase letters, numbers, and hyphens
+    - Must not start or end with '-'
+    - Must not contain consecutive hyphens ('--')
+
+    Returns:
+        (is_valid, error_message)
+    """
+    if not name or not isinstance(name, str):
+        return False, "Name is required"
+
+    if len(name) < 1 or len(name) > 64:
+        return False, "Name must be 1-64 characters"
+
+    if not re.match(r'^[a-z0-9-]+$', name):
+        return False, "Name may only contain lowercase letters, numbers, and hyphens"
+
+    if name.startswith('-') or name.endswith('-'):
+        return False, "Name must not start or end with hyphen"
+
+    if '--' in name:
+        return False, "Name must not contain consecutive hyphens"
+
+    return True, ""
 
 
 def package_skill_with_installer(
@@ -178,32 +317,23 @@ Linux / macOS:
 
 
 def parse_plugin_filename(filename: str) -> tuple[str, str]:
-    """Parse plugin filename to extract name and version.
+    """Parse plugin filename to extract skill name.
 
-    Format: {skill-name}-{version}.zip
-    Example: ask-questions-if-underspecified-1.0.0.zip
-             semgrep-rule-creator-1.1.0.zip
+    Format: {skill-name}.zip (version is no longer extracted from filename)
+    Example: ask-questions-if-underspecified.zip
+             semgrep-rule-creator.zip
 
-    Returns: (skill_name, version)
+    Note: Version is now specified in SKILL.md metadata instead of filename.
+
+    Returns: (skill_name, "unknown") - version always returns "unknown" to indicate
+             it should be read from SKILL.md metadata
     """
     # Remove .zip extension
-    name_without_ext = filename[:-4] if filename.endswith('.zip') else filename
+    skill_name = filename[:-4] if filename.endswith('.zip') else filename
 
-    # Find the last occurrence of version pattern (x.x.x)
-    parts = name_without_ext.split('-')
-
-    # Look for version pattern from the end
-    for i in range(len(parts) - 1, -1, -1):
-        part = parts[i]
-        # Check if this part looks like a version (contains digits and dots)
-        if any(c.isdigit() for c in part) and ('.' in part or part.isdigit()):
-            # This and everything after is the version
-            skill_name = '-'.join(parts[:i])
-            version = '-'.join(parts[i:])
-            return skill_name, version
-
-    # Fallback: treat everything as name, version as unknown
-    return name_without_ext, "unknown"
+    # Version is no longer parsed from filename
+    # It should be read from SKILL.md metadata
+    return skill_name, "unknown"
 
 
 def scan_plugins() -> List[dict]:
@@ -214,7 +344,17 @@ def scan_plugins() -> List[dict]:
         if not zip_file.is_file():
             continue
 
-        skill_name, version = parse_plugin_filename(zip_file.name)
+        # Use filename (without .zip) as skill identifier
+        # Version is extracted from SKILL.md metadata, not filename
+        skill_name = zip_file.name[:-4] if zip_file.name.endswith('.zip') else zip_file.name
+
+        # Extract version from SKILL.md inside the zip
+        metadata = extract_metadata_from_skill_md(zip_file)
+        if metadata and metadata.get("metadata"):
+            skill_metadata = metadata.get("metadata", {})
+            version = skill_metadata.get("version", "unknown")
+        else:
+            version = "unknown"
 
         if skill_name not in plugins:
             plugins[skill_name] = {
@@ -233,8 +373,8 @@ def scan_plugins() -> List[dict]:
     # Sort versions and get metadata for each skill
     result = []
     for skill_name, skill_data in sorted(plugins.items()):
-        # Sort versions
-        skill_data["versions"].sort(key=lambda x: x["version"])
+        # Sort versions (filter out "unknown" versions to the end)
+        skill_data["versions"].sort(key=lambda x: (x["version"] == "unknown", x["version"]))
 
         # Get metadata from latest version
         latest = skill_data["versions"][-1]
@@ -248,12 +388,13 @@ def scan_plugins() -> List[dict]:
 
 
 def extract_metadata(zip_filename: str) -> Optional[dict]:
-    """Extract metadata from package.json inside zip.
+    """Extract metadata from SKILL.md inside zip per Agent Skills specification.
 
-    The ZIP may have an outer folder:
+    The ZIP should have structure:
         skill-name-1.0.0.zip
         └── skill-name/
-            ├── package.json
+            ├── SKILL.md
+            ├── scripts/
             └── ...
 
     Args:
@@ -262,41 +403,74 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
     Returns:
         Metadata dict or fallback info
     """
-    import zipfile
-
     zip_path = PLUGINS_DIR / zip_filename
-    skill_name, _ = parse_plugin_filename(zip_filename)
+    skill_name, version = parse_plugin_filename(zip_filename)
 
+    # Try to extract from SKILL.md
+    metadata = extract_metadata_from_skill_md(zip_path)
+
+    if metadata:
+        # Extract version from metadata field (per Agent Skills spec)
+        skill_metadata = metadata.get("metadata", {})
+        if isinstance(skill_metadata, dict):
+            spec_version = skill_metadata.get("version")
+        else:
+            spec_version = None
+            skill_metadata = {}
+
+        # Normalize metadata format per Agent Skills spec
+        normalized = {
+            "name": metadata.get("name", skill_name),
+            "version": spec_version if spec_version else (version if version != "unknown" else "1.0.0"),
+            "description": metadata.get("description", "No description available"),
+            "license": metadata.get("license"),
+            "compatibility": metadata.get("compatibility"),
+            "metadata": skill_metadata,
+            "allowed_tools": metadata.get("allowed-tools")
+        }
+        return normalized
+
+    # Fallback: try legacy package.json format for backward compatibility
     try:
+        import zipfile
         with zipfile.ZipFile(zip_path, 'r') as zf:
             namelist = zf.namelist()
 
-            # First, try to find package.json directly in root
             for name in namelist:
-                if name == 'package.json':
+                if name == 'package.json' or (name.endswith('/package.json')):
                     content = zf.read(name)
-                    metadata = json.loads(content)
-                    return metadata
+                    legacy_metadata = json.loads(content)
+                    # Convert legacy format to Agent Skills format
+                    legacy_author = legacy_metadata.get("author", {})
+                    author_name = "Unknown"
+                    if isinstance(legacy_author, dict):
+                        author_name = legacy_author.get("name", "Unknown")
+                    elif isinstance(legacy_author, str):
+                        author_name = legacy_author
 
-            # Second, try to find package.json in a subdirectory
-            # This handles the case: skill-name/package.json
-            for name in namelist:
-                parts = name.split('/')
-                # Check if it's a subdirectory containing package.json
-                if len(parts) == 2 and parts[1] == 'package.json':
-                    content = zf.read(name)
-                    metadata = json.loads(content)
-                    return metadata
-
+                    return {
+                        "name": legacy_metadata.get("name", skill_name),
+                        "version": legacy_metadata.get("version", version if version != "unknown" else "1.0.0"),
+                        "description": legacy_metadata.get("description", "No description available"),
+                        "license": None,
+                        "compatibility": None,
+                        "metadata": {
+                            "author": author_name,
+                            "version": legacy_metadata.get("version", version if version != "unknown" else "1.0.0")
+                        },
+                        "legacy": True
+                    }
     except Exception:
         pass
 
-    # Fallback: return basic info
+    # Final fallback
     return {
         "name": skill_name,
-        "version": "unknown",
+        "version": version if version != "unknown" else "1.0.0",
         "description": "No description available",
-        "author": {"name": "Unknown"}
+        "license": None,
+        "compatibility": None,
+        "metadata": {}
     }
 
 
@@ -374,8 +548,15 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Plugin not found")
 
-    # Parse skill name and version from filename
-    skill_name, version = parse_plugin_filename(filename)
+    # Get skill name from filename (version is now in SKILL.md metadata)
+    skill_name = filename[:-4] if filename.endswith('.zip') else filename
+
+    # Extract version from SKILL.md inside the ZIP
+    metadata = extract_metadata_from_skill_md(file_path)
+    if metadata and metadata.get("metadata"):
+        version = metadata.get("metadata", {}).get("version", "unknown")
+    else:
+        version = "unknown"
 
     # Record download
     try:
@@ -476,13 +657,26 @@ async def upload_page(request: Request, _: bool = Depends(require_auth)):
 
 
 def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
-    """Validate a skill ZIP file.
+    """Validate a skill ZIP file according to Agent Skills specification.
 
-    The ZIP may have an outer folder:
-        skill-name-1.0.0.zip
-        └── skill-name/
-            ├── package.json
-            └── ...
+    The ZIP should have structure:
+        skill-name/
+        ├── SKILL.md          # Required
+        ├── scripts/          # Optional
+        ├── references/       # Optional
+        └── assets/           # Optional
+
+    SKILL.md must contain YAML frontmatter with required fields:
+        - name: skill identifier (max 64 chars, lowercase letters/numbers/hyphens only)
+        - description: what the skill does (max 1024 chars)
+        - metadata.version: version string (e.g., "1.0.0")
+        - metadata.author: author identifier (format: lowercase letter + 8 digits, e.g., "w00545471")
+
+    Optional fields:
+        - license: license name or reference
+        - compatibility: environment requirements (max 500 chars)
+        - metadata: arbitrary key-value mapping (other custom fields)
+        - allowed-tools: space-delimited list of pre-approved tools
 
     Args:
         zip_path: Path to the skill ZIP file
@@ -495,40 +689,87 @@ def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
     try:
         with zipfile.ZipFile(zip_path, 'r') as zf:
             namelist = zf.namelist()
-            package_json = None
 
-            # First, try to find package.json directly in root
-            for name in namelist:
-                if name == 'package.json':
-                    content = zf.read(name)
-                    package_json = json.loads(content)
-                    break
+            # Find SKILL.md (may be in root or subdirectory)
+            skill_md_paths = [name for name in namelist
+                             if name.endswith('SKILL.md') or name == 'SKILL.md']
 
-            # Second, try to find package.json in a subdirectory
-            if not package_json:
-                for name in namelist:
-                    parts = name.split('/')
-                    # Check if it's a subdirectory containing package.json
-                    if len(parts) == 2 and parts[1] == 'package.json':
-                        content = zf.read(name)
-                        package_json = json.loads(content)
-                        break
+            if not skill_md_paths:
+                return False, {"error": "Missing SKILL.md in ZIP"}
 
-            if not package_json:
-                return False, {"error": "Missing package.json in ZIP"}
+            # Read and parse SKILL.md
+            skill_md_path = skill_md_paths[0]
+            content = zf.read(skill_md_path).decode('utf-8')
+
+            metadata, _ = parse_skill_md(content)
+
+            if metadata is None:
+                return False, {"error": "Invalid YAML frontmatter in SKILL.md"}
 
             # Validate required fields
-            if "name" not in package_json:
-                return False, {"error": "Missing 'name' in package.json"}
-            if "version" not in package_json:
-                return False, {"error": "Missing 'version' in package.json"}
+            if "name" not in metadata:
+                return False, {"error": "Missing required field 'name' in SKILL.md YAML frontmatter"}
+            if "description" not in metadata:
+                return False, {"error": "Missing required field 'description' in SKILL.md YAML frontmatter"}
 
-            return True, package_json
+            # Validate name format
+            is_name_valid, name_error = validate_skill_name(metadata["name"])
+            if not is_name_valid:
+                return False, {"error": f"Invalid skill name: {name_error}"}
+
+            # Validate description length (max 1024 chars)
+            description = metadata["description"]
+            if not isinstance(description, str) or len(description) == 0 or len(description) > 1024:
+                return False, {"error": "Description must be 1-1024 characters"}
+
+            # Validate optional fields if present
+            # compatibility: max 500 chars
+            if "compatibility" in metadata:
+                compat = metadata["compatibility"]
+                if not isinstance(compat, str) or len(compat) == 0 or len(compat) > 500:
+                    return False, {"error": "Compatibility must be 1-500 characters if provided"}
+
+            # Extract and validate metadata fields (version and author are required)
+            skill_metadata = metadata.get("metadata", {})
+            if not isinstance(skill_metadata, dict):
+                return False, {"error": "Metadata must be a key-value mapping"}
+
+            # Validate version is required in metadata
+            version = skill_metadata.get("version")
+            if not version:
+                return False, {"error": "Missing required field 'metadata.version' in SKILL.md"}
+            if not isinstance(version, str) or len(version) == 0:
+                return False, {"error": "Metadata.version must be a non-empty string"}
+
+            # Validate author is required in metadata
+            author = skill_metadata.get("author")
+            if not author:
+                return False, {"error": "Missing required field 'metadata.author' in SKILL.md"}
+            if not isinstance(author, str) or len(author) == 0:
+                return False, {"error": "Metadata.author must be a non-empty string"}
+
+            # Validate author format: lowercase letter followed by 8 digits (e.g., w00545471)
+            import re
+            if not re.match(r'^[a-z]\d{8}$', author):
+                return False, {"error": "Invalid author format. Must be a lowercase letter followed by 8 digits (e.g., w00545471)"}
+
+            # Normalize metadata for return (matching API format)
+            normalized_metadata = {
+                "name": metadata["name"],
+                "description": metadata["description"],
+                "version": version,
+                "license": metadata.get("license"),
+                "compatibility": metadata.get("compatibility"),
+                "metadata": skill_metadata,
+                "allowed_tools": metadata.get("allowed-tools")
+            }
+
+            return True, normalized_metadata
 
     except zipfile.BadZipFile:
         return False, {"error": "Invalid ZIP file"}
-    except json.JSONDecodeError:
-        return False, {"error": "Invalid JSON in package.json"}
+    except yaml.YAMLError as e:
+        return False, {"error": f"Invalid YAML in SKILL.md: {str(e)}"}
     except Exception as e:
         return False, {"error": str(e)}
 
@@ -538,13 +779,13 @@ def save_skill_zip(temp_zip: Path, metadata: dict) -> Path:
 
     Args:
         temp_zip: Path to the temporary ZIP file
-        metadata: Skill metadata from package.json
+        metadata: Skill metadata from SKILL.md
 
     Returns:
         Path to the saved ZIP file
     """
     skill_name = metadata["name"]
-    version = metadata["version"]
+    version = metadata.get("version", "1.0.0")
     target_filename = f"{skill_name}-{version}.zip"
     target_path = PLUGINS_DIR / target_filename
 
@@ -747,8 +988,15 @@ async def batch_download(request: Request):
                     print(f"Warning: ZIP file not found: {filename}")
                     continue
 
-                # Parse skill info
-                skill_name, version = parse_plugin_filename(filename)
+                # Get skill name from filename
+                skill_name = filename[:-4] if filename.endswith('.zip') else filename
+
+                # Extract version from SKILL.md inside the ZIP
+                skill_metadata = extract_metadata_from_skill_md(target_zip)
+                if skill_metadata and skill_metadata.get("metadata"):
+                    version = skill_metadata.get("metadata", {}).get("version", "unknown")
+                else:
+                    version = "unknown"
 
                 # Add skill to batch package (without individual installer scripts)
                 try:
