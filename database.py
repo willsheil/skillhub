@@ -458,6 +458,28 @@ def update_last_login(user_id: int) -> None:
         conn.commit()
 
 
+def check_skill_exists(skill_name: str, version: str) -> bool:
+    """Check if a skill with the same name and version already exists.
+
+    Args:
+        skill_name: The name of the skill
+        version: The version of the skill
+
+    Returns:
+        True if skill exists, False otherwise
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) as count FROM skills
+            WHERE skill_name = %s AND version = %s
+            """,
+            (skill_name, version)
+        ).fetchone()
+
+        return row["count"] > 0 if row else False
+
+
 def create_skill_record(
     skill_name: str,
     version: str,

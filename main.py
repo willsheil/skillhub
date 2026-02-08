@@ -1301,6 +1301,23 @@ async def upload_plugin(
         target_filename = f"{skill_name}-{version}.zip"
         target_path = PENDING_DIR / target_filename
 
+        # Check if skill with same name and version already exists
+        from database import check_skill_exists
+        if check_skill_exists(skill_name, version):
+            error_msg = f"Skill {skill_name}@{version} already exists. Please use a different version."
+            # Return HTML error for admin_upload page
+            if "admin" in request.headers.get("referer", ""):
+                return templates.TemplateResponse("admin_upload.html", {
+                    "request": request,
+                    "success": None,
+                    "error": error_msg
+                })
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=error_msg
+                )
+
         # Copy file to pending location
         shutil.copy(temp_zip, target_path)
 
@@ -1401,6 +1418,17 @@ async def upload_batch(
                 results["failed"].append({
                     "file": file.filename,
                     "error": metadata.get('error', 'Unknown error')
+                })
+                continue
+
+            # Check if skill with same name and version already exists
+            from database import check_skill_exists
+            skill_name = metadata["name"]
+            skill_version = metadata.get("version", "1.0.0")
+            if check_skill_exists(skill_name, skill_version):
+                results["failed"].append({
+                    "file": file.filename,
+                    "error": f"Skill {skill_name}@{skill_version} already exists"
                 })
                 continue
 
