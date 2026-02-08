@@ -2095,6 +2095,121 @@ async def stats_page(request: Request):
     })
 
 
+@app.get("/skill/{skill_name}", response_class=HTMLResponse)
+async def skill_detail_page(request: Request, skill_name: str):
+    """Display skill detail page with Skill.md content."""
+    # Check if user is authenticated
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Find the skill ZIP file
+    # First try exact match, then try with version pattern
+    skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
+    if not skill_zip.exists():
+        # Try to find a ZIP that starts with skill_name-
+        matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
+        if matching_zips:
+            skill_zip = matching_zips[0]  # Use the first match
+        else:
+            raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
+
+    # Extract metadata from the skill
+    metadata = extract_metadata(skill_zip.name)
+
+    # Get download count from database
+    from database import get_download_stats
+    stats = get_download_stats()
+    download_count = 0
+    for ranking in stats["rankings"]:
+        if ranking["skill_name"] == skill_name:
+            download_count = ranking["downloads"]
+            break
+
+    # Get author from metadata
+    author = "Unknown"
+    if metadata and "metadata" in metadata:
+        author_meta = metadata["metadata"].get("author", "Unknown")
+        if isinstance(author_meta, dict):
+            author = author_meta.get("name", "Unknown")
+        else:
+            author = str(author_meta) if author_meta else "Unknown"
+
+    # Get version
+    version = metadata.get("version", "1.0.0") if metadata else "1.0.0"
+
+    # Get updated_at from file modification time
+    updated_at = datetime.fromtimestamp(skill_zip.stat().st_mtime).strftime("%Y-%m-%d")
+
+    # Get current user
+    user = get_current_user(request)
+
+    return templates.TemplateResponse("skill_detail.html", {
+        "request": request,
+        "skill_name": metadata.get("name", skill_name) if metadata else skill_name,
+        "author": author,
+        "download_count": download_count,
+        "version": version,
+        "updated_at": updated_at,
+        "download_url": f"/plugins/{skill_zip.name}",
+        "user": user
+    })
+
+
+@app.get("/api/skill/{skill_name}/content")
+async def get_skill_content_api(skill_name: str):
+    """Get Skill.md content for a skill.
+
+    Returns the complete SKILL.md file content (including YAML frontmatter).
+    """
+    print(f"[DEBUG] API called with skill_name: '{skill_name}'")
+
+    # Find the skill ZIP file
+    # First try exact match, then try with version pattern
+    skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
+    print(f"[DEBUG] Trying exact match: {skill_zip}, exists: {skill_zip.exists()}")
+
+    if not skill_zip.exists():
+        # Try to find a ZIP that starts with skill_name-
+        matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
+        print(f"[DEBUG] Pattern match found: {len(matching_zips)} files")
+        if matching_zips:
+            skill_zip = matching_zips[0]  # Use the first match
+            print(f"[DEBUG] Using: {skill_zip}")
+        else:
+            raise HTTPException(status_code=404, detail=f"Skill ZIP file not found for: {skill_name}")
+
+    try:
+        import zipfile
+
+        with zipfile.ZipFile(skill_zip, 'r') as zf:
+            # Find SKILL.md (may be in root or subdirectory)
+            skill_md_paths = [name for name in zf.namelist()
+                             if 'SKILL.md' in name or name.endswith('SKILL.md')]
+
+            print(f"[DEBUG] Found SKILL.md files: {skill_md_paths}")
+
+            if not skill_md_paths:
+                return {"content": None}
+
+            # Read SKILL.md content
+            skill_md_path = skill_md_paths[0]
+            content = zf.read(skill_md_path).decode('utf-8')
+
+            print(f"[DEBUG] SKILL.md content length: {len(content)} bytes")
+
+            # Return the complete SKILL.md content (including YAML frontmatter)
+            return {"content": content}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read skill content: {str(e)}"
+        )
+
+
 @app.get("/api/admin/stats")
 async def api_admin_stats(
     _: bool = Depends(require_admin)

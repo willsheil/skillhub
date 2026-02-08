@@ -188,61 +188,25 @@
             text-decoration: underline;
         }
 
-        /* Fixed Toolbar (shown when items selected) */
-        .fixed-toolbar {
-            position: fixed;
-            top: 60px;
-            left: 220px;
-            right: 0;
-            height: 48px;
-            background: #ffffff;
-            border-bottom: 1px solid #eaeaea;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 24px;
-            z-index: 98;
-            transition: all 0.2s ease;
-        }
-
-        .fixed-toolbar.visible {
-            display: flex;
-        }
-
-        .toolbar-info {
-            font-size: 14px;
-            color: #64748b;
-        }
-
-        .toolbar-info strong {
-            color: #171717;
-            font-weight: 500;
-        }
-
-        .toolbar-actions {
-            display: flex;
-            gap: 8px;
-        }
-
         /* Main Content */
         .main-content {
             padding-top: 60px;
+            min-height: calc(100vh - 60px);
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 24px;
+            padding: 32px 24px;
         }
 
         /* Search Section */
         .search-section {
             background: #ffffff;
-            border: 1px solid #eaeaea;
-            border-radius: 6px;
-            padding: 16px;
-            margin-bottom: 24px;
+            border: 2px solid #eaeaea;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 32px;
             display: flex;
             gap: 12px;
             align-items: center;
@@ -250,18 +214,18 @@
 
         .search-input {
             flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #eaeaea;
-            border-radius: 4px;
-            font-size: 14px;
+            padding: 14px 20px;
+            border: 2px solid #eaeaea;
+            border-radius: 12px;
+            font-size: 15px;
             color: #171717;
             outline: none;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            transition: all 0.3s ease;
         }
 
         .search-input:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
         }
 
         .search-input::placeholder {
@@ -269,18 +233,19 @@
         }
 
         .sort-select, .pagesize-select {
-            padding: 8px 12px;
-            border: 1px solid #eaeaea;
-            border-radius: 4px;
+            padding: 12px 16px;
+            border: 2px solid #eaeaea;
+            border-radius: 12px;
             font-size: 14px;
             color: #171717;
             background: #ffffff;
             cursor: pointer;
             outline: none;
+            transition: all 0.2s ease;
         }
 
         .sort-select:focus, .pagesize-select:focus {
-            border-color: #2563eb;
+            border-color: #667eea;
         }
 
         .pagesize-label {
@@ -290,30 +255,31 @@
         }
 
         .btn {
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: 12px 20px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             border: none;
             outline: none;
-            transition: all 0.15s ease;
+            transition: all 0.2s ease;
             white-space: nowrap;
         }
 
         .btn-primary {
-            background: #2563eb;
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
         }
 
         .btn-primary:hover {
-            background: #1d4ed8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
 
         .btn-secondary {
             background: #ffffff;
             color: #171717;
-            border: 1px solid #eaeaea;
+            border: 2px solid #eaeaea;
         }
 
         .btn-secondary:hover {
@@ -321,157 +287,182 @@
             border-color: #d4d4d4;
         }
 
-        /* Skills Table */
-        .skills-table-container {
+        /* Skills Grid */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1024px) {
+            .skills-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .skills-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Skill Card */
+        .skill-card {
             background: #ffffff;
-            border: 1px solid #eaeaea;
-            border-radius: 6px;
+            border: 2px solid #eaeaea;
+            border-radius: 16px;
             overflow: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
 
-        .skills-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .skills-table thead {
-            background: #fafafa;
-            border-bottom: 1px solid #eaeaea;
-        }
-
-        .skills-table th {
-            padding: 12px 16px;
-            text-align: left;
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #64748b;
-            border-bottom: 1px solid #eaeaea;
-        }
-
-        .skills-table th.sortable {
+        .skill-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+            border-color: #667eea;
             cursor: pointer;
-            user-select: none;
         }
 
-        .skills-table th.sortable:hover {
-            background: #f0f0f0;
-        }
-
-        .skills-table th .sort-indicator {
-            margin-left: 4px;
-            color: #a1a1aa;
-        }
-
-        .skills-table th.sort-asc .sort-indicator::after {
-            content: '↑';
-            color: #2563eb;
-        }
-
-        .skills-table th.sort-desc .sort-indicator::after {
-            content: '↓';
-            color: #2563eb;
-        }
-
-        .skills-table td {
-            padding: 12px 16px;
+        /* Card Header */
+        .card-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9ff, #faf5ff);
             border-bottom: 1px solid #eaeaea;
-            vertical-align: middle;
-            font-size: 14px;
         }
 
-        .skills-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .skills-table tbody tr:hover {
-            background: #fafafa;
-        }
-
-        /* Checkbox */
-        .checkbox-cell {
-            width: 40px;
-            text-align: center;
-        }
-
-        .checkbox-cell input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-            accent-color: #2563eb;
-        }
-
-        /* Skill Name */
-        .skill-name {
-            font-weight: 500;
-            color: #171717;
-        }
-
-        /* Version Badge */
-        .version-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            background: #f3f4f6;
-            color: #64748b;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        /* Download Count */
-        .download-count {
-            display: inline-flex;
+        .header-left {
+            display: flex;
             align-items: center;
-            gap: 4px;
-            color: #2563eb;
-            font-size: 13px;
-            font-weight: 500;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
         }
 
-        .download-count .icon {
-            color: #2563eb;
+        .skill-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 24px;
         }
 
-        /* Description */
-        .description {
-            color: #737373;
-            max-width: 500px;
+        .skill-icon img {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            object-fit: cover;
+        }
+
+        .skill-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .skill-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #171717;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
-        .description:hover {
-            text-overflow: ellipsis;
-            overflow: hidden;
-            white-space: normal;
-            word-wrap: break-word;
+        .skill-author {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 2px;
         }
 
-        /* Author */
-        .author {
-            color: #737373;
+        /* Card Content */
+        .card-content {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .description {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-height: 44px;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Card Footer */
+        .card-footer {
+            padding: 16px 20px;
+            background: #fafafa;
+            border-top: 1px solid #eaeaea;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #64748b;
             font-size: 13px;
         }
 
-        /* Download Links */
-        .download-links {
+        .download-icon {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .download-count {
+            font-weight: 500;
+        }
+
+        .footer-right {
             display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
+            align-items: center;
+            gap: 8px;
         }
 
-        .download-link {
-            color: #2563eb;
-            text-decoration: none;
-            padding: 2px 4px;
-            border-radius: 4px;
-            transition: background 0.15s ease;
-        }
-
-        .download-link:hover {
+        .download-btn, .version-badge {
             background: #f3f4f6;
+            color: #64748b;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            display: inline-block;
+        }
+
+        .download-btn:hover {
+            background: #e5e7eb;
+            color: #171717;
         }
 
         /* Pagination */
@@ -479,92 +470,98 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 8px;
-            margin-top: 24px;
-            padding: 16px 0;
+            gap: 12px;
+            margin-top: 40px;
+            padding: 24px 0;
         }
 
         .pagination-info {
-            font-size: 13px;
-            color: #737373;
+            font-size: 14px;
+            color: #64748b;
         }
 
         .pagination-controls {
             display: flex;
-            gap: 4px;
+            gap: 8px;
         }
 
         .page-btn {
-            padding: 6px 12px;
+            padding: 10px 18px;
             background: white;
-            border: 1px solid #eaeaea;
-            border-radius: 4px;
+            border: 2px solid #eaeaea;
+            border-radius: 8px;
             color: #171717;
             font-size: 14px;
             cursor: pointer;
             text-decoration: none;
-            transition: all 0.15s ease;
+            transition: all 0.2s ease;
         }
 
         .page-btn:hover:not(:disabled) {
-            background: #fafafa;
-            border-color: #d4d4d4;
+            border-color: #667eea;
+            color: #667eea;
         }
 
         .page-btn:disabled {
             color: #d4d4d4;
             cursor: not-allowed;
+            opacity: 0.5;
         }
 
         .page-btn.current {
-            background: #2563eb;
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
-            border-color: #2563eb;
+            border-color: transparent;
         }
 
         /* Empty State */
         .empty-state {
+            grid-column: 1 / -1;
             text-align: center;
             padding: 80px 24px;
-            color: #737373;
+            color: #64748b;
+        }
+
+        .empty-state .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
         }
 
         .empty-state h2 {
-            font-size: 16px;
+            font-size: 20px;
             font-weight: 500;
             color: #171717;
             margin-bottom: 8px;
         }
 
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 24px;
-            color: #737373;
-            font-size: 13px;
+        .empty-state p {
+            font-size: 14px;
+            color: #64748b;
         }
 
-        .footer a {
-            color: #2563eb;
+        .empty-state a {
+            color: #667eea;
             text-decoration: none;
+            font-weight: 500;
         }
 
-        .footer a:hover {
+        .empty-state a:hover {
             text-decoration: underline;
         }
 
         /* Loading State */
         .loading {
+            grid-column: 1 / -1;
             text-align: center;
             padding: 80px 24px;
-            color: #737373;
+            color: #64748b;
         }
 
         .spinner {
-            width: 32px;
-            height: 32px;
-            border: 2px solid #eaeaea;
-            border-top-color: #2563eb;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #eaeaea;
+            border-top-color: #667eea;
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
             margin: 0 auto 16px;
@@ -572,6 +569,24 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: #64748b;
+            font-size: 13px;
+            margin-top: 40px;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
         }
 
         /* Responsive */
@@ -589,30 +604,29 @@
                 margin-left: 0;
             }
 
-            .fixed-header, .fixed-toolbar {
+            .fixed-header {
                 left: 0;
             }
 
-            .toolbar-actions {
-                gap: 4px;
+            .search-section {
+                flex-direction: column;
+                align-items: stretch;
             }
 
-            .btn {
-                padding: 6px 12px;
-                font-size: 13px;
+            .sort-select, .pagesize-select {
+                width: 100%;
             }
 
-            .skills-table {
-                font-size: 13px;
+            .card-header {
+                padding: 16px;
             }
 
-            .skills-table th,
-            .skills-table td {
-                padding: 10px 12px;
+            .card-content {
+                padding: 16px;
             }
 
-            .description {
-                max-width: 300px;
+            .card-footer {
+                padding: 12px 16px;
             }
         }
     </style>
@@ -679,17 +693,6 @@
             </div>
         </div>
 
-        <!-- Fixed Toolbar (shown when items selected) -->
-        <div class="fixed-toolbar" id="fixedToolbar">
-            <div class="toolbar-info">
-                已选择 <strong id="selectedCount">0</strong> 个技能
-            </div>
-            <div class="toolbar-actions">
-                <button class="btn btn-primary" onclick="downloadSelected()">⬇️ 批量下载</button>
-                <button class="btn btn-secondary" onclick="clearSelection()">清除选择</button>
-            </div>
-        </div>
-
         <!-- Main Content -->
         <div class="main-content">
             <div class="container">
@@ -708,42 +711,26 @@
                         <option value="name_asc">名称 A-Z</option>
                         <option value="name_desc">名称 Z-A</option>
                     </select>
-                    <span class="pagesize-label">每页</span>
-                    <select class="pagesize-select" id="pageSizeSelect" onchange="handlePageSizeChange()">
-                        <option value="20" selected>20条</option>
-                        <option value="50">50条</option>
-                        <option value="100">100条</option>
-                    </select>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="pagesize-label">每页</span>
+                        <select class="pagesize-select" id="pageSizeSelect" onchange="handlePageSizeChange()">
+                            <option value="12" selected>12条</option>
+                            <option value="24">24条</option>
+                            <option value="48">48条</option>
+                        </select>
+                    </div>
                     <button class="btn btn-secondary" onclick="clearSearch()">清除</button>
                 </div>
 
-                <!-- Skills Table -->
-                <div class="skills-table-container">
-                    <table class="skills-table" id="skillsTable">
-                        <thead>
-                            <tr>
-                                <th class="checkbox-cell">
-                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
-                                </th>
-                                <th>技能名称</th>
-                                <th>版本</th>
-                                <th class="sortable" onclick="sortByColumn('downloads')">
-                                    下载次数 <span class="sort-indicator" id="downloadSort">↓</span>
-                                </th>
-                                <th style="width: 40%;">描述</th>
-                                <th>作者</th>
-                            </tr>
-                        </thead>
-                        <tbody id="skillsTableBody">
-                            <!-- Skills will be loaded via JavaScript -->
-                        </tbody>
-                    </table>
+                <!-- Skills Grid -->
+                <div class="skills-grid" id="skillsGrid">
+                    <!-- Skills will be loaded via JavaScript -->
                 </div>
 
                 <!-- Pagination -->
                 <div class="pagination" id="pagination">
                     <div class="pagination-info" id="paginationInfo">
-                        显示 1-20 / 共 24 个技能
+                        显示 1-12 / 共 24 个技能
                     </div>
                     <div class="pagination-controls" id="paginationControls">
                         <!-- Pagination buttons will be added via JavaScript -->
@@ -763,8 +750,7 @@
         let allSkills = [];
         let filteredSkills = [];
         let currentPage = 1;
-        let pageSize = 20;  // 默认每页20条
-        let selectedSkills = new Set();
+        let pageSize = 12;  // 默认每页12条（3列 x 4行）
         let downloadStats = {};
         let currentSort = { field: 'upload_time', order: 'desc' };
 
@@ -804,12 +790,103 @@
                 sortSkills();
                 filteredSkills = [...allSkills];
 
-                renderTable();
+                renderCards();
                 updatePagination();
             } catch (error) {
                 console.error('Failed to load data:', error);
                 showError();
             }
+        }
+
+        // Generate tags based on skill description
+        function generateTags(skill) {
+            const tags = [];
+            const desc = (skill.metadata?.description || '').toLowerCase();
+
+            // Generate tags based on keywords
+            if (desc.includes('效率') || desc.includes('自动') || desc.includes('快捷')) {
+                tags.push({ text: '效率类', color: '#3b82f6' });
+            } else if (desc.includes('分析') || desc.includes('统计') || desc.includes('数据')) {
+                tags.push({ text: '分析类', color: '#8b5cf6' });
+            } else if (desc.includes('工具') || desc.includes('实用')) {
+                tags.push({ text: '工具类', color: '#10b981' });
+            } else if (desc.includes('安全') || desc.includes('测试') || desc.includes('检测')) {
+                tags.push({ text: '安全类', color: '#f59e0b' });
+            } else if (desc.includes('AI') || desc.includes('智能') || desc.includes('机器学习')) {
+                tags.push({ text: 'AI类', color: '#ec4899' });
+            } else {
+                tags.push({ text: '通用', color: '#64748b' });
+            }
+
+            // Limit to 3 tags
+            return tags.slice(0, 3).map(tag =>
+                `<span class="tag" style="background: ${tag.color}20; color: ${tag.color}">
+                    ${tag.text}
+                </span>`
+            ).join('');
+        }
+
+        // Generate skill icon emoji based on name
+        function generateSkillIcon(skill) {
+            const name = (skill.metadata?.name || skill.name).toLowerCase();
+
+            if (name.includes('代码') || name.includes('code')) return '💻';
+            if (name.includes('安全') || name.includes('security')) return '🔒';
+            if (name.includes('分析') || name.includes('analysis')) return '📊';
+            if (name.includes('搜索') || name.includes('search')) return '🔍';
+            if (name.includes('效率') || name.includes('productivity')) return '⚡';
+            if (name.includes('AI') || name.includes('智能')) return '🤖';
+            if (name.includes('文件') || name.includes('file')) return '📁';
+            if (name.includes('网络') || name.includes('network')) return '🌐';
+            if (name.includes('测试') || name.includes('test')) return '🧪';
+            if (name.includes('工具') || name.includes('tool')) return '🛠️';
+
+            return '📦'; // Default icon
+        }
+
+        // Get author name from skill metadata
+        function getAuthorName(skill) {
+            const author = skill.metadata?.metadata?.author;
+            if (typeof author === 'object' && author !== null) {
+                return author.name || '未知';
+            }
+            return author || '未知';
+        }
+
+        // Generate card HTML for a skill
+        function generateCardHTML(skill) {
+            const icon = generateSkillIcon(skill);
+            const tags = generateTags(skill);
+            const author = getAuthorName(skill);
+            const latestVersion = skill.versions && skill.versions.length > 0 ? skill.versions[0] : null;
+
+            return `
+                <div class="card-header">
+                    <div class="header-left">
+                        <div class="skill-icon">${icon}</div>
+                        <div class="skill-info">
+                            <div class="skill-title" title="${skill.metadata?.name || skill.name}">${skill.metadata?.name || skill.name}</div>
+                            <div class="skill-author">by ${author}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div class="description" title="${skill.metadata?.description || '暂无描述'}">${skill.metadata?.description || '暂无描述'}</div>
+                    <div class="tags">${tags}</div>
+                </div>
+                <div class="card-footer">
+                    <div class="footer-left">
+                        <span class="download-icon">⬇</span>
+                        <span class="download-count">${skill.download_count || 0}</span>
+                    </div>
+                    <div class="footer-right">
+                        ${latestVersion ? `
+                            <a href="/plugins/${latestVersion.filename}" class="download-btn" download>下载</a>
+                            <span class="version-badge">v${skill.latest_version}</span>
+                        ` : '<span style="color: #ef4444;">无可用版本</span>'}
+                    </div>
+                </div>
+            `;
         }
 
         // Sort skills based on current sort settings
@@ -822,7 +899,6 @@
 
                 switch (field) {
                     case 'upload_time':
-                        // Use the latest version's updated_at
                         valA = a.versions && a.versions.length > 0 ?
                             new Date(a.versions[a.versions.length - 1].updated_at) : new Date(0);
                         valB = b.versions && b.versions.length > 0 ?
@@ -863,28 +939,8 @@
             }
 
             currentPage = 1;
-            renderTable();
+            renderCards();
             updatePagination();
-        }
-
-        // Sort by column click
-        function sortByColumn(column) {
-            if (currentSort.field === column) {
-                // Toggle order
-                currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSort.field = column;
-                currentSort.order = 'desc';
-            }
-
-            // Update sort indicator
-            document.getElementById('downloadSort').textContent = currentSort.order === 'asc' ? '↑' : '↓';
-
-            // Update select to match
-            const selectValue = `${currentSort.field}_${currentSort.order}`;
-            document.getElementById('sortSelect').value = selectValue;
-
-            handleSort();
         }
 
         // Filter skills based on search query
@@ -892,7 +948,6 @@
             filteredSkills = allSkills.filter(skill => {
                 const name = (skill.metadata?.name || skill.name).toLowerCase();
                 const description = (skill.metadata?.description || '').toLowerCase();
-                // Author is now in metadata.metadata.author per Agent Skills spec
                 const author = (skill.metadata?.metadata?.author || '').toLowerCase();
 
                 return name.includes(query) ||
@@ -901,74 +956,44 @@
             });
         }
 
-        // Render skills table
-        function renderTable() {
-            const tbody = document.getElementById('skillsTableBody');
+        // Render skills cards
+        function renderCards() {
+            const grid = document.getElementById('skillsGrid');
             const start = (currentPage - 1) * pageSize;
             const end = Math.min(start + pageSize, filteredSkills.length);
             const pageSkills = filteredSkills.slice(start, end);
 
             if (pageSkills.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="empty-state">
-                            <h2>未找到技能</h2>
-                            <p>请调整搜索条件或<a href="#" onclick="location.reload()">刷新页面</a></p>
-                        </td>
-                    </tr>
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔍</div>
+                        <h2>未找到技能</h2>
+                        <p>请调整搜索条件或<a href="#" onclick="location.reload()">刷新页面</a></p>
+                    </div>
                 `;
                 return;
             }
 
-            tbody.innerHTML = pageSkills.map(skill => `
-                <tr data-skill-id="${skill.name}" data-filenames='${JSON.stringify(skill.versions.map(v => v.filename)).replace(/'/g, "\\'")}'>
-                    <td class="checkbox-cell">
-                        <input type="checkbox"
-                               class="skill-checkbox"
-                               ${selectedSkills.has(skill.name) ? 'checked' : ''}
-                               onchange="updateSelection()">
-                    </td>
-                    <td>
-                        <div class="skill-name">${skill.metadata?.name || skill.name}</div>
-                    </td>
-                    <td><span class="version-badge">v${skill.latest_version}</span></td>
-                    <td>
-                        <div class="download-links">
-                            ${skill.versions.map(ver => `
-                                <a href="/plugins/${ver.filename}"
-                                   class="download-link"
-                                   title="下载 ${ver.version} (${Math.round(ver.size / 1024)} KB)"
-                                   download>
-                                    <span class="download-count">
-                                        <span class="icon">⬇️</span>
-                                        ${skill.download_count || 0}
-                                    </span>
-                                </a>
-                            `).join('')}
-                        </div>
-                    </td>
-                    <td>
-                        <div class="description" title="${skill.metadata?.description || '暂无描述'}">
-                            ${skill.metadata?.description || '暂无描述'}
-                        </div>
-                    </td>
-                    <td>
-                        <div class="author">${skill.metadata?.metadata?.author || '未知'}</div>
-                    </td>
-                </tr>
+            grid.innerHTML = pageSkills.map(skill => `
+                <div class="skill-card" data-skill-id="${skill.name}" style="cursor: pointer;">
+                    ${generateCardHTML(skill)}
+                </div>
             `).join('');
+
+            // Add click handlers to skill cards
+            document.querySelectorAll('.skill-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // Don't navigate if clicking on download button or link
+                    if (e.target.closest('a') || e.target.closest('.download-btn')) {
+                        return;
+                    }
+                    const skillName = card.dataset.skillId;
+                    window.location.href = `/skill/${encodeURIComponent(skillName)}`;
+                });
+            });
 
             // Update header stats
             document.getElementById('headerStats').textContent = `${allSkills.length} 个技能`;
-
-            // Update select all checkbox state
-            const pageCheckboxes = document.querySelectorAll('.skill-checkbox');
-            const allSelected = pageCheckboxes.length > 0 && Array.from(pageCheckboxes).every(cb => cb.checked);
-            const someSelected = Array.from(pageCheckboxes).some(cb => cb.checked);
-
-            const selectAllCheckbox = document.getElementById('selectAll');
-            selectAllCheckbox.checked = allSelected;
-            selectAllCheckbox.indeterminate = someSelected && !allSelected;
         }
 
         // Pagination
@@ -1022,72 +1047,9 @@
 
         function goToPage(page) {
             currentPage = page;
-            renderTable();
+            renderCards();
             updatePagination();
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // Selection
-        function toggleSelectAll() {
-            const selectAllCheckbox = document.getElementById('selectAll');
-            const checkboxes = document.querySelectorAll('.skill-checkbox');
-            const isChecked = selectAllCheckbox.checked;
-
-            checkboxes.forEach(cb => {
-                cb.checked = isChecked;
-                const skillId = cb.closest('tr').dataset.skillId;
-                if (isChecked) {
-                    selectedSkills.add(skillId);
-                } else {
-                    selectedSkills.delete(skillId);
-                }
-            });
-
-            updateToolbar();
-        }
-
-        function updateSelection() {
-            const checkboxes = document.querySelectorAll('.skill-checkbox:checked');
-
-            selectedSkills.clear();
-            checkboxes.forEach(cb => {
-                selectedSkills.add(cb.closest('tr').dataset.skillId);
-            });
-
-            const allCheckboxes = document.querySelectorAll('.skill-checkbox');
-            const allSelected = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.checked);
-            const someSelected = Array.from(allCheckboxes).some(cb => cb.checked);
-
-            const selectAllCheckbox = document.getElementById('selectAll');
-            selectAllCheckbox.checked = allSelected;
-            selectAllCheckbox.indeterminate = someSelected && !allSelected;
-
-            updateToolbar();
-        }
-
-        function updateToolbar() {
-            const toolbar = document.getElementById('fixedToolbar');
-            const count = selectedSkills.size;
-
-            document.getElementById('selectedCount').textContent = count;
-
-            if (count > 0) {
-                toolbar.classList.add('visible');
-            } else {
-                toolbar.classList.remove('visible');
-            }
-        }
-
-        function clearSelection() {
-            const checkboxes = document.querySelectorAll('.skill-checkbox');
-            checkboxes.forEach(cb => cb.checked = false);
-
-            const selectAllCheckbox = document.getElementById('selectAll');
-            selectAllCheckbox.checked = false;
-            selectAllCheckbox.indeterminate = false;
-
-            selectedSkills.clear();
-            updateToolbar();
         }
 
         // Search
@@ -1101,7 +1063,7 @@
             }
 
             currentPage = 1;
-            renderTable();
+            renderCards();
             updatePagination();
         }
 
@@ -1109,7 +1071,7 @@
             document.getElementById('searchInput').value = '';
             filteredSkills = [...allSkills];
             currentPage = 1;
-            renderTable();
+            renderCards();
             updatePagination();
         }
 
@@ -1124,79 +1086,19 @@
                 currentPage = Math.max(1, totalPages);
             }
 
-            renderTable();
+            renderCards();
             updatePagination();
-        }
-
-        // Batch Download
-        async function downloadSelected() {
-            if (selectedSkills.size === 0) {
-                alert('请先选择要下载的技能');
-                return;
-            }
-
-            const selectedFilenames = [];
-            selectedSkills.forEach(skillName => {
-                const row = document.querySelector(`tr[data-skill-id="${skillName}"]`);
-                if (row) {
-                    const filenames = JSON.parse(row.dataset.filenames);
-                    filenames.forEach(filename => selectedFilenames.push(filename));
-                }
-            });
-
-            if (selectedFilenames.length === 0) {
-                alert('没有找到要下载的文件');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/batch-download', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ filenames: selectedFilenames })
-                });
-
-                if (!response.ok) {
-                    throw new Error('下载失败');
-                }
-
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = 'skills-batch.zip';
-                if (contentDisposition) {
-                    const match = contentDisposition.match(/filename="?([^"]+)"?/);
-                    if (match) {
-                        filename = match[1];
-                    }
-                }
-
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-
-            } catch (error) {
-                console.error('Download failed:', error);
-                alert('下载失败，请重试');
-            }
         }
 
         // Show error
         function showError() {
-            document.getElementById('skillsTableBody').innerHTML = `
-                <tr>
-                    <td colspan="6" class="empty-state">
-                        <h2>加载失败</h2>
-                        <p>请刷新页面重试</p>
-                    </td>
-                </tr>
+            document.getElementById('skillsGrid').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">⚠️</div>
+                    <h2>加载失败</h2>
+                    <p>请刷新页面重试</p>
+                    <button class="btn btn-primary" onclick="location.reload()">刷新页面</button>
+                </div>
             `;
         }
     </script>

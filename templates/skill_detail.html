@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ skill_name }} - 技能详情</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
+            background: #ffffff;
+            color: #171717;
+            line-height: 1.6;
+        }
+
+        /* Header Navigation */
+        .header-nav {
+            background: #24292e;
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: white;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1012px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        /* Skill Header */
+        .skill-header {
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .skill-title {
+            font-size: 40px;
+            font-weight: 700;
+            color: #171717;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .skill-badges {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-public {
+            background: #2ea44f;
+            color: white;
+        }
+
+        .meta-info {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            font-size: 14px;
+            color: #586069;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .meta-icon {
+            font-size: 16px;
+        }
+
+        .meta-link {
+            color: #586069;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .meta-link:hover {
+            color: #0366d6;
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 16px;
+            border-bottom: 1px solid #eaeaea;
+            margin-bottom: 24px;
+        }
+
+        .tab-item {
+            padding: 12px 16px;
+            color: #586069;
+            text-decoration: none;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-item:hover {
+            color: #0366d6;
+            border-bottom-color: #0366d6;
+        }
+
+        .tab-item.active {
+            color: #0366d6;
+            font-weight: 600;
+            border-bottom-color: #0366d6;
+        }
+
+        /* Content Section */
+        .content-section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #171717;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        /* Markdown Content */
+        .markdown-content {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #24292e;
+        }
+
+        .markdown-content h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin: 24px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .markdown-content h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 24px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .markdown-content h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 20px 0 12px;
+        }
+
+        .markdown-content h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+        }
+
+        .markdown-content p {
+            margin-bottom: 16px;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin: 0 0 16px 0;
+            padding-left: 32px;
+        }
+
+        .markdown-content li {
+            margin-bottom: 8px;
+        }
+
+        .markdown-content code {
+            background: #f6f8fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 85%;
+        }
+
+        .markdown-content pre {
+            background: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-bottom: 16px;
+        }
+
+        .markdown-content pre code {
+            background: transparent;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .markdown-content .yaml-frontmatter {
+            background: #f6f8fa;
+            border: 1px solid #dfe2e5;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+        }
+
+        .markdown-content .yaml-frontmatter code {
+            color: #586069;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid #dfe2e5;
+            padding-left: 16px;
+            color: #586069;
+            margin: 0 0 16px 0;
+        }
+
+        .markdown-content a {
+            color: #0366d6;
+            text-decoration: none;
+        }
+
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        .markdown-content table th,
+        .markdown-content table td {
+            border: 1px solid #dfe2e5;
+            padding: 6px 13px;
+        }
+
+        .markdown-content table th {
+            background: #f6f8fa;
+            font-weight: 600;
+        }
+
+        .markdown-content img {
+            max-width: 100%;
+            border-radius: 6px;
+            margin: 16px 0;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #d1d5da;
+            background: #fafbfc;
+            color: #24292e;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: #f3f4f6;
+            border-color: #c3c8cf;
+        }
+
+        .btn-primary {
+            background: #2ea44f;
+            color: white;
+            border-color: rgba(27, 31, 35, 0.15);
+        }
+
+        .btn-primary:hover {
+            background: #2c974b;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 60px;
+            padding: 40px 24px;
+            border-top: 1px solid #eaeaea;
+            text-align: center;
+            color: #586069;
+            font-size: 14px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 24px;
+            color: #586069;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 2px solid #eaeaea;
+            border-top-color: #0366d6;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error {
+            background: #ffe3e6;
+            border: 1px solid #da3633;
+            color: #da3633;
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 24px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .skill-title {
+                font-size: 32px;
+            }
+
+            .meta-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .container {
+                padding: 24px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Navigation -->
+    <div class="header-nav">
+        <a href="/" class="nav-link">← 返回首页</a>
+        <a href="/stats" class="nav-link">下载统计</a>
+        {% if user %}
+            {% if user.role == 'admin' %}
+            <a href="/admin" class="nav-link">管理后台</a>
+            {% endif %}
+            <a href="/upload" class="nav-link">上传技能</a>
+            <span style="margin-left: auto; color: rgba(255,255,255,0.7);">{{ user.employee_id }}</span>
+        {% else %}
+            <a href="/login" class="nav-link" style="margin-left: auto;">登录</a>
+        {% endif %}
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Skill Header -->
+        <div class="skill-header">
+            <h1 class="skill-title">{{ skill_name }}</h1>
+
+            <div class="skill-badges">
+                <span class="badge badge-public">Public</span>
+            </div>
+
+            <div class="meta-info">
+                <div class="meta-item">
+                    <span class="meta-icon">👤</span>
+                    <span>by {{ author }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">⬇</span>
+                    <span>{{ download_count }} 次下载</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">📦</span>
+                    <span>版本 v{{ version }}</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-icon">📅</span>
+                    <span>{{ updated_at }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            {% if download_url %}
+            <a href="{{ download_url }}" class="btn btn-primary">
+                <span>⬇</span> 下载技能
+            </a>
+            {% endif %}
+            <a href="/" class="btn">← 返回列表</a>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <a href="#readme" class="tab-item active">📄 README</a>
+        </div>
+
+        <!-- Content Section -->
+        <div id="readme" class="content-section">
+            <div id="markdownContent" class="markdown-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Skill应用商店@内部网络安全实验室</p>
+    </footer>
+
+    <script>
+        // Load Skill.md content
+        async function loadSkillMD() {
+            const skillName = {{ skill_name | tojson }};
+            const contentDiv = document.getElementById('markdownContent');
+
+            try {
+                const response = await fetch(`/api/skill/${encodeURIComponent(skillName)}/content`);
+                if (!response.ok) {
+                    throw new Error('Failed to load content');
+                }
+
+                const data = await response.json();
+
+                if (data.content) {
+                    // Render markdown
+                    contentDiv.innerHTML = renderMarkdown(data.content);
+                } else {
+                    contentDiv.innerHTML = '<p style="color: #586069; padding: 40px; text-align: center;">暂无详细内容</p>';
+                }
+            } catch (error) {
+                console.error('Error loading content:', error);
+                contentDiv.innerHTML = '<p style="color: #da3633; padding: 40px; text-align: center;">加载失败，请稍后重试</p>';
+            }
+        }
+
+        // Simple markdown renderer (basic implementation)
+        function renderMarkdown(text) {
+            let html = text;
+
+            // Handle YAML frontmatter (between --- markers)
+            html = html.replace(/^---\s*\n([\s\S]*?)\n---\s*\n/gim, '<pre class="yaml-frontmatter"><code>$1</code></pre>');
+
+            // Headers
+            html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+            // Bold
+            html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+
+            // Italic
+            html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
+
+            // Code blocks
+            html = html.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>');
+
+            // Inline code
+            html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
+
+            // Links
+            html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/gim, '<a href="$2" target="_blank">$1</a>');
+
+            // Images
+            html = html.replace(/!\[([^\]]*)\]\(([^\)]+)\)/gim, '<img src="$2" alt="$1">');
+
+            // Unordered lists
+            html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+            // Ordered lists
+            html = html.replace(/^\s*\d+\.\s+(.*$)/gim, '<li>$1</li>');
+
+            // Blockquotes
+            html = html.replace(/^>\s+(.*$)/gim, '<blockquote>$1</blockquote>');
+
+            // Tables (basic support)
+            html = html.replace(/\|(.+)\|/gim, function(match) {
+                const cells = match.split('|').filter(c => c.trim());
+                return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+            });
+
+            // Paragraphs
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = '<p>' + html + '</p>';
+
+            // Clean up empty paragraphs
+            html = html.replace(/<p><(h[1-6]|ul|pre|blockquote|table)/g, '<$1');
+            html = html.replace(/<\/(h[1-6]|ul|pre|blockquote|table)><\/p>/g, '</$1>');
+            html = html.replace(/<p><\/p>/g, '');
+
+            return html;
+        }
+
+        // Load content on page ready
+        document.addEventListener('DOMContentLoaded', loadSkillMD);
+    </script>
+</body>
+</html>
