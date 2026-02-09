@@ -54,7 +54,20 @@
       "Bash(unzip -p:*)",
       "Bash(for f in test_skills/*.zip)",
       "Bash(chmod:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(sqlite3:*)",
+      "Bash(\"D:/anaconda/envs/a2a/python.exe\" -m pip install pymysql)",
+      "Bash(\"D:/anaconda/envs/a2a/python.exe\" check_mysql.py)",
+      "Bash(\"D:/anaconda/envs/a2a/python.exe\" migrate_to_mysql.py)",
+      "Bash(\"D:/anaconda/envs/a2a/python.exe\" main.py)",
+      "Bash(git tag:*)",
+      "Bash(C:\\\\Python314\\\\python.exe -m py_compile:*)",
+      "Bash(test:*)",
+      "Bash(del:*)",
+      "Bash(ping:*)",
+      "Bash(grep:*)",
+      "Bash(C:\\\\Users\\\\pickm\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\python.exe:*)",
+      "Bash(git rm:*)"
     ]
   }
 }

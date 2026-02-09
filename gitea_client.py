@@ -83,6 +83,10 @@ class GiteaClient:
         self.temp_dir = Path(tempfile.gettempdir()) / "gitea_sync"
         self.temp_dir.mkdir(exist_ok=True)
 
+        # Git configuration for commits
+        self.git_user_name = os.getenv("GIT_USER_NAME", "Skill Registry")
+        self.git_user_email = os.getenv("GIT_USER_EMAIL", "registry@local")
+
         logger.info(f"GiteaClient initialized with repo: {self.repo_url}")
 
     def _run_git_command(self, cwd: Path, args: list) -> Tuple[str, str, int]:
@@ -101,15 +105,78 @@ class GiteaClient:
         cmd = ["git"] + args
         logger.debug(f"Running: {' '.join(cmd)}")
 
+        # Set environment to disable proxy for localhost
+        env = os.environ.copy()
+        no_proxy = os.getenv("NO_PROXY", "127.0.0.1,localhost")
+        env["NO_PROXY"] = no_proxy
+        env["no_proxy"] = no_proxy
+        # Also explicitly unset http/https proxy for localhost
+        env["HTTP_PROXY"] = ""
+        env["HTTPS_PROXY"] = ""
+        env["http_proxy"] = ""
+        env["https_proxy"] = ""
+
         result = subprocess.run(
             cmd,
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=300,  # 5 minute timeout
+            env=env
         )
 
         return result.stdout, result.stderr, result.returncode
+
+    def _ensure_git_config(self, repo_path: Path):
+        """Ensure git config is set for the repository.
+
+        Args:
+            repo_path: Path to git repository
+        """
+        # Set user name and email for this repository
+        self._run_git_command(
+            repo_path,
+            ["config", "user.name", self.git_user_name]
+        )
+        self._run_git_command(
+            repo_path,
+            ["config", "user.email", self.git_user_email]
+        )
+
+    def _get_default_branch(self, repo_path: Path) -> str:
+        """Get the default branch name of the remote repository.
+
+        Args:
+            repo_path: Path to git repository
+
+        Returns:
+            Default branch name (usually 'main' or 'master')
+        """
+        # Try to get the default branch from remote
+        stdout, stderr, returncode = self._run_git_command(
+            repo_path,
+            ["symbolic-ref", "refs/remotes/origin/HEAD"]
+        )
+
+        if returncode == 0 and stdout:
+            # Format: refs/remotes/origin/main
+            branch = stdout.strip().split('/')[-1]
+            logger.info(f"Detected default branch: {branch}")
+            return branch
+
+        # Fallback: try common branch names
+        for branch in ['main', 'master']:
+            stdout, stderr, returncode = self._run_git_command(
+                repo_path,
+                ["ls-remote", "--symref", "--exit-code", "origin", "HEAD"]
+            )
+            if returncode == 0 and branch in stdout:
+                logger.info(f"Detected default branch from ls-remote: {branch}")
+                return branch
+
+        # Default to 'main' for new repositories
+        logger.info("Could not detect default branch, using 'main'")
+        return 'main'
 
     def clone_or_pull_repo(self) -> Path:
         """Clone or pull latest code from Gitea repository.
@@ -121,15 +188,31 @@ class GiteaClient:
 
         if local_path.exists():
             logger.info(f"Repository exists, pulling latest: {local_path}")
-            self._git_pull(local_path)
+            # Ensure git config is set
+            self._ensure_git_config(local_path)
+            # Get default branch and pull
+            branch = self._get_default_branch(local_path)
+            self._git_pull(local_path, branch)
         else:
             logger.info(f"Cloning repository: {self.repo_url}")
             self._git_clone(self.repo_url, local_path)
+            # Ensure git config is set after clone
+            self._ensure_git_config(local_path)
 
         return local_path
 
     def _git_clone(self, url: str, path: Path):
-        """Clone repository."""
+        """Clone repository.
+
+        Args:
+            url: Repository URL
+            path: Local path to clone to
+
+        Raises:
+            AuthenticationError: If authentication fails
+            RepositoryNotFoundError: If repository doesn't exist
+            GiteaError: For other clone failures
+        """
         # Inject token into URL for authentication
         if self.token:
             # URL format: https://token@url
@@ -147,18 +230,35 @@ class GiteaClient:
         )
 
         if returncode != 0:
-            if "Authentication failed" in stderr or "could not read Username" in stderr:
-                raise AuthenticationError(f"Git authentication failed: {stderr}")
-            elif "repository not found" in stderr.lower() or "could not find repository" in stderr.lower():
+            error_msg = stderr.strip()
+            if "Authentication failed" in error_msg or "could not read Username" in error_msg:
+                raise AuthenticationError(f"Git authentication failed: {error_msg}")
+            elif "repository not found" in error_msg.lower() or "could not find repository" in error_msg.lower():
                 raise RepositoryNotFoundError(f"Repository not found: {url}")
+            # Empty repository is ok - will be initialized on first push
+            elif "could not find remote ref" in error_msg or "does not appear to be a git repository" in error_msg:
+                logger.warning(f"Repository appears to be empty: {error_msg}")
+                # Create an empty repo structure
+                path.mkdir(parents=True, exist_ok=True)
+                self._run_git_command(path, ["init"])
+                self._run_git_command(path, ["remote", "add", "origin", url])
+                self._ensure_git_config(path)
             else:
-                raise GiteaError(f"Git clone failed: {stderr}")
+                raise GiteaError(f"Git clone failed: {error_msg}")
 
-    def _git_pull(self, path: Path):
-        """Pull latest changes."""
+    def _git_pull(self, path: Path, branch: str = None):
+        """Pull latest changes.
+
+        Args:
+            path: Path to git repository
+            branch: Branch name to pull (default: auto-detect)
+        """
+        if branch is None:
+            branch = self._get_default_branch(path)
+
         stdout, stderr, returncode = self._run_git_command(
             path,
-            ["pull", "origin", "master"]
+            ["pull", "origin", branch]
         )
 
         if returncode != 0:
@@ -215,14 +315,42 @@ class GiteaClient:
         Raises:
             GiteaError: If add, commit, or push operations fail
         """
+        # Ensure git config is set
+        self._ensure_git_config(repo_path)
+
+        # Get the current branch (or use 'main' as default for empty repos)
+        try:
+            branch = self._get_default_branch(repo_path)
+        except Exception:
+            branch = 'main'
+            # Set the branch for empty repo
+            self._run_git_command(repo_path, ["checkout", "-b", branch])
+
         # Stage all changes
         self._git_add_all(repo_path)
 
         # Create commit and get hash
         commit_hash = self._git_commit(repo_path, message)
 
-        # Push to remote
-        self._git_push(repo_path)
+        # Push to remote with -u for first push
+        try:
+            stdout, stderr, returncode = self._run_git_command(
+                repo_path,
+                ["push", "-u", "origin", branch]
+            )
+
+            if returncode != 0:
+                if "Authentication failed" in stderr:
+                    raise AuthenticationError(f"Git push authentication failed: {stderr}")
+                elif "network" in stderr.lower() or "timeout" in stderr.lower():
+                    raise NetworkError(f"Git push network error: {stderr}")
+                else:
+                    raise GiteaError(f"Git push failed: {stderr}")
+
+        except GiteaError as e:
+            # Try regular push if -u flag fails
+            logger.warning(f"Push with -u failed, trying regular push: {e}")
+            self._git_push(repo_path, branch)
 
         return commit_hash
 
@@ -285,20 +413,24 @@ class GiteaClient:
 
         raise GiteaError("Git commit succeeded but could not retrieve commit hash")
 
-    def _git_push(self, path: Path):
+    def _git_push(self, path: Path, branch: str = None):
         """Push commits to remote repository.
 
         Args:
             path: Path to git repository
+            branch: Branch name to push to (default: auto-detect)
 
         Raises:
             AuthenticationError: If authentication fails
             NetworkError: If network or timeout errors occur
             GiteaError: For other failures
         """
+        if branch is None:
+            branch = self._get_default_branch(path)
+
         stdout, stderr, returncode = self._run_git_command(
             path,
-            ["push", "origin", "master"]
+            ["push", "origin", branch]
         )
 
         if returncode != 0:

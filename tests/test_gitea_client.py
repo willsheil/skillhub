@@ -5,6 +5,9 @@ Tests cover:
 - Client initialization with environment variables
 - Exception hierarchy
 - Basic configuration validation
+- Git user configuration
+- Default branch detection
+- Empty repository handling
 """
 
 import os
@@ -30,6 +33,23 @@ def test_gitea_client_initialization(monkeypatch):
     assert client.token == "test_token_123"
     assert client.temp_dir.exists()
     assert client.temp_dir.name == "gitea_sync"
+    # New: check git config attributes
+    assert client.git_user_name == "Skill Registry"
+    assert client.git_user_email == "registry@local"
+
+
+def test_gitea_client_initialization_with_custom_git_config(monkeypatch):
+    """Test GiteaClient initialization with custom git config from environment."""
+    # Mock environment variables with custom git config
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token_123")
+    monkeypatch.setenv("GIT_USER_NAME", "Custom User")
+    monkeypatch.setenv("GIT_USER_EMAIL", "custom@example.com")
+
+    client = GiteaClient()
+
+    assert client.git_user_name == "Custom User"
+    assert client.git_user_email == "custom@example.com"
 
 
 def test_gitea_client_missing_repo_url(monkeypatch):
@@ -96,6 +116,9 @@ def test_exception_catching():
 
 
 def test_clone_or_pull_repo(monkeypatch):
+    """Test clone_or_pull_repo handles both clone and pull scenarios."""
+    import tempfile
+
     # Mock environment variables
     monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
     monkeypatch.setenv("GITEA_TOKEN", "test_token")
@@ -113,6 +136,159 @@ def test_clone_or_pull_repo(monkeypatch):
     # Should not raise
     repo_path = client.clone_or_pull_repo()
     assert repo_path == client.temp_dir / "repo"
+
+
+def test_ensure_git_config(monkeypatch, tmp_path):
+    """Test _ensure_git_config sets git user.name and user.email."""
+    import subprocess
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token")
+
+    client = GiteaClient()
+
+    # Track git config commands
+    config_commands = []
+
+    def mock_run(*args, **kwargs):
+        cmd = args[0] if args else []
+        if "config" in cmd:
+            config_commands.append(cmd)
+        class MockResult:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    repo_path = tmp_path / "test_repo"
+    repo_path.mkdir()
+
+    client._ensure_git_config(repo_path)
+
+    # Check that config commands were called
+    assert len(config_commands) >= 2
+    assert any("user.name" in cmd for cmd in config_commands)
+    assert any("user.email" in cmd for cmd in config_commands)
+
+
+def test_get_default_branch_from_symbolic_ref(monkeypatch, tmp_path):
+    """Test _get_default_branch detects branch from symbolic-ref."""
+    import subprocess
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+
+    client = GiteaClient()
+
+    def mock_run(*args, **kwargs):
+        cmd = args[0] if args else []
+        class MockResult:
+            returncode = 0
+            stdout = "refs/remotes/origin/main" if "symbolic-ref" in cmd else ""
+            stderr = ""
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    repo_path = tmp_path / "test_repo"
+    repo_path.mkdir()
+
+    branch = client._get_default_branch(repo_path)
+    assert branch == "main"
+
+
+def test_get_default_branch_fallback_to_main(monkeypatch, tmp_path):
+    """Test _get_default_branch falls back to 'main' when detection fails."""
+    import subprocess
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+
+    client = GiteaClient()
+
+    def mock_run(*args, **kwargs):
+        class MockResult:
+            returncode = 1  # Command fails
+            stdout = ""
+            stderr = ""
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    repo_path = tmp_path / "test_repo"
+    repo_path.mkdir()
+
+    branch = client._get_default_branch(repo_path)
+    assert branch == "main"
+
+
+def test_git_pull_with_branch_parameter(monkeypatch, tmp_path):
+    """Test _git_pull accepts and uses branch parameter."""
+    import subprocess
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+
+    client = GiteaClient()
+
+    pulled_branches = []
+
+    def mock_run(*args, **kwargs):
+        cmd = args[0] if args else []
+        if "pull" in cmd:
+            # Extract branch from command: git pull origin <branch>
+            if len(cmd) >= 4:
+                pulled_branches.append(cmd[3])
+        class MockResult:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    repo_path = tmp_path / "test_repo"
+    repo_path.mkdir()
+
+    # Test with explicit branch
+    client._git_pull(repo_path, "main")
+    assert "main" in pulled_branches
+
+    # Test with default branch detection
+    pulled_branches.clear()
+    client._git_pull(repo_path)
+    # Should call _get_default_branch which returns 'main' by default
+
+
+def test_git_push_with_branch_parameter(monkeypatch, tmp_path):
+    """Test _git_push accepts and uses branch parameter."""
+    import subprocess
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+
+    client = GiteaClient()
+
+    pushed_branches = []
+
+    def mock_run(*args, **kwargs):
+        cmd = args[0] if args else []
+        if "push" in cmd:
+            # Extract branch from command: git push origin <branch>
+            if len(cmd) >= 4:
+                pushed_branches.append(cmd[3])
+        class MockResult:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    repo_path = tmp_path / "test_repo"
+    repo_path.mkdir()
+
+    # Test with explicit branch
+    client._git_push(repo_path, "main")
+    assert "main" in pushed_branches
 
 
 def test_add_skill_folder(monkeypatch):
@@ -152,9 +328,8 @@ def test_add_skill_folder(monkeypatch):
         assert (skill_path / "script.py").exists()
 
 
-def test_commit_and_push(monkeypatch):
-    """Test commit_and_push orchestrates add, commit, and push operations."""
-    import tempfile
+def test_commit_and_push(monkeypatch, tmp_path):
+    """Test commit_and_push orchestrates config, add, commit, and push operations."""
     import subprocess
 
     # Mock environment variables
@@ -163,29 +338,96 @@ def test_commit_and_push(monkeypatch):
 
     client = GiteaClient()
 
-    # Mock subprocess.run to return success
-    call_count = [0]
+    # Track all git commands
+    git_commands = []
+
     def mock_run(*args, **kwargs):
-        call_count[0] += 1
+        cmd = args[0] if args else []
+        git_commands.append(cmd)
+
+        # Set up responses for different commands
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+        if "symbolic-ref" in cmd:
+            # Detect default branch as 'main'
+            stdout = "refs/remotes/origin/main"
+        elif "commit" in cmd:
+            # Return a commit hash
+            stdout = "[main abc123def456789] Test commit"
+        elif "log" in cmd and "--format=%H" in cmd:
+            stdout = "abc123def456789"
+
         class MockResult:
-            returncode = 0
-            stdout = f"[master abc123def456{call_count[0]}] feat: add test-skill-1.0.0"  # Mock commit output
-            stderr = ""
+            pass
+        MockResult.returncode = returncode
+        MockResult.stdout = stdout
+        MockResult.stderr = stderr
         return MockResult()
 
     monkeypatch.setattr("subprocess.run", mock_run)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        repo_path = Path(tmpdir)
-        repo_path.mkdir()
+    repo_path = tmp_path / "test_repo"
+    repo_path.mkdir()
 
-        commit_hash = client.commit_and_push(
-            repo_path,
-            "feat: add test-skill-1.0.0"
-        )
+    commit_hash = client.commit_and_push(
+        repo_path,
+        "feat: add test-skill-1.0.0"
+    )
 
-        assert commit_hash is not None
-        assert call_count[0] == 3  # add, commit, push
+    assert commit_hash is not None
+    # Should have: config user.name, config user.email, add, commit, push
+    assert len(git_commands) >= 5
+    assert any("config" in cmd and "user.name" in cmd for cmd in git_commands)
+    assert any("config" in cmd and "user.email" in cmd for cmd in git_commands)
+    assert any("add" in cmd for cmd in git_commands)
+    assert any("commit" in cmd for cmd in git_commands)
+    assert any("push" in cmd and "-u" in cmd for cmd in git_commands)
+
+
+def test_git_clone_empty_repository(monkeypatch, tmp_path):
+    """Test _git_clone handles empty repository gracefully."""
+    import subprocess
+
+    monkeypatch.setenv("GITEA_REPO_URL", "https://localhost:3000/test/repo.git")
+    monkeypatch.setenv("GITEA_TOKEN", "test_token")
+
+    client = GiteaClient()
+
+    git_commands = []
+
+    def mock_run(*args, **kwargs):
+        cmd = args[0] if args else []
+        git_commands.append(cmd)
+
+        class MockResult:
+            pass
+
+        if "clone" in cmd:
+            # Simulate empty repository error
+            MockResult.returncode = 128
+            MockResult.stdout = ""
+            MockResult.stderr = "fatal: couldn't find remote ref master"
+        else:
+            MockResult.returncode = 0
+            MockResult.stdout = ""
+            MockResult.stderr = ""
+
+        return MockResult()
+
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    repo_path = tmp_path / "test_repo"
+
+    # Should not raise, will initialize empty repo
+    client._git_clone("https://localhost:3000/test/repo.git", repo_path)
+
+    # Verify repo was initialized
+    assert repo_path.exists()
+    # Check that init and remote add were called
+    assert any("init" in cmd for cmd in git_commands)
+    assert any("remote" in cmd and "add" in cmd for cmd in git_commands)
 
 
 def test_push_with_retry_success_on_third_attempt(monkeypatch):

@@ -345,17 +345,55 @@
 
         .file-info {
             flex: 1;
+            min-width: 0;
         }
 
         .file-name {
             font-weight: 600;
             font-size: 14px;
             margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .file-size {
             font-size: 12px;
             color: var(--muted-foreground);
+        }
+
+        /* Source Type Select in File Item */
+        .file-source-type {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 8px;
+        }
+
+        .file-source-type label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted-foreground);
+            white-space: nowrap;
+        }
+
+        .file-source-type select {
+            padding: 6px 10px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--foreground);
+            background: var(--card);
+            cursor: pointer;
+            outline: none;
+            transition: all 0.15s ease;
+            min-width: 100px;
+        }
+
+        .file-source-type select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
         }
 
         .file-remove {
@@ -367,6 +405,7 @@
             font-size: 12px;
             font-weight: 600;
             transition: all 0.15s ease;
+            white-space: nowrap;
         }
 
         .file-remove:hover {
@@ -518,6 +557,10 @@
 
             .page-content {
                 padding: 20px;
+            }
+
+            .file-source-type label {
+                display: none;
             }
         }
     </style>
@@ -685,7 +728,7 @@
                 </div>
                 <div class="card-content">
                     <div class="requirements-grid">
-    <div class="requirement-item">
+                        <div class="requirement-item">
                             <div class="requirement-icon">📄</div>
                             <div class="requirement-text">
                                 <h4>SKILL.md</h4>
@@ -738,6 +781,20 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
+        // Source type options HTML
+        function getSourceTypeSelect(name = 'source_type') {
+            return `
+                <div class="file-source-type">
+                    <label>类型:</label>
+                    <select name="${name}" class="source-type-select">
+                        <option value="opensource">开源</option>
+                        <option value="icsl">ICSL自研</option>
+                        <option value="huawei">华为自研</option>
+                    </select>
+                </div>
+            `;
+        }
+
         // Single file handling
         const singleFile = document.getElementById('single-file');
         const singleFileList = document.getElementById('single-file-list');
@@ -753,6 +810,7 @@
                             <div class="file-name">${file.name}</div>
                             <div class="file-size">${formatFileSize(file.size)}</div>
                         </div>
+                        ${getSourceTypeSelect('source_type')}
                         <button type="button" class="file-remove" onclick="clearSingleFile()">移除</button>
                     </div>
                 `;
@@ -797,6 +855,7 @@
                         <div class="file-name">${file.name}</div>
                         <div class="file-size">${formatFileSize(file.size)}</div>
                     </div>
+                    ${getSourceTypeSelect(`source_type_${index}`)}
                     <button type="button" class="file-remove" onclick="removeBatchFile(${index})">移除</button>
                 </div>
             `).join('');

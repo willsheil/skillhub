@@ -110,6 +110,23 @@ def migrate_add_user_id_to_downloads():
             print("Migration: user_id column already exists in downloads table")
 
 
+def migrate_add_source_type_to_skills():
+    """Migrate skills table to add source_type column if it doesn't exist.
+
+    Source type can be: 'opensource', 'icsl', 'huawei'
+    """
+    with get_connection() as conn:
+        cursor = conn.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        if "source_type" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN source_type VARCHAR(20) DEFAULT 'opensource'")
+            conn.commit()
+            print("Migration: Added source_type column to skills table")
+        else:
+            print("Migration: source_type column already exists in skills table")
+
+
 def init_db():
     """Initialize database and create tables."""
     with get_connection() as conn:
@@ -163,6 +180,7 @@ def init_db():
                 filename VARCHAR(255) NOT NULL,
                 uploader_id INT NOT NULL,
                 status VARCHAR(20),
+                source_type VARCHAR(20) DEFAULT 'opensource',
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 reviewed_at TIMESTAMP NULL,
                 reviewer_id INT,
@@ -195,6 +213,7 @@ def init_db():
     # Run migrations after all tables are created
     migrate_add_user_id_to_downloads()
     migrate_gitea_push_tasks()
+    migrate_add_source_type_to_skills()
 
 
 def migrate_gitea_push_tasks():
@@ -485,7 +504,8 @@ def create_skill_record(
     version: str,
     filename: str,
     uploader_id: int,
-    status: str
+    status: str,
+    source_type: str = 'opensource'
 ) -> int:
     """Create a skill record.
 
@@ -495,6 +515,7 @@ def create_skill_record(
         filename: The filename of the skill
         uploader_id: The ID of the user uploading the skill
         status: The status of the skill
+        source_type: The source type of the skill (opensource, icsl, huawei)
 
     Returns:
         The ID of the inserted record
@@ -502,10 +523,10 @@ def create_skill_record(
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO skills (skill_name, version, filename, uploader_id, status)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO skills (skill_name, version, filename, uploader_id, status, source_type)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (skill_name, version, filename, uploader_id, status)
+            (skill_name, version, filename, uploader_id, status, source_type)
         )
         conn.commit()
         return cursor.lastrowid
@@ -527,6 +548,7 @@ def get_pending_skills() -> List[Dict[str, Any]]:
                 s.filename,
                 s.uploader_id,
                 s.status,
+                s.source_type,
                 s.uploaded_at,
                 s.reviewed_at,
                 s.reviewer_id,
@@ -547,6 +569,7 @@ def get_pending_skills() -> List[Dict[str, Any]]:
                 "filename": row["filename"],
                 "uploader_id": row["uploader_id"],
                 "status": row["status"],
+                "source_type": row["source_type"],
                 "uploaded_at": row["uploaded_at"],
                 "reviewed_at": row["reviewed_at"],
                 "reviewer_id": row["reviewer_id"],
@@ -576,6 +599,7 @@ def get_skill_by_id(skill_id: int) -> Optional[Dict[str, Any]]:
                 filename,
                 uploader_id,
                 status,
+                source_type,
                 uploaded_at,
                 reviewed_at,
                 reviewer_id,
@@ -594,6 +618,7 @@ def get_skill_by_id(skill_id: int) -> Optional[Dict[str, Any]]:
                 "filename": row["filename"],
                 "uploader_id": row["uploader_id"],
                 "status": row["status"],
+                "source_type": row["source_type"],
                 "uploaded_at": row["uploaded_at"],
                 "reviewed_at": row["reviewed_at"],
                 "reviewer_id": row["reviewer_id"],
@@ -650,6 +675,7 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
                 filename,
                 uploader_id,
                 status,
+                source_type,
                 uploaded_at,
                 reviewed_at,
                 reviewer_id,
@@ -669,6 +695,7 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
                 "filename": row["filename"],
                 "uploader_id": row["uploader_id"],
                 "status": row["status"],
+                "source_type": row["source_type"],
                 "uploaded_at": row["uploaded_at"],
                 "reviewed_at": row["reviewed_at"],
                 "reviewer_id": row["reviewer_id"],
@@ -871,6 +898,30 @@ def get_top_users_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
             })
 
         return results
+
+
+def get_skill_source_type(skill_name: str) -> Optional[str]:
+    """Get the source type for a skill by name.
+
+    Args:
+        skill_name: The name of the skill
+
+    Returns:
+        Source type string (opensource, icsl, huawei) or None if not found
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT source_type
+            FROM skills
+            WHERE skill_name = %s
+            ORDER BY uploaded_at DESC
+            LIMIT 1
+            """,
+            (skill_name,)
+        ).fetchone()
+
+        return row["source_type"] if row else None
 
 
 def create_user(employee_id: str, api_key: str, role: str = "user") -> int:

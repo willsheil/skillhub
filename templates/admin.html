@@ -285,6 +285,21 @@
             gap: 8px;
         }
 
+        /* Source Type Select */
+        .source-type-select {
+            padding: 4px 8px;
+            border: 1px solid #eaeaea;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .source-type-select:focus {
+            border-color: #667eea;
+        }
+
         /* Loading */
         .loading {
             text-align: center;
@@ -414,6 +429,7 @@
         <!-- Tabs -->
         <div class="tabs">
             <div class="tab active" data-tab="pending">待审核技能</div>
+            <div class="tab" data-tab="skills">技能管理</div>
             <div class="tab" data-tab="stats">统计信息</div>
         </div>
 
@@ -422,6 +438,16 @@
             <!-- Pending Skills Tab -->
             <div class="tab-pane active" id="pendingPane">
                 <div id="pendingContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skills Management Tab -->
+            <div class="tab-pane" id="skillsPane">
+                <div id="skillsContent">
                     <div class="loading">
                         <div class="spinner"></div>
                         <div>加载中...</div>
@@ -458,6 +484,8 @@
                 // Load content
                 if (tabName === 'pending') {
                     loadPendingSkills();
+                } else if (tabName === 'skills') {
+                    loadSkillsManagement();
                 } else if (tabName === 'stats') {
                     loadStats();
                 }
@@ -589,6 +617,147 @@
                 console.error('Review failed:', error);
                 showMessage('操作失败: ' + error.message, 'error');
             }
+        }
+
+        // Load skills management
+        async function loadSkillsManagement() {
+            const content = document.getElementById('skillsContent');
+
+            try {
+                const response = await fetch('/api/admin/skills?limit=100');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.detail || '加载失败');
+                }
+
+                const skills = result.data || [];
+
+                if (skills.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-text">暂无技能</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Render skills table
+                let html = `
+                    <div style="margin-bottom: 16px;">
+                        <button class="btn btn-primary" onclick="loadSkillsManagement()">刷新</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>技能名称</th>
+                                <th>版本</th>
+                                <th>来源类型</th>
+                                <th>状态</th>
+                                <th>上传者</th>
+                                <th>上传时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                const sourceTypeLabels = {
+                    'opensource': '开源',
+                    'icsl': 'ICSL自研',
+                    'huawei': '华为自研'
+                };
+
+                const statusLabels = {
+                    'pending': '待审核',
+                    'approved': '已通过',
+                    'rejected': '已拒绝'
+                };
+
+                const statusColors = {
+                    'pending': '#f59e0b',
+                    'approved': '#10b981',
+                    'rejected': '#ef4444'
+                };
+
+                for (const skill of skills) {
+                    const uploadedAt = new Date(skill.uploaded_at).toLocaleString('zh-CN');
+                    const sourceTypeLabel = sourceTypeLabels[skill.source_type] || skill.source_type;
+                    const statusLabel = statusLabels[skill.status] || skill.status;
+
+                    html += `
+                        <tr data-skill-id="${skill.id}">
+                            <td>${skill.id}</td>
+                            <td>${skill.skill_name}</td>
+                            <td>${skill.version}</td>
+                            <td>
+                                <select class="source-type-select" data-skill-id="${skill.id}" onchange="updateSourceType(${skill.id}, this.value)">
+                                    <option value="opensource" ${skill.source_type === 'opensource' ? 'selected' : ''}>开源</option>
+                                    <option value="icsl" ${skill.source_type === 'icsl' ? 'selected' : ''}>ICSL自研</option>
+                                    <option value="huawei" ${skill.source_type === 'huawei' ? 'selected' : ''}>华为自研</option>
+                                </select>
+                            </td>
+                            <td><span style="color: ${statusColors[skill.status] || '#64748b'}">${statusLabel}</span></td>
+                            <td>${skill.uploader_name || '-'}</td>
+                            <td>${uploadedAt}</td>
+                            <td>
+                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="editSkill(${skill.id})">编辑</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                html += `
+                        </tbody>
+                    </table>
+                `;
+
+                content.innerHTML = html;
+
+            } catch (error) {
+                console.error('Failed to load skills:', error);
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-text">加载失败: ${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Update source type
+        async function updateSourceType(skillId, newSourceType) {
+            try {
+                const response = await fetch(`/api/admin/skills/${skillId}/source-type`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        source_type: newSourceType
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage(`已更新来源类型为: ${newSourceType}`, 'success');
+                } else {
+                    showMessage('更新失败: ' + (result.detail || '未知错误'), 'error');
+                    // Reset select to original value
+                    loadSkillsManagement();
+                }
+
+            } catch (error) {
+                console.error('Update failed:', error);
+                showMessage('更新失败: ' + error.message, 'error');
+                loadSkillsManagement();
+            }
+        }
+
+        // Edit skill (placeholder for future functionality)
+        function editSkill(skillId) {
+            showMessage('编辑功能开发中...', 'info');
         }
 
         // Load stats

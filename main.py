@@ -41,7 +41,8 @@ from database import (
     create_skill_record, get_pending_skills, get_skill_by_id,
     update_skill_status, get_user_uploads, get_total_users_count,
     get_skills_count_by_status, get_today_downloads_count,
-    get_top_skills_by_downloads, get_top_users_by_downloads
+    get_top_skills_by_downloads, get_top_users_by_downloads,
+    get_skill_source_type
 )
 
 # Configure logging
@@ -423,6 +424,13 @@ def scan_plugins() -> List[dict]:
         metadata = extract_metadata(latest["filename"])
         skill_data["metadata"] = metadata
         skill_data["latest_version"] = latest["version"]
+
+        # Get source_type from database
+        # Use the skill name from metadata (SKILL.md) for database lookup,
+        # not the filename, as database stores the name from SKILL.md
+        db_skill_name = metadata.get("name") if metadata else skill_name
+        source_type = get_skill_source_type(db_skill_name)
+        skill_data["source_type"] = source_type or "opensource"
 
         result.append(skill_data)
 
@@ -1245,6 +1253,7 @@ async def api_user_uploads(
 async def upload_plugin(
     request: Request,
     file: UploadFile = File(...),
+    source_type: str = Form(default="opensource"),
     _: bool = Depends(require_auth)
 ):
     """Upload a single skill ZIP file (requires auth).
@@ -1328,7 +1337,8 @@ async def upload_plugin(
             version=version,
             filename=target_filename,
             uploader_id=user_id,
-            status='pending'
+            status='pending',
+            source_type=source_type
         )
 
         # Return HTML success for admin_upload page
@@ -1380,6 +1390,7 @@ async def upload_plugin(
 async def upload_batch(
     request: Request,
     files: List[UploadFile] = File(...),
+    source_type: str = Form(default="opensource"),
     _: bool = Depends(require_auth)
 ):
     """Upload multiple skill ZIP files (batch upload)."""
@@ -1397,11 +1408,17 @@ async def upload_batch(
         "failed": []
     }
 
-    for file in files:
+    # Get source_type for each file from form data (source_type_0, source_type_1, etc.)
+    form_data = await request.form()
+
+    for idx, file in enumerate(files):
         # Skip non-ZIP files
         if not file.filename or not file.filename.endswith('.zip'):
             results["failed"].append({"file": file.filename, "error": "Not a ZIP file"})
             continue
+
+        # Get source type for this specific file (default to 'opensource' or use global source_type)
+        file_source_type = form_data.get(f"source_type_{idx}", source_type)
 
         temp_dir = tempfile.mkdtemp()
         temp_zip = Path(temp_dir) / "upload.zip"
@@ -1434,6 +1451,18 @@ async def upload_batch(
 
             # Save the skill ZIP
             target_path = save_skill_zip(temp_zip, metadata)
+
+            # Create database record with source_type
+            user_id = request.session.get("user_id")
+            create_skill_record(
+                skill_name=skill_name,
+                version=skill_version,
+                filename=f"{skill_name}-{skill_version}.zip",
+                uploader_id=user_id,
+                status='approved',  # Batch uploads are auto-approved
+                source_type=file_source_type
+            )
+
             results["success"].append({
                 "name": metadata["name"],
                 "version": metadata["version"]
@@ -2324,6 +2353,129 @@ async def api_admin_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch admin statistics: {str(e)}"
+        )
+
+
+@app.put("/api/admin/skills/{skill_id}/source-type")
+async def api_update_skill_source_type(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_admin)
+):
+    """Update the source_type of a skill (admin only).
+
+    Expects JSON body with:
+    {
+        "source_type": "opensource" | "icsl" | "huawei"
+    }
+    """
+    try:
+        # Get current user
+        reviewer_id = request.session.get("user_id")
+        if not reviewer_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Parse request body
+        data = await request.json()
+        source_type = data.get("source_type")
+
+        # Validate source_type
+        valid_types = ["opensource", "icsl", "huawei"]
+        if source_type not in valid_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid source_type. Must be one of: {', '.join(valid_types)}"
+            )
+
+        # Get skill record
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        # Update source_type in database
+        from database import get_connection
+        with get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE skills
+                SET source_type = %s
+                WHERE id = %s
+                """,
+                (source_type, skill_id)
+            )
+            conn.commit()
+
+        return {
+            "success": True,
+            "message": f"Updated source_type for {skill['skill_name']} to {source_type}",
+            "skill_id": skill_id,
+            "source_type": source_type
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update source_type: {str(e)}"
+        )
+
+
+@app.get("/api/admin/skills")
+async def api_get_all_skills(
+    status: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Get all skills with optional status filter (admin only).
+
+    Args:
+        status: Filter by status (pending/approved/rejected)
+        limit: Maximum number of skills to return
+
+    Returns:
+        List of skills with full details
+    """
+    try:
+        from database import get_connection
+
+        with get_connection() as conn:
+            if status:
+                rows = conn.execute("""
+                    SELECT s.id, s.skill_name, s.version, s.filename, s.status,
+                           s.source_type, s.uploaded_at, u.employee_id as uploader_name
+                    FROM skills s
+                    LEFT JOIN users u ON s.uploader_id = u.id
+                    WHERE s.status = %s
+                    ORDER BY s.uploaded_at DESC
+                    LIMIT %s
+                """, (status, limit)).fetchall()
+            else:
+                rows = conn.execute("""
+                    SELECT s.id, s.skill_name, s.version, s.filename, s.status,
+                           s.source_type, s.uploaded_at, u.employee_id as uploader_name
+                    FROM skills s
+                    LEFT JOIN users u ON s.uploader_id = u.id
+                    ORDER BY s.uploaded_at DESC
+                    LIMIT %s
+                """, (limit,)).fetchall()
+
+            return {
+                "success": True,
+                "data": rows,
+                "count": len(rows)
+            }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch skills: {str(e)}"
         )
 
 
