@@ -12,7 +12,9 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
@@ -42,7 +44,15 @@ from database import (
     update_skill_status, get_user_uploads, get_total_users_count,
     get_skills_count_by_status, get_today_downloads_count,
     get_top_skills_by_downloads, get_top_users_by_downloads,
-    get_skill_source_type
+    get_skill_source_type, create_notification, update_skill_active_status,
+    get_skill_active_status, get_my_skills, set_default_skill_version,
+    get_skill_versions, get_user_notifications, get_unread_notifications_count,
+    mark_notification_read, mark_all_notifications_read, cleanup_old_notifications,
+    get_users_list, create_user, update_user_role, disable_user,
+    enable_user, reset_user_api_key, get_user_skills_count,
+    get_default_skill_version, get_all_default_skill_versions,
+    get_skill_approval_status, delete_skill_version, batch_unlist_skills,
+    batch_delete_skills
 )
 
 # Configure logging
@@ -55,21 +65,14 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # 默认密码，生�
 # Session secret key (should be changed in production)
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
 
-app = FastAPI(title="Skill Registry", version="1.0.0")
-
-# Add session middleware
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-
-# Static files and templates
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# API key reset rate limiting (user_id -> last_reset_time)
+_api_key_reset_times = {}
 
 
-# Startup and shutdown event handlers
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and start background services."""
-    # Initialize database
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup
     init_db()
 
     # Start Gitea push service if configured
@@ -90,11 +93,20 @@ async def startup_event():
     else:
         logger.info("Gitea integration disabled (GITEA_REPO_URL not set)")
 
+    yield
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
+    # Shutdown
     logger.info("Shutting down...")
+
+
+app = FastAPI(title="Skill Registry", version="1.0.0", lifespan=lifespan)
+
+# Add session middleware
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+# Static files and templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 
 def require_auth(request: Request):
@@ -179,7 +191,9 @@ def parse_skill_md(content: str) -> Tuple[Optional[dict], str]:
         If no YAML frontmatter found, returns (None, content)
     """
     # Pattern to match YAML frontmatter between --- markers
-    pattern = r'^---\s*\n(.*?)\n---\s*\n(.*)$'
+    # Use .+? instead of .*? to ensure we match at least one character
+    # Remove ^ anchor since content might have leading whitespace
+    pattern = r'---\s*\n(.+?)\n---\s*\n(.*)'
     match = re.match(pattern, content, re.DOTALL)
 
     if match:
@@ -380,59 +394,70 @@ def parse_plugin_filename(filename: str) -> tuple[str, str]:
 
 
 def scan_plugins() -> List[dict]:
-    """Scan plugins directory and return metadata list."""
-    plugins = {}
+    """Get approved and active skills from database with metadata from ZIP files.
 
-    for zip_file in PLUGINS_DIR.glob("*.zip"):
-        if not zip_file.is_file():
-            continue
-
-        # Use filename (without .zip) as skill identifier
-        # Version is extracted from SKILL.md metadata, not filename
-        skill_name = zip_file.name[:-4] if zip_file.name.endswith('.zip') else zip_file.name
-
-        # Extract version from SKILL.md inside the zip
-        metadata = extract_metadata_from_skill_md(zip_file)
-        if metadata and metadata.get("metadata"):
-            skill_metadata = metadata.get("metadata", {})
-            version = skill_metadata.get("version", "unknown")
-        else:
-            version = "unknown"
-
-        if skill_name not in plugins:
-            plugins[skill_name] = {
-                "name": skill_name,
-                "metadata": None,
-                "versions": []
-            }
-
-        plugins[skill_name]["versions"].append({
-            "version": version,
-            "filename": zip_file.name,
-            "size": zip_file.stat().st_size,
-            "updated_at": datetime.fromtimestamp(zip_file.stat().st_mtime).isoformat()
-        })
-
-    # Sort versions and get metadata for each skill
+    This is optimized to only show skills that are both approved and active,
+    avoiding the need to scan all ZIP files repeatedly.
+    """
     result = []
-    for skill_name, skill_data in sorted(plugins.items()):
-        # Sort versions (filter out "unknown" versions to the end)
-        skill_data["versions"].sort(key=lambda x: (x["version"] == "unknown", x["version"]))
 
-        # Get metadata from latest version
-        latest = skill_data["versions"][-1]
-        metadata = extract_metadata(latest["filename"])
-        skill_data["metadata"] = metadata
-        skill_data["latest_version"] = latest["version"]
+    # Get all approved and active skills directly from database
+    from database import get_connection
 
-        # Get source_type from database
-        # Use the skill name from metadata (SKILL.md) for database lookup,
-        # not the filename, as database stores the name from SKILL.md
-        db_skill_name = metadata.get("name") if metadata else skill_name
-        source_type = get_skill_source_type(db_skill_name)
-        skill_data["source_type"] = source_type or "opensource"
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id, skill_name, version, filename, uploader_id, status,
+                source_type, uploaded_at, reviewed_at, reviewer_id,
+                review_comment, is_active, is_default_version
+            FROM skills
+            WHERE status = 'approved' AND is_active = 1
+            ORDER BY skill_name, uploaded_at DESC
+            """
+        ).fetchall()
 
-        result.append(skill_data)
+        # Group by skill_name to get only one entry per skill (the default version if exists)
+        skills_by_name = {}
+        for row in rows:
+            skill_name = row["skill_name"]
+            is_default = row["is_default_version"]
+
+            # If we haven't added this skill yet, or this is the default version
+            if skill_name not in skills_by_name or is_default:
+                skills_by_name[skill_name] = row
+            # If current is not default and existing is not default, keep the first one
+            elif not skills_by_name[skill_name]["is_default_version"]:
+                continue  # Keep the existing one
+
+        # Build result list with metadata from ZIP files
+        for skill_name, row in skills_by_name.items():
+            # Extract metadata from ZIP file
+            metadata = extract_metadata(row["filename"])
+            if not metadata:
+                # Fallback if ZIP file doesn't exist or is invalid
+                metadata = {
+                    "name": skill_name,
+                    "description": f"{skill_name} - 技能描述",
+                    "version": row["version"],
+                    "license": None,
+                    "compatibility": None,
+                    "metadata": {"version": row["version"]},
+                    "allowed_tools": None
+                }
+
+            result.append({
+                "name": skill_name,
+                "metadata": metadata,
+                "latest_version": row["version"],
+                "source_type": row["source_type"] or "opensource",
+                "uploaded_at": row["uploaded_at"].isoformat() if row["uploaded_at"] else None,
+                "download_count": 0,  # TODO: Add download count if tracking
+                "versions": [{
+                    "version": row["version"],
+                    "filename": row["filename"]
+                }]
+            })
 
     return result
 
@@ -829,6 +854,27 @@ async def admin_dashboard(request: Request):
     })
 
 
+@app.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_page(request: Request):
+    """Display user management page (requires admin)."""
+    # Get current user
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Check admin role
+    if user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return templates.TemplateResponse("admin_users.html", {
+        "request": request,
+        "user": user
+    })
+
+
 def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
     """Validate a skill ZIP file according to Agent Skills specification.
 
@@ -873,7 +919,7 @@ def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
             # Read and parse SKILL.md
             skill_md_path = skill_md_paths[0]
             content = zf.read(skill_md_path).decode('utf-8')
-
+            print("111",content)
             metadata, _ = parse_skill_md(content)
 
             if metadata is None:
@@ -985,22 +1031,49 @@ def approve_skill_file(skill_id: int) -> bool:
     if skill["status"] != "pending":
         return False
 
-    # Move file from pending to plugins
+    # File paths
     pending_path = PENDING_DIR / skill["filename"]
     plugins_path = PLUGINS_DIR / skill["filename"]
 
-    if not pending_path.exists():
-        return False
-
     try:
-        shutil.move(str(pending_path), str(plugins_path))
+        # Check if file is in pending directory
+        if pending_path.exists():
+            # Move file from pending to plugins
+            # Remove existing file if it exists (prevents FileExistsError on re-approval)
+            if plugins_path.exists():
+                logger.info(f"Removing existing file: {plugins_path}")
+                plugins_path.unlink()
+
+            shutil.move(str(pending_path), str(plugins_path))
+        elif not plugins_path.exists():
+            # File not in pending and not in plugins - error
+            logger.error(f"Skill file not found: {skill['filename']} (checked both pending and plugins directories)")
+            return False
+        else:
+            # File already in plugins directory (possibly from old batch upload)
+            logger.info(f"File already in plugins directory: {plugins_path}")
 
         # Update database status
         update_skill_status(skill_id, "approved")
 
+        # Set is_active=1 on approval
+        update_skill_active_status(skill_id, True)
+
+        # Create notification for uploader
+        uploader_id = skill.get("uploader_id")
+        if uploader_id:
+            content = f"您的技能 {skill['skill_name']} (版本 {skill['version']}) 已通过审核并上线。"
+            create_notification(
+                user_id=uploader_id,
+                type="review_success",
+                title="您的技能已通过审核",
+                content=content,
+                related_skill_id=skill_id
+            )
+
         return True
     except Exception as e:
-        print(f"Failed to approve skill {skill_id}: {e}")
+        logger.error(f"Failed to approve skill {skill_id}: {e}")
         return False
 
 
@@ -1032,9 +1105,23 @@ def reject_skill_file(skill_id: int, comment: Optional[str] = None) -> bool:
         # Update database status
         update_skill_status(skill_id, "rejected", comment=comment)
 
+        # Create notification for uploader
+        uploader_id = skill.get("uploader_id")
+        if uploader_id:
+            content = f"您的技能 {skill['skill_name']} (版本 {skill['version']}) 未通过审核。"
+            if comment:
+                content += f" 原因: {comment}"
+            create_notification(
+                user_id=uploader_id,
+                type="review_rejected",
+                title="您的技能未通过审核",
+                content=content,
+                related_skill_id=skill_id
+            )
+
         return True
     except Exception as e:
-        print(f"Failed to reject skill {skill_id}: {e}")
+        logger.error(f"Failed to reject skill {skill_id}: {e}")
         return False
 
 
@@ -1249,6 +1336,577 @@ async def api_user_uploads(
         )
 
 
+@app.get("/api/notifications")
+async def api_get_notifications(
+    request: Request,
+    unread_only: bool = Query(False, description="Filter to only unread notifications"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of notifications to return"),
+    offset: int = Query(0, ge=0, description="Number of notifications to skip"),
+    _: bool = Depends(require_auth)
+):
+    """Get notifications for the current user with pagination.
+
+    Query parameters:
+    - unread_only: If True, only return unread notifications (default: False)
+    - limit: Maximum number of notifications to return (default: 50, max: 100)
+    - offset: Number of notifications to skip for pagination (default: 0)
+
+    Returns notifications sorted newest first.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        result = get_user_notifications(user_id, unread_only, limit, offset)
+
+        return {
+            "success": True,
+            "data": result
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch notifications: {str(e)}"
+        )
+
+
+@app.get("/api/notifications/unread-count")
+async def api_get_unread_count(
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Get the count of unread notifications for the current user."""
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        count = get_unread_notifications_count(user_id)
+
+        return {
+            "success": True,
+            "data": {
+                "unread_count": count
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch unread count: {str(e)}"
+        )
+
+
+@app.post("/api/notifications/{notification_id}/read")
+async def api_mark_notification_read(
+    notification_id: int,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Mark a specific notification as read.
+
+    Verifies that the user owns this notification before marking it as read.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        success = mark_notification_read(notification_id, user_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Notification not found or does not belong to this user"
+            )
+
+        return {
+            "success": True,
+            "data": {
+                "message": "Notification marked as read"
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to mark notification as read: {str(e)}"
+        )
+
+
+@app.post("/api/notifications/read-all")
+async def api_mark_all_read(
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Mark all notifications as read for the current user."""
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        count = mark_all_notifications_read(user_id)
+
+        return {
+            "success": True,
+            "data": {
+                "message": f"Marked {count} notifications as read",
+                "count": count
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to mark all notifications as read: {str(e)}"
+        )
+
+
+@app.get("/api/my-skills")
+async def api_my_skills(
+    request: Request,
+    status: str = Query("all", description="Filter by status: all, active, unlisted, pending, rejected"),
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
+    _: bool = Depends(require_auth)
+):
+    """Get current user's skills with pagination and filtering.
+
+    Query parameters:
+    - status: Filter by status ('all', 'active', 'unlisted', 'pending', 'rejected')
+    - page: Page number (default: 1, min: 1)
+    - per_page: Items per page (default: 20, min: 1, max: 100)
+
+    Returns paginated list of skills for the authenticated user.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Calculate offset from page number
+        offset = (page - 1) * per_page
+
+        # Get user skills from database
+        result = get_my_skills(
+            user_id=user_id,
+            status_filter=status,
+            limit=per_page,
+            offset=offset
+        )
+
+        # Calculate pagination metadata
+        total = result["total"]
+        total_pages = (total + per_page - 1) // per_page
+
+        return {
+            "success": True,
+            "data": result["skills"],
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch skills: {str(e)}"
+        )
+
+
+@app.get("/my-skills", response_class=HTMLResponse)
+async def my_skills_page(request: Request):
+    """Render the my_skills.html page (requires auth)."""
+    user = get_current_user(request)
+
+    return templates.TemplateResponse("my_skills.html", {
+        "request": request,
+        "user": user
+    })
+
+
+class BatchOperationRequest(BaseModel):
+    """Request model for batch operations."""
+    skill_ids: List[int]
+
+
+@app.post("/api/my-skills/batch/unlist")
+async def api_batch_unlist_skills(
+    request_data: BatchOperationRequest,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Unlist multiple skills at once.
+
+    User must own all the skills to unlist them.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        result = batch_unlist_skills(user_id, request_data.skill_ids)
+
+        message = f"已下架 {result['success_count']} 个技能"
+        if result["failed_ids"]:
+            message += f"，{len(result['failed_ids'])} 个失败"
+
+        return {
+            "success": True,
+            "message": message,
+            "success_count": result["success_count"],
+            "failed_ids": result["failed_ids"]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to batch unlist skills: {str(e)}"
+        )
+
+
+@app.post("/api/my-skills/batch/delete")
+async def api_batch_delete_skills(
+    request_data: BatchOperationRequest,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Delete multiple skills at once.
+
+    User must own all the skills to delete them. The physical ZIP files will also be removed.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        result = batch_delete_skills(user_id, request_data.skill_ids)
+
+        message = f"已删除 {result['success_count']} 个技能"
+        if result["failed_ids"]:
+            message += f"，{len(result['failed_ids'])} 个失败"
+
+        return {
+            "success": True,
+            "message": message,
+            "success_count": result["success_count"],
+            "failed_ids": result["failed_ids"]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to batch delete skills: {str(e)}"
+        )
+
+
+@app.post("/api/my-skills/{skill_id}/unlist")
+async def api_unlist_skill(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Unlist a skill (set is_active = 0).
+
+    User must own the skill to unlist it.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Get skill record
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        # Verify ownership
+        if skill["uploader_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't own this skill"
+            )
+
+        # Update active status
+        update_skill_active_status(skill_id, False)
+
+        return {
+            "success": True,
+            "message": f"Skill {skill['skill_name']}@{skill['version']} has been unlisted",
+            "skill_id": skill_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to unlist skill: {str(e)}"
+        )
+
+
+@app.post("/api/my-skills/{skill_id}/publish")
+async def api_publish_skill(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Publish a skill (set is_active = 1).
+
+    User must own the skill to publish it.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Get skill record
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        # Verify ownership
+        if skill["uploader_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't own this skill"
+            )
+
+        # Update active status
+        update_skill_active_status(skill_id, True)
+
+        return {
+            "success": True,
+            "message": f"Skill {skill['skill_name']}@{skill['version']} has been published",
+            "skill_id": skill_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to publish skill: {str(e)}"
+        )
+
+
+@app.post("/api/my-skills/{skill_id}/set-default")
+async def api_set_default_skill(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Set a skill version as the default for its skill name.
+
+    User must own the skill. All other versions of the same skill
+    will have is_default_version set to 0.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Get skill record
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        # Verify ownership
+        if skill["uploader_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't own this skill"
+            )
+
+        # Set as default version
+        success = set_default_skill_version(
+            user_id=user_id,
+            skill_name=skill["skill_name"],
+            skill_id=skill_id
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to set default version"
+            )
+
+        return {
+            "success": True,
+            "message": f"Skill {skill['skill_name']}@{skill['version']} is now the default version",
+            "skill_id": skill_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set default version: {str(e)}"
+        )
+
+
+@app.get("/api/my-skills/versions/{skill_name}")
+async def api_get_skill_versions(
+    skill_name: str,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Get all versions of a skill owned by the current user.
+
+    Returns versions sorted newest first. User must own at least
+    one version of the skill.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Get skill versions (function already verifies ownership by filtering on uploader_id)
+        versions = get_skill_versions(user_id, skill_name)
+
+        # Check if user owns any version of this skill
+        if not versions:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No versions found for skill '{skill_name}' or you don't own this skill"
+            )
+
+        return {
+            "success": True,
+            "data": versions,
+            "skill_name": skill_name,
+            "count": len(versions)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch skill versions: {str(e)}"
+        )
+
+
+@app.delete("/api/my-skills/{skill_id}")
+async def api_delete_skill(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Delete a skill version.
+
+    User must own the skill to delete it. The physical ZIP file will also be removed.
+    If this is the default version and there are other versions, another version will be set as default.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Get skill record for response message
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        # Verify ownership
+        if skill["uploader_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't own this skill"
+            )
+
+        # Delete the skill
+        success = delete_skill_version(user_id, skill_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete skill"
+            )
+
+        return {
+            "success": True,
+            "message": f"Skill {skill['skill_name']}@{skill['version']} has been deleted",
+            "skill_id": skill_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete skill: {str(e)}"
+        )
+
+
 @app.post("/api/upload")
 async def upload_plugin(
     request: Request,
@@ -1260,22 +1918,25 @@ async def upload_plugin(
 
     Saves to pending directory and creates database record with status='pending'.
     Requires admin approval before being made available.
+
+    Returns JSON response for AJAX requests.
     """
     import tempfile
+    from fastapi.responses import JSONResponse
 
     # Get current user
     user_id = request.session.get("user_id")
     if not user_id:
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
+            content={"success": False, "error": "请先登录"}
         )
 
     # Validate file extension
     if not file.filename or not file.filename.endswith('.zip'):
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only ZIP files are allowed"
+            content={"success": False, "error": "只支持 ZIP 格式的文件"}
         )
 
     # Save uploaded file to temp location
@@ -1291,17 +1952,41 @@ async def upload_plugin(
 
         if not is_valid:
             error_msg = result.get('error', 'Unknown error')
+
+            # Map validation errors to user-friendly messages
+            error_messages = {
+                "Missing SKILL.md in ZIP": "ZIP 文件中缺少 SKILL.md 文件",
+                "Invalid YAML frontmatter in SKILL.md": "SKILL.md 中的 YAML 格式无效",
+                "Missing required field 'name' in SKILL.md YAML frontmatter": "SKILL.md 中缺少必需字段 'name'",
+                "Missing required field 'description' in SKILL.md YAML frontmatter": "SKILL.md 中缺少必需字段 'description'",
+                "Missing required field 'metadata.version' in SKILL.md": "SKILL.md 中缺少 metadata.version 字段",
+                "Metadata.version must be a non-empty string": "版本号不能为空",
+                "Missing required field 'metadata.author' in SKILL.md": "SKILL.md 中缺少 metadata.author 字段",
+                "Metadata.author must be a non-empty string": "作者信息不能为空",
+                "Invalid ZIP file": "无效的 ZIP 文件",
+            }
+
+            # Check for skill name validation errors
+            if "Invalid skill name:" in error_msg:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={"success": False, "error": f"技能名称格式错误: {error_msg.split(':', 1)[1].strip() if ':' in error_msg else error_msg}"}
+                )
+
+            # Use user-friendly message if available, otherwise use original
+            user_friendly_error = error_messages.get(error_msg, error_msg)
+
             # Return HTML error for admin_upload page
             if "admin" in request.headers.get("referer", ""):
                 return templates.TemplateResponse("admin_upload.html", {
                     "request": request,
                     "success": None,
-                    "error": f"Validation failed: {error_msg}"
+                    "error": user_friendly_error
                 })
             else:
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Validation failed: {error_msg}"
+                    content={"success": False, "error": user_friendly_error}
                 )
 
         # Save the skill ZIP to pending directory
@@ -1313,7 +1998,8 @@ async def upload_plugin(
         # Check if skill with same name and version already exists
         from database import check_skill_exists
         if check_skill_exists(skill_name, version):
-            error_msg = f"Skill {skill_name}@{version} already exists. Please use a different version."
+            error_msg = f"技能 {skill_name}@{version} 已存在，请使用不同的版本号"
+
             # Return HTML error for admin_upload page
             if "admin" in request.headers.get("referer", ""):
                 return templates.TemplateResponse("admin_upload.html", {
@@ -1322,9 +2008,9 @@ async def upload_plugin(
                     "error": error_msg
                 })
             else:
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=error_msg
+                    content={"success": False, "error": error_msg}
                 )
 
         # Copy file to pending location
@@ -1341,34 +2027,33 @@ async def upload_plugin(
             source_type=source_type
         )
 
+        # Return success response
+        success_msg = f"成功上传 {result['name']}@{result['version']}，等待管理员审核"
+
         # Return HTML success for admin_upload page
         if "admin" in request.headers.get("referer", ""):
             return templates.TemplateResponse("admin_upload.html", {
                 "request": request,
-                "success": f"Successfully uploaded {result['name']}@{result['version']} (pending approval)",
+                "success": success_msg,
                 "error": None
             })
         else:
-            # For AJAX requests from upload page, return simple HTML that can be parsed
-            success_msg = f"Successfully uploaded {result['name']}@{result['version']} (pending approval)"
-            html_response = f"""
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body>
-                <div class="message success">{success_msg}</div>
-                <script>
-                    setTimeout(function() {{ window.location.href = '/upload'; }}, 2000);
-                </script>
-            </body>
-            </html>
-            """
-            return HTMLResponse(content=html_response)
+            # Return JSON for AJAX requests
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": success_msg,
+                    "skill_name": result['name'],
+                    "version": result['version'],
+                    "skill_id": skill_id
+                }
+            )
 
-    except HTTPException:
-        raise
     except Exception as e:
-        error_msg = f"Upload failed: {str(e)}"
+        import traceback
+        traceback.print_exc()
+        error_msg = f"上传失败: {str(e)}"
+
         if "admin" in request.headers.get("referer", ""):
             return templates.TemplateResponse("admin_upload.html", {
                 "request": request,
@@ -1376,9 +2061,9 @@ async def upload_plugin(
                 "error": error_msg
             })
         else:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=error_msg
+                content={"success": False, "error": error_msg}
             )
 
     finally:
@@ -1442,6 +2127,8 @@ async def upload_batch(
             from database import check_skill_exists
             skill_name = metadata["name"]
             skill_version = metadata.get("version", "1.0.0")
+            target_filename = f"{skill_name}-{skill_version}.zip"
+
             if check_skill_exists(skill_name, skill_version):
                 results["failed"].append({
                     "file": file.filename,
@@ -1449,17 +2136,18 @@ async def upload_batch(
                 })
                 continue
 
-            # Save the skill ZIP
-            target_path = save_skill_zip(temp_zip, metadata)
+            # Save the skill ZIP to pending directory for review
+            target_path = PENDING_DIR / target_filename
+            shutil.copy(temp_zip, target_path)
 
             # Create database record with source_type
             user_id = request.session.get("user_id")
             create_skill_record(
                 skill_name=skill_name,
                 version=skill_version,
-                filename=f"{skill_name}-{skill_version}.zip",
+                filename=target_filename,
                 uploader_id=user_id,
-                status='approved',  # Batch uploads are auto-approved
+                status='pending',  # Batch uploads also require admin approval
                 source_type=file_source_type
             )
 
@@ -2205,26 +2893,41 @@ async def skill_detail_page(request: Request, skill_name: str):
     if not user_id:
         return RedirectResponse(url="/login", status_code=302)
 
-    # Find the skill ZIP file
-    # First try exact match, then try with version pattern
-    skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
-    if not skill_zip.exists():
-        # Try to find a ZIP that starts with skill_name-
-        matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
-        if matching_zips:
-            skill_zip = matching_zips[0]  # Use the first match
-        else:
-            raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
+    # First, try to get the default version from database
+    default_version = get_default_skill_version(skill_name)
+
+    skill_zip = None
+
+    if default_version:
+        # Use the default version's filename
+        skill_zip = PLUGINS_DIR / default_version["filename"]
+        if not skill_zip.exists():
+            # Default version file not found, fall back to searching
+            skill_zip = None
+
+    if not skill_zip:
+        # No default version or file not found, try exact match
+        skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
+        if not skill_zip.exists():
+            # Try to find a ZIP that starts with skill_name-
+            matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
+            if matching_zips:
+                skill_zip = matching_zips[0]  # Use the first match
+            else:
+                raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
 
     # Extract metadata from the skill
     metadata = extract_metadata(skill_zip.name)
+
+    # Get the real skill name from metadata
+    real_skill_name = metadata.get("name", skill_name) if metadata else skill_name
 
     # Get download count from database
     from database import get_download_stats
     stats = get_download_stats()
     download_count = 0
     for ranking in stats["rankings"]:
-        if ranking["skill_name"] == skill_name:
+        if ranking["skill_name"] == real_skill_name:
             download_count = ranking["downloads"]
             break
 
@@ -2248,7 +2951,7 @@ async def skill_detail_page(request: Request, skill_name: str):
 
     return templates.TemplateResponse("skill_detail.html", {
         "request": request,
-        "skill_name": metadata.get("name", skill_name) if metadata else skill_name,
+        "skill_name": real_skill_name,
         "author": author,
         "download_count": download_count,
         "version": version,
@@ -2530,6 +3233,345 @@ async def api_get_gitea_tasks(
             detail=f"Failed to fetch tasks: {str(e)}"
         )
 
+
+# ==================== User Management API Endpoints ====================
+
+@app.get("/api/admin/users")
+async def api_get_users(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    role: Optional[str] = Query(None, regex="^(admin|user)$"),
+    status_filter: Optional[str] = Query(None, regex="^(active|disabled)$"),
+    search: Optional[str] = Query(None, max_length=50),
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Get paginated list of users with optional filters.
+
+    Query params:
+        page: Page number (default: 1)
+        per_page: Users per page (default: 20, max: 100)
+        role: Filter by role ('admin' or 'user')
+        status_filter: Filter by status ('active' or 'disabled')
+        search: Search by employee_id (partial match)
+
+    Returns:
+        Paginated user list with total count
+    """
+    try:
+        result = get_users_list(
+            page=page,
+            per_page=per_page,
+            role=role,
+            status_filter=status_filter,
+            search=search
+        )
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch users: {str(e)}"
+        )
+
+
+@app.post("/api/admin/users")
+async def api_create_user(
+    request: Request,
+    employee_id: str = Form(..., max_length=50),
+    role: str = Form(..., regex="^(admin|user)$"),
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Create a new user.
+
+    Form data:
+        employee_id: Employee ID (alphanumeric, max 50 chars)
+        role: User role ('admin' or 'user')
+
+    Returns:
+        Created user data with API key (shown only once)
+    """
+    try:
+        # Validate employee_id format
+        if not employee_id or not re.match(r'^[a-zA-Z0-9_-]+$', employee_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid employee_id format. Must be alphanumeric with underscores/hyphens only."
+            )
+
+        # Check if employee_id already exists
+        existing_user = get_user_by_credentials(employee_id, "dummy")
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"User with employee_id '{employee_id}' already exists"
+            )
+
+        # Generate 32-char API key
+        api_key = secrets.token_hex(16)
+
+        # Create user
+        user_id = create_user(employee_id=employee_id, api_key=api_key, role=role)
+
+        # Get the created user
+        user = get_user_by_id(user_id)
+
+        return {
+            "success": True,
+            "data": {
+                "id": user["id"],
+                "employee_id": user["employee_id"],
+                "role": user["role"],
+                "api_key": api_key,  # Only shown once on creation
+                "created_at": user["created_at"]
+            },
+            "message": "User created successfully. Save the API key now as it won't be shown again."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
+
+
+@app.put("/api/admin/users/{user_id}")
+async def api_update_user_role(
+    user_id: int,
+    request: Request,
+    role: str = Form(..., regex="^(admin|user)$"),
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Update a user's role.
+
+    Form data:
+        role: New role ('admin' or 'user')
+
+    Prevents editing own role.
+    """
+    try:
+        # Prevent editing own role
+        current_user_id = request.session.get("user_id")
+        if current_user_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot modify your own role"
+            )
+
+        # Check if user exists
+        user = get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Update role
+        success = update_user_role(user_id, role)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Failed to update user role"
+            )
+
+        return {
+            "success": True,
+            "data": {
+                "id": user_id,
+                "employee_id": user["employee_id"],
+                "role": role
+            },
+            "message": "User role updated successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update user role: {str(e)}"
+        )
+
+
+@app.delete("/api/admin/users/{user_id}")
+async def api_disable_user(
+    user_id: int,
+    request: Request,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Disable (soft delete) a user.
+
+    Prevents disabling if user has active skills (skills_count > 0).
+    Prevents disabling self.
+    """
+    try:
+        # Prevent disabling self
+        current_user_id = request.session.get("user_id")
+        if current_user_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot disable your own account"
+            )
+
+        # Check if user exists
+        user = get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Check if user has active skills
+        skills_count = get_user_skills_count(user_id)
+        if skills_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot disable user with {skills_count} active skill(s). Please reassign or remove skills first."
+            )
+
+        # Disable user
+        success = disable_user(user_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Failed to disable user"
+            )
+
+        return {
+            "success": True,
+            "data": {
+                "id": user_id,
+                "employee_id": user["employee_id"],
+                "status": "disabled"
+            },
+            "message": "User disabled successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to disable user: {str(e)}"
+        )
+
+
+@app.patch("/api/admin/users/{user_id}/enable")
+async def api_enable_user(
+    user_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Re-enable a disabled user.
+
+    Sets status back to 'active'.
+    """
+    try:
+        # Check if user exists
+        user = get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Enable user
+        success = enable_user(user_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Failed to enable user"
+            )
+
+        return {
+            "success": True,
+            "data": {
+                "id": user_id,
+                "employee_id": user["employee_id"],
+                "status": "active"
+            },
+            "message": "User enabled successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to enable user: {str(e)}"
+        )
+
+
+@app.post("/api/admin/users/{user_id}/reset-key")
+async def api_reset_user_api_key(
+    user_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Reset a user's API key.
+
+    Generates a new 32-character API key.
+    Old key is immediately invalidated.
+    Rate limited to once per 5 minutes per user.
+    """
+    try:
+        # Check rate limit (5 minutes)
+        from datetime import timedelta
+        rate_limit_minutes = 5
+        current_time = datetime.now()
+
+        if user_id in _api_key_reset_times:
+            last_reset_time = _api_key_reset_times[user_id]
+            time_since_reset = current_time - last_reset_time
+            if time_since_reset < timedelta(minutes=rate_limit_minutes):
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"API key reset too frequently. Please wait {rate_limit_minutes} minutes between resets."
+                )
+
+        # Check if user exists
+        user = get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Generate new API key
+        new_api_key = secrets.token_hex(16)
+
+        # Reset API key
+        success = reset_user_api_key(user_id, new_api_key)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Failed to reset API key"
+            )
+
+        # Store reset time after successful reset
+        _api_key_reset_times[user_id] = current_time
+
+        return {
+            "success": True,
+            "data": {
+                "id": user_id,
+                "employee_id": user["employee_id"],
+                "api_key": new_api_key
+            },
+            "message": "API key reset successfully. Save the new key now as it won't be shown again."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reset API key: {str(e)}"
+        )
+
+
+# ==================== UI Routes ====================
 
 @app.get("/admin/gitea-tasks", response_class=HTMLResponse)
 async def gitea_tasks_page(request: Request):

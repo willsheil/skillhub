@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - Skill Registry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #10B981;
+            --primary-hover: #059669;
+            --primary-light: rgba(16, 185, 129, 0.1);
+            --border: #eaeaea;
+            --text: #171717;
+            --text-muted: #64748b;
+            --bg: #fafafa;
+            --surface: #ffffff;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --success: #10b981;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: var(--bg);
+            color: var(--primary);
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .user-info {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .user-info strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 80px;
+            padding-bottom: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+
+        /* Page Header */
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .breadcrumb-separator {
+            color: var(--border);
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* Action Bar */
+        .action-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px 10px 40px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--bg);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            background: var(--surface);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 10px 36px 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--surface);
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            transition: all 0.2s ease;
+        }
+
+        .filter-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* Table Container */
+        .table-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .data-table th:not(:last-child) {
+            border-right: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tbody tr {
+            transition: background 0.15s ease;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--bg);
+        }
+
+        .employee-id {
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-role-admin {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-role-user {
+            background: #f3f4f6;
+            color: #64748b;
+        }
+
+        .badge-status-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-status-disabled {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-count {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .icon-btn.delete:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 24px 0;
+        }
+
+        .page-btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 36px;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            animation: modalSlideIn 0.2s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .form-label .required {
+            color: var(--danger);
+            margin-left: 2px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--surface);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .form-input:disabled,
+        .form-select:disabled {
+            background: var(--bg);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .api-key-display {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .api-key-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .api-key-value {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text);
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .copy-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .copy-btn.copied {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Loading */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-description {
+            font-size: 14px;
+        }
+
+        /* Message Toast */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            animation: toastSlideIn 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 280px;
+        }
+
+        @keyframes toastSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .toast.success {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
+        .toast-icon {
+            font-size: 16px;
+        }
+
+        /* Inline Error */
+        .inline-error {
+            color: var(--danger);
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .inline-error.active {
+            display: block;
+        }
+
+        .form-input.error {
+            border-color: var(--danger);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .data-table {
+                font-size: 13px;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 12px 12px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .action-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                min-width: 100%;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+
+            .filter-select {
+                flex: 1;
+            }
+
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .data-table {
+                min-width: 800px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar-brand">
+            <div class="logo-icon">S</div>
+            <span>管理后台</span>
+        </a>
+        <div class="navbar-nav">
+            <a href="/admin" class="nav-link">技能管理</a>
+            <a href="/admin/users" class="nav-link active">用户管理</a>
+            <span class="user-info">管理员: <strong>{{ user.employee_id }}</strong></span>
+            <a href="/" class="nav-link">首页</a>
+            <a href="/logout" class="nav-link">退出</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="breadcrumb">
+                <a href="/admin">管理后台</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>用户管理</span>
+            </div>
+            <h1 class="page-title">用户管理</h1>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索工号...">
+            </div>
+            <div class="filter-group">
+                <select class="filter-select" id="roleFilter">
+                    <option value="">全部角色</option>
+                    <option value="admin">管理员</option>
+                    <option value="user">普通用户</option>
+                </select>
+                <select class="filter-select" id="statusFilter">
+                    <option value="">全部状态</option>
+                    <option value="active">启用</option>
+                    <option value="disabled">禁用</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="addUserBtn">
+                <span>+</span>
+                <span>添加用户</span>
+            </button>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-container" id="tableContainer">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+    </main>
+
+    <!-- Create/Edit User Modal -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">添加用户</h3>
+                <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId" value="">
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            工号
+                            <span class="required">*</span>
+                        </label>
+                        <input type="text" class="form-input" id="employeeId" placeholder="请输入工号" required>
+                        <div class="inline-error" id="employeeIdError">请输入工号</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            角色
+                            <span class="required">*</span>
+                        </label>
+                        <select class="form-select" id="userRole" required>
+                            <option value="">请选择角色</option>
+                            <option value="user">普通用户</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                        <div class="inline-error" id="userRoleError">请选择角色</div>
+                    </div>
+
+                    <div class="api-key-display" id="apiKeyDisplay" style="display: none;">
+                        <div class="api-key-label">API Key（请妥善保存）</div>
+                        <div class="api-key-value">
+                            <span id="apiKeyValue">-</span>
+                            <button type="button" class="copy-btn" onclick="copyApiKey()">
+                                <span id="copyBtnText">复制</span>
+                            </button>
+                        </div>
+                        <div class="form-hint">关闭窗口后将无法再次查看此密钥</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('userModal')">取消</button>
+                <button class="btn btn-primary" id="saveUserBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Key Confirmation Modal -->
+    <div class="modal-overlay" id="resetKeyModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">重置 API Key</h3>
+                <button class="modal-close" onclick="closeModal('resetKeyModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 12px;">确定要重置用户的 API Key 吗？</p>
+                <p style="color: var(--text-muted); font-size: 13px;">此操作将生成新的 API Key，旧的密钥将立即失效。</p>
+                <input type="hidden" id="resetKeyUserId">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('resetKeyModal')">取消</button>
+                <button class="btn btn-danger" id="confirmResetKeyBtn">确认重置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // State
+        let users = [];
+        let filteredUsers = [];
+        let currentPage = 1;
+        const pageSize = 20;
+        let searchTimeout = null;
+        let currentFilters = {
+            search: '',
+            role: '',
+            status: ''
+        };
+        const pagination = { total: 0, pages: 1 };
+
+        // Format date
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
+        }
+
+        // Show toast
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icons = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ'
+            };
+
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type]}</span>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                setTimeout(() => toast.remove(), 200);
+            }, 4000);
+        }
+
+        // Open modal
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        // Close modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+
+            // Reset form for user modal
+            if (modalId === 'userModal') {
+                document.getElementById('userForm').reset();
+                document.getElementById('userId').value = '';
+                document.getElementById('apiKeyDisplay').style.display = 'none';
+                document.querySelectorAll('.inline-error').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.form-input, .form-select').forEach(el => el.classList.remove('error'));
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            const container = document.getElementById('tableContainer');
+
+            try {
+                const response = await fetch('/api/admin/users');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.detail || '加载失败');
+                }
+
+                // result.data contains {users: [], total: ..., page: ..., pages: ...}
+                const responseData = result.data || {};
+                users = responseData.users || [];
+                pagination.total = responseData.total || 0;
+                pagination.pages = responseData.pages || 1;
+                applyFilters();
+                renderTable();
+
+            } catch (error) {
+                console.error('Failed to load users:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <div class="empty-title">加载失败</div>
+                        <div class="empty-description">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            filteredUsers = users.filter(user => {
+                const matchesSearch = !currentFilters.search ||
+                    user.employee_id.toLowerCase().includes(currentFilters.search.toLowerCase());
+
+                const matchesRole = !currentFilters.role || user.role === currentFilters.role;
+
+                const matchesStatus = !currentFilters.status ||
+                    (currentFilters.status === 'active' && !user.is_disabled) ||
+                    (currentFilters.status === 'disabled' && user.is_disabled);
+
+                return matchesSearch && matchesRole && matchesStatus;
+            });
+
+            currentPage = 1;
+        }
+
+        // Render table
+        function renderTable() {
+            const container = document.getElementById('tableContainer');
+            const start = (currentPage - 1) * pageSize;
+            const end = Math.min(start + pageSize, filteredUsers.length);
+            const pageUsers = filteredUsers.slice(start, end);
+
+            if (filteredUsers.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">👥</div>
+                        <div class="empty-title">暂无用户</div>
+                        <div class="empty-description">点击"添加用户"按钮创建新用户</div>
+                    </div>
+                `;
+                renderPagination();
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>工号</th>
+                            <th>角色</th>
+                            <th>状态</th>
+                            <th>技能数量</th>
+                            <th>创建时间</th>
+                            <th>最后登录</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${pageUsers.map(user => renderRow(user)).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            renderPagination();
+        }
+
+        // Render row
+        function renderRow(user) {
+            const roleBadge = user.role === 'admin'
+                ? '<span class="badge badge-role-admin">管理员</span>'
+                : '<span class="badge badge-role-user">普通用户</span>';
+
+            const statusBadge = user.is_disabled
+                ? '<span class="badge badge-status-disabled">已禁用</span>'
+                : '<span class="badge badge-status-active">已启用</span>';
+
+            const canDelete = user.skills_count === 0;
+            const deleteBtn = canDelete
+                ? `<button class="icon-btn delete" onclick="deleteUser(${user.id}, '${user.employee_id}')" title="删除">🗑</button>`
+                : `<button class="icon-btn" disabled title="用户有技能，无法删除">🗑</button>`;
+
+            return `
+                <tr data-user-id="${user.id}">
+                    <td><span class="employee-id">${user.employee_id}</span></td>
+                    <td>${roleBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td><span class="badge badge-count">${user.skills_count || 0}</span></td>
+                    <td>${formatDate(user.created_at)}</td>
+                    <td>${formatDate(user.last_login)}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="icon-btn" onclick="editUser(${user.id}, '${user.employee_id}', '${user.role}')" title="编辑">✏</button>
+                            <button class="icon-btn" onclick="toggleUserStatus(${user.id}, '${user.employee_id}', ${!user.is_disabled})" title="${user.is_disabled ? '启用' : '禁用'}">
+                                ${user.is_disabled ? '▶' : '⏸'}
+                            </button>
+                            <button class="icon-btn" onclick="showResetKeyModal(${user.id}, '${user.employee_id}')" title="重置密钥">🔑</button>
+                            ${deleteBtn}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // Render pagination
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            const totalPages = Math.ceil(filteredUsers.length / pageSize);
+
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let buttons = '';
+
+            buttons += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">‹</button>`;
+
+            const maxVisiblePages = 7;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                buttons += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            buttons += `<button class="page-btn" ${currentPage >= totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">›</button>`;
+
+            container.innerHTML = buttons;
+        }
+
+        // Go to page
+        function goToPage(page) {
+            currentPage = page;
+            renderTable();
+        }
+
+        // Add user
+        function addUser() {
+            document.getElementById('modalTitle').textContent = '添加用户';
+            document.getElementById('employeeId').disabled = false;
+            document.getElementById('employeeId').required = true;
+            document.getElementById('apiKeyDisplay').style.display = 'none';
+            openModal('userModal');
+        }
+
+        // Edit user
+        function editUser(id, employeeId, role) {
+            document.getElementById('modalTitle').textContent = '编辑用户';
+            document.getElementById('userId').value = id;
+            document.getElementById('employeeId').value = employeeId;
+            document.getElementById('employeeId').disabled = true;
+            document.getElementById('userRole').value = role;
+            document.getElementById('apiKeyDisplay').style.display = 'none';
+            openModal('userModal');
+        }
+
+        // Save user
+        async function saveUser() {
+            const userId = document.getElementById('userId').value;
+            const employeeId = document.getElementById('employeeId').value.trim();
+            const userRole = document.getElementById('userRole').value;
+
+            // Validation
+            let hasError = false;
+
+            if (!userId && !employeeId) {
+                document.getElementById('employeeIdError').classList.add('active');
+                document.getElementById('employeeId').classList.add('error');
+                hasError = true;
+            } else {
+                document.getElementById('employeeIdError').classList.remove('active');
+                document.getElementById('employeeId').classList.remove('error');
+            }
+
+            if (!userRole) {
+                document.getElementById('userRoleError').classList.add('active');
+                document.getElementById('userRole').classList.add('error');
+                hasError = true;
+            } else {
+                document.getElementById('userRoleError').classList.remove('active');
+                document.getElementById('userRole').classList.remove('error');
+            }
+
+            if (hasError) return;
+
+            const saveBtn = document.getElementById('saveUserBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.textContent = '保存中...';
+
+            try {
+                let response;
+
+                if (userId) {
+                    // Update user role - use FormData as expected by API
+                    const formData = new FormData();
+                    formData.append('role', userRole);
+                    response = await fetch(`/api/admin/users/${userId}`, {
+                        method: 'PUT',
+                        body: formData
+                    });
+                } else {
+                    // Create new user - use FormData as expected by API
+                    const formData = new FormData();
+                    formData.append('employee_id', employeeId);
+                    formData.append('role', userRole);
+                    response = await fetch('/api/admin/users', {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(userId ? '用户更新成功' : '用户创建成功', 'success');
+
+                    if (!userId && result.data?.api_key) {
+                        // Show API key for new user
+                        document.getElementById('apiKeyValue').textContent = result.data.api_key;
+                        document.getElementById('apiKeyDisplay').style.display = 'block';
+                    } else {
+                        closeModal('userModal');
+                        await loadUsers();
+                    }
+                } else {
+                    showToast(result.detail || '操作失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('Save failed:', error);
+                showToast('操作失败: ' + error.message, 'error');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
+        }
+
+        // Toggle user status
+        async function toggleUserStatus(id, employeeId, enable) {
+            const action = enable ? '启用' : '禁用';
+
+            if (!confirm(`确定要${action}用户 "${employeeId}" 吗？`)) {
+                return;
+            }
+
+            try {
+                let response;
+                if (enable) {
+                    // Enable uses PATCH
+                    response = await fetch(`/api/admin/users/${id}/enable`, {
+                        method: 'PATCH'
+                    });
+                } else {
+                    // Disable uses DELETE
+                    response = await fetch(`/api/admin/users/${id}`, {
+                        method: 'DELETE'
+                    });
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(`用户${action}成功`, 'success');
+                    await loadUsers();
+                } else {
+                    showToast(result.detail || `${action}失败`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Toggle status failed:', error);
+                showToast(`${action}失败: ` + error.message, 'error');
+            }
+        }
+
+        // Show reset key modal
+        function showResetKeyModal(id, employeeId) {
+            document.getElementById('resetKeyUserId').value = id;
+            openModal('resetKeyModal');
+        }
+
+        // Reset API key
+        async function resetApiKey() {
+            const userId = document.getElementById('resetKeyUserId').value;
+
+            const confirmBtn = document.getElementById('confirmResetKeyBtn');
+            const originalText = confirmBtn.textContent;
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '重置中...';
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/reset-key`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('API Key 重置成功', 'success');
+                    closeModal('resetKeyModal');
+                    await loadUsers();
+                } else {
+                    showToast(result.detail || '重置失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('Reset key failed:', error);
+                showToast('重置失败: ' + error.message, 'error');
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = originalText;
+            }
+        }
+
+        // Delete user
+        async function deleteUser(id, employeeId) {
+            if (!confirm(`确定要删除用户 "${employeeId}" 吗？此操作不可恢复。`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/users/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('用户删除成功', 'success');
+                    await loadUsers();
+                } else {
+                    showToast(result.detail || '删除失败', 'error');
+                }
+
+            } catch (error) {
+                console.error('Delete failed:', error);
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // Copy API key
+        function copyApiKey() {
+            const apiKey = document.getElementById('apiKeyValue').textContent;
+            const copyBtn = document.querySelector('.copy-btn');
+            const copyBtnText = document.getElementById('copyBtnText');
+
+            navigator.clipboard.writeText(apiKey).then(() => {
+                copyBtn.classList.add('copied');
+                copyBtnText.textContent = '已复制';
+
+                setTimeout(() => {
+                    copyBtn.classList.remove('copied');
+                    copyBtnText.textContent = '复制';
+                }, 2000);
+            }).catch(() => {
+                showToast('复制失败，请手动复制', 'error');
+            });
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+
+            // Search with debounce
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentFilters.search = e.target.value.trim();
+                    applyFilters();
+                    renderTable();
+                }, 300);
+            });
+
+            // Role filter
+            document.getElementById('roleFilter').addEventListener('change', (e) => {
+                currentFilters.role = e.target.value;
+                applyFilters();
+                renderTable();
+            });
+
+            // Status filter
+            document.getElementById('statusFilter').addEventListener('change', (e) => {
+                currentFilters.status = e.target.value;
+                applyFilters();
+                renderTable();
+            });
+
+            // Add user button
+            document.getElementById('addUserBtn').addEventListener('click', addUser);
+
+            // Save user button
+            document.getElementById('saveUserBtn').addEventListener('click', saveUser);
+
+            // Confirm reset key button
+            document.getElementById('confirmResetKeyBtn').addEventListener('click', resetApiKey);
+
+            // Close modals on overlay click
+            document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {
+                        overlay.classList.remove('active');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -170,6 +170,34 @@
             color: white;
         }
 
+        /* Sort select dropdown */
+        .sort-select {
+            padding: 8px 32px 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #64748b;
+            background: #f3f4f6;
+            border: none;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+
+        .sort-select:hover {
+            background: #e5e7eb;
+            color: #171717;
+        }
+
+        .sort-select:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+
         /* Search Section */
         .search-section {
             padding: 32px 0;
@@ -635,8 +663,10 @@
                     <span style="font-size: 14px; color: #64748b;">{{ user.employee_id }}</span>
                     {% if user.role == 'admin' %}
                     <a href="/admin" class="user-btn user-btn-outline">管理后台</a>
+                    <a href="/admin/users" class="user-btn user-btn-outline">用户管理</a>
                     {% endif %}
                     <a href="/upload" class="user-btn user-btn-solid">上传</a>
+                    <a href="/my-skills" class="user-btn user-btn-outline">我的技能</a>
                     <a href="/logout" class="user-btn user-btn-outline">退出</a>
                 {% else %}
                     <a href="/login" class="user-btn user-btn-outline">登录</a>
@@ -713,7 +743,7 @@
                     <p class="section-subtitle">探索所有可用技能</p>
                 </div>
                 <div style="display: flex; gap: 12px; align-items: center;">
-                    <select class="category-pill" id="sortSelect" onchange="handleSort()" style="cursor: pointer;">
+                    <select class="sort-select" id="sortSelect" onchange="handleSort()" style="cursor: pointer;">
                         <option value="upload_time_desc">最新</option>
                         <option value="downloads_desc">热门</option>
                         <option value="name_asc">名称</option>
@@ -735,6 +765,9 @@
     <footer class="footer">
         <p>Skill应用商店@内部网络安全实验室</p>
     </footer>
+
+    <!-- Notifications -->
+    <script src="/static/js/notifications.js"></script>
 
     <script>
         // State
@@ -863,6 +896,33 @@
             return sourceTypeConfig[sourceType] || sourceTypeConfig['opensource'];
         }
 
+        // Render hot today section (top skills by downloads)
+        function renderHotToday() {
+            const grid = document.getElementById('hotTodayGrid');
+            if (!grid) return;
+
+            // Get top 6 skills by download count
+            const hotSkills = [...allSkills]
+                .sort((a, b) => (b.download_count || 0) - (a.download_count || 0))
+                .slice(0, 6);
+
+            if (hotSkills.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <p>暂无热门数据</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = hotSkills.map(skill => `
+                <div class="card">
+                    ${generateCardHTML(skill)}
+                </div>
+            `).join('');
+        }
+
         // Load data
         window.addEventListener('DOMContentLoaded', async () => {
             await loadData();
@@ -893,6 +953,7 @@
                 filteredSkills = [...allSkills];
 
                 renderCards();
+                renderHotToday();
                 updatePagination();
 
                 // Update stats count
@@ -1030,7 +1091,10 @@
 
         function handleSort() {
             const value = document.getElementById('sortSelect').value;
-            const [field, order] = value.split('_');
+            // Split from the right to handle multi-word field names like "upload_time_desc"
+            const lastUnderscoreIndex = value.lastIndexOf('_');
+            const field = value.substring(0, lastUnderscoreIndex);
+            const order = value.substring(lastUnderscoreIndex + 1);
             currentSort = { field, order };
 
             sortSkills();

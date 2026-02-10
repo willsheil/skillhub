@@ -352,6 +352,42 @@
             border: 1px solid #fecaca;
         }
 
+        /* Toast Notification */
+        .toast-notification {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            min-width: 300px;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            border-left: 4px solid #10b981;
+        }
+
+        .toast-notification.show {
+            transform: translateX(0);
+        }
+
+        .toast-notification.error {
+            border-left-color: #dc2626;
+        }
+
+        .toast-notification-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #171717;
+            margin-bottom: 4px;
+        }
+
+        .toast-notification-message {
+            font-size: 13px;
+            color: #64748b;
+        }
+
         /* Skill Info */
         .skill-name {
             font-weight: 500;
@@ -383,6 +419,123 @@
         /* Top Skills Table */
         .top-skills-table {
             margin-top: 24px;
+        }
+
+        /* Edit Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: #ffffff;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #eaeaea;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #171717;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #64748b;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .modal-close:hover {
+            background: #f3f4f6;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-input:disabled {
+            background: #f3f4f6;
+            color: #64748b;
+        }
+
+        .form-readonly {
+            background: #f9fafb;
+            color: #64748b;
+        }
+
+        .form-select {
+            cursor: pointer;
+            background: #ffffff;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #eaeaea;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
         }
 
         /* Responsive */
@@ -431,6 +584,7 @@
             <div class="tab active" data-tab="pending">待审核技能</div>
             <div class="tab" data-tab="skills">技能管理</div>
             <div class="tab" data-tab="stats">统计信息</div>
+            <div class="tab" data-tab="users">用户管理</div>
         </div>
 
         <!-- Tab Content -->
@@ -464,6 +618,16 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Users Tab -->
+            <div class="tab-pane" id="usersPane">
+                <div id="usersContent">
+                    <div style="padding: 40px; text-align: center;">
+                        <p style="color: #64748b; margin-bottom: 20px;">访问完整的用户管理界面</p>
+                        <a href="/admin/users" class="btn btn-success" style="display: inline-block; text-decoration: none;">前往用户管理页面</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -488,6 +652,9 @@
                     loadSkillsManagement();
                 } else if (tabName === 'stats') {
                     loadStats();
+                } else if (tabName === 'users') {
+                    // Users tab - show link to dedicated page
+                    // Content is static HTML
                 }
             });
         });
@@ -865,18 +1032,178 @@
         }
 
         function showMessage(message, type) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = message;
+            // Create toast notification
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type === 'error' ? 'error' : ''}`;
 
-            const tabContent = document.querySelector('.tab-content');
-            tabContent.insertBefore(messageDiv, tabContent.firstChild);
+            const title = type === 'error' ? '操作失败' : '操作成功';
 
-            setTimeout(() => messageDiv.remove(), 5000);
+            toast.innerHTML = `
+                <div class="toast-notification-title">${title}</div>
+                <div class="toast-notification-message">${message}</div>
+            `;
+
+            document.body.appendChild(toast);
+
+            // Show toast
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // Hide and remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
         // Load pending skills on page load
         document.addEventListener('DOMContentLoaded', loadPendingSkills);
+
+        // Edit skill modal
+        let currentEditingSkill = null;
+
+        async function editSkill(skillId) {
+            try {
+                // Get skill details from existing data
+                const response = await fetch('/api/admin/skills');
+                const result = await response.json();
+
+                if (!result.success) {
+                    showMessage('获取技能信息失败', 'error');
+                    return;
+                }
+
+                const skills = result.data || [];
+                const skill = skills.find(s => s.id === skillId);
+
+                if (!skill) {
+                    showMessage('未找到该技能', 'error');
+                    return;
+                }
+
+                currentEditingSkill = skill;
+                showEditModal(skill);
+            } catch (error) {
+                console.error('Failed to load skill details:', error);
+                showMessage('加载技能详情失败: ' + error.message, 'error');
+            }
+        }
+
+        function showEditModal(skill) {
+            // Create modal if it doesn't exist
+            let modal = document.getElementById('skillEditModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'skillEditModal';
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3 class="modal-title">编辑技能</h3>
+                            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label class="form-label">技能名称</label>
+                                <input type="text" class="form-input form-readonly" id="editSkillName" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">版本</label>
+                                <input type="text" class="form-input form-readonly" id="editSkillVersion" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">来源类型</label>
+                                <select class="form-select" id="editSourceType">
+                                    <option value="opensource">开源</option>
+                                    <option value="icsl">ICSL自研</option>
+                                    <option value="huawei">华为自研</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">状态</label>
+                                <input type="text" class="form-input form-readonly" id="editSkillStatus" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">上传者</label>
+                                <input type="text" class="form-input form-readonly" id="editSkillUploader" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">创建时间</label>
+                                <input type="text" class="form-input form-readonly" id="editSkillCreatedAt" disabled>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                            <button class="btn btn-success" onclick="saveSkillEdit()">保存</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            // Fill in the skill data
+            document.getElementById('editSkillName').value = skill.skill_name || '';
+            document.getElementById('editSkillVersion').value = skill.version || '';
+            document.getElementById('editSourceType').value = skill.source_type || 'opensource';
+
+            const statusMap = {
+                'pending': '待审核',
+                'approved': '已通过',
+                'rejected': '已拒绝'
+            };
+            document.getElementById('editSkillStatus').value = statusMap[skill.status] || skill.status || '';
+            document.getElementById('editSkillUploader').value = skill.uploader_name || skill.uploader_employee_id || '-';
+            document.getElementById('editSkillCreatedAt').value = formatDate(skill.uploaded_at || skill.created_at || '');
+
+            // Show modal
+            modal.classList.add('active');
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('skillEditModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            currentEditingSkill = null;
+        }
+
+        async function saveSkillEdit() {
+            if (!currentEditingSkill) return;
+
+            const sourceType = document.getElementById('editSourceType').value;
+
+            try {
+                const response = await fetch(`/api/admin/skills/${currentEditingSkill.id}/source-type`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        source_type: sourceType
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('技能信息已更新', 'success');
+                    closeEditModal();
+                    loadSkillsManagement(); // Reload the skills table
+                } else {
+                    showMessage(result.detail || '更新失败', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to update skill:', error);
+                showMessage('更新失败: ' + error.message, 'error');
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('skillEditModal');
+            if (modal && e.target === modal) {
+                closeEditModal();
+            }
+        });
     </script>
 </body>
 </html>

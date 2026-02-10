@@ -127,6 +127,45 @@ def migrate_add_source_type_to_skills():
             print("Migration: source_type column already exists in skills table")
 
 
+def migrate_table_engines():
+    """Migrate existing tables to InnoDB engine for foreign key support."""
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+
+        # Check and convert users table
+        cursor.execute("""
+            SELECT ENGINE FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+        """)
+        result = cursor.fetchone()
+        if result and result.get('ENGINE') != 'InnoDB':
+            conn.execute("ALTER TABLE users ENGINE=InnoDB")
+            conn.commit()
+            print("Migration: Converted users table to InnoDB")
+
+        # Check and convert skills table
+        cursor.execute("""
+            SELECT ENGINE FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'skills'
+        """)
+        result = cursor.fetchone()
+        if result and result.get('ENGINE') != 'InnoDB':
+            conn.execute("ALTER TABLE skills ENGINE=InnoDB")
+            conn.commit()
+            print("Migration: Converted skills table to InnoDB")
+
+        # Check and convert downloads table
+        cursor.execute("""
+            SELECT ENGINE FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'downloads'
+        """)
+        result = cursor.fetchone()
+        if result and result.get('ENGINE') != 'InnoDB':
+            conn.execute("ALTER TABLE downloads ENGINE=InnoDB")
+            conn.commit()
+            print("Migration: Converted downloads table to InnoDB")
+
+
 def init_db():
     """Initialize database and create tables."""
     with get_connection() as conn:
@@ -140,7 +179,7 @@ def init_db():
                 ip_address VARCHAR(255),
                 user_agent VARCHAR(255),
                 user_id INT
-            )
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
         # Index for faster queries
@@ -158,9 +197,11 @@ def init_db():
                 employee_id VARCHAR(20) UNIQUE NOT NULL,
                 api_key VARCHAR(255) NOT NULL,
                 role VARCHAR(20) NOT NULL DEFAULT 'user',
+                status VARCHAR(20) DEFAULT 'active',
+                skills_count INT DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login TIMESTAMP NULL
-            )
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
         # Index for employee_id lookups
@@ -187,7 +228,7 @@ def init_db():
                 review_comment VARCHAR(255),
                 FOREIGN KEY (uploader_id) REFERENCES users(id),
                 FOREIGN KEY (reviewer_id) REFERENCES users(id)
-            )
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
         # Index for status lookups
@@ -211,9 +252,11 @@ def init_db():
         conn.commit()
 
     # Run migrations after all tables are created
+    migrate_table_engines()  # Convert existing tables to InnoDB for foreign key support
     migrate_add_user_id_to_downloads()
     migrate_gitea_push_tasks()
     migrate_add_source_type_to_skills()
+    migrate_add_user_management_features()
 
 
 def migrate_gitea_push_tasks():
@@ -222,29 +265,44 @@ def migrate_gitea_push_tasks():
     Creates the gitea_push_tasks table for tracking async push operations
     and adds a foreign key column to the skills table for tracking the latest
     push task. This should be called AFTER the skills table is created.
+
+    Enhanced state machine includes:
+    - 'pending': Task is waiting to be processed
+    - 'reserved': Task has been reserved by a worker (prevents duplicate processing)
+    - 'pushing': Task is actively being pushed
+    - 'success': Task completed successfully
+    - 'failed': Task failed (may or may not be retryable)
+    - 'retry_pending': Task failed and is waiting for retry
     """
     with get_connection() as conn:
+        # Drop the table first if it exists to ensure clean schema
+        conn.execute("DROP TABLE IF EXISTS gitea_push_tasks")
+        conn.commit()
+
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS gitea_push_tasks (
+            CREATE TABLE gitea_push_tasks (
                 id INT PRIMARY KEY AUTO_INCREMENT,
                 skill_id INT NOT NULL,
                 skill_name VARCHAR(255) NOT NULL,
                 version VARCHAR(50) NOT NULL,
-                status ENUM('pending', 'pushing', 'success', 'failed') DEFAULT 'pending',
+                status ENUM('pending', 'reserved', 'pushing', 'success', 'failed', 'retry_pending') DEFAULT 'pending',
                 retry_count INT DEFAULT 0,
                 max_retries INT DEFAULT 3,
                 error_message TEXT,
                 commit_hash VARCHAR(40),
                 gitea_path VARCHAR(500),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reserved_at TIMESTAMP NULL,
+                worker_id VARCHAR(50) NULL,
                 started_at TIMESTAMP NULL,
                 completed_at TIMESTAMP NULL,
                 FOREIGN KEY (skill_id) REFERENCES skills(id),
-                INDEX idx_status_created (status, created_at)
+                INDEX idx_status_created (status, created_at),
+                INDEX idx_worker_reserved (worker_id, reserved_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
         conn.commit()
-        print("Migration: gitea_push_tasks table created")
+        print("Migration: gitea_push_tasks table created with enhanced state machine")
 
         # Add column to skills table if not exists
         cursor = conn._conn.cursor()
@@ -257,6 +315,45 @@ def migrate_gitea_push_tasks():
             print("Migration: Added latest_push_task_id column to skills table")
         else:
             print("Migration: latest_push_task_id column already exists in skills table")
+
+
+def migrate_gitea_reserved_status():
+    """Migrate existing gitea_push_tasks table to add reserved status support.
+
+    Adds new columns for task reservation:
+    - reserved_at: Timestamp when task was reserved
+    - worker_id: ID of the worker that reserved the task
+
+    This migration can be run on existing installations to add the new
+    state machine features without losing existing data.
+    """
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+
+        # Check current table structure
+        cursor.execute("DESCRIBE gitea_push_tasks")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        # Add reserved_at column
+        if "reserved_at" not in columns:
+            conn.execute("ALTER TABLE gitea_push_tasks ADD COLUMN reserved_at TIMESTAMP NULL AFTER created_at")
+            conn.commit()
+            print("Migration: Added reserved_at column to gitea_push_tasks table")
+        else:
+            print("Migration: reserved_at column already exists in gitea_push_tasks table")
+
+        # Add worker_id column
+        if "worker_id" not in columns:
+            conn.execute("ALTER TABLE gitea_push_tasks ADD COLUMN worker_id VARCHAR(50) NULL AFTER reserved_at")
+            conn.commit()
+            print("Migration: Added worker_id column to gitea_push_tasks table")
+        else:
+            print("Migration: worker_id column already exists in gitea_push_tasks table")
+
+        # Update ENUM to include new statuses
+        # MySQL doesn't support modifying ENUM directly, need to recreate
+        print("Migration: Status enum expansion requires manual recreation or use migrate_gitea_push_tasks()")
+        print("  For new installations, the full schema includes: pending, reserved, pushing, success, failed, retry_pending")
 
 
 @contextmanager
@@ -945,3 +1042,1105 @@ def create_user(employee_id: str, api_key: str, role: str = "user") -> int:
         )
         conn.commit()
         return cursor.lastrowid
+
+
+def get_users_list(
+    page: int = 1,
+    per_page: int = 20,
+    role: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None
+) -> Dict[str, Any]:
+    """Get paginated list of users with optional filters.
+
+    Args:
+        page: Page number (1-indexed)
+        per_page: Number of users per page
+        role: Filter by role ('admin' or 'user')
+        status_filter: Filter by status ('active' or 'disabled')
+        search: Search by employee_id (partial match)
+
+    Returns:
+        Dictionary containing:
+        - users: List of user records
+        - total: Total count matching the filter
+        - page: Current page number
+        - per_page: Items per page
+        - pages: Total number of pages
+    """
+    # Validate inputs against whitelist to prevent SQL injection
+    valid_roles = {'admin', 'user'}
+    valid_statuses = {'active', 'disabled'}
+
+    if role is not None and role not in valid_roles:
+        raise ValueError(f"Invalid role: {role}. Must be one of {valid_roles}")
+
+    if status_filter is not None and status_filter not in valid_statuses:
+        raise ValueError(f"Invalid status_filter: {status_filter}. Must be one of {valid_statuses}")
+
+    # Build WHERE clause
+    conditions = []
+    params = []
+
+    if role:
+        conditions.append("role = %s")
+        params.append(role)
+
+    if status_filter:
+        conditions.append("status = %s")
+        params.append(status_filter)
+
+    if search:
+        conditions.append("employee_id LIKE %s")
+        params.append(f"%{search}%")
+
+    where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    with get_connection() as conn:
+        # Get total count
+        total_row = conn.execute(
+            f"SELECT COUNT(*) as total FROM users{where_clause}",
+            params
+        ).fetchone()
+        total = total_row["total"] if total_row else 0
+
+        # Get paginated results
+        offset = (page - 1) * per_page
+        rows = conn.execute(
+            f"""
+            SELECT id, employee_id, role, status, skills_count, created_at, last_login
+            FROM users
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            params + [per_page, offset]
+        ).fetchall()
+
+        users = []
+        for row in rows:
+            users.append({
+                "id": row["id"],
+                "employee_id": row["employee_id"],
+                "role": row["role"],
+                "status": row["status"],
+                "skills_count": row["skills_count"],
+                "created_at": row["created_at"],
+                "last_login": row["last_login"]
+            })
+
+        pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+        return {
+            "users": users,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": pages
+        }
+
+
+def update_user_role(user_id: int, role: str) -> bool:
+    """Update a user's role.
+
+    Args:
+        user_id: The user's ID
+        role: New role ('admin' or 'user')
+
+    Returns:
+        True if updated, False if user not found
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE users
+            SET role = %s
+            WHERE id = %s
+            """,
+            (role, user_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def disable_user(user_id: int) -> bool:
+    """Disable a user (soft delete).
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        True if disabled, False if user not found
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE users
+            SET status = 'disabled'
+            WHERE id = %s
+            """,
+            (user_id,)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def enable_user(user_id: int) -> bool:
+    """Re-enable a disabled user.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        True if enabled, False if user not found
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE users
+            SET status = 'active'
+            WHERE id = %s
+            """,
+            (user_id,)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def reset_user_api_key(user_id: int, new_api_key: str) -> bool:
+    """Reset a user's API key.
+
+    Args:
+        user_id: The user's ID
+        new_api_key: The new API key
+
+    Returns:
+        True if updated, False if user not found
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE users
+            SET api_key = %s
+            WHERE id = %s
+            """,
+            (new_api_key, user_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def get_user_skills_count(user_id: int) -> int:
+    """Get the number of active skills for a user.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        Count of active skills
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) as count
+            FROM skills
+            WHERE uploader_id = %s AND is_active = 1
+            """,
+            (user_id,)
+        ).fetchone()
+        return row["count"] if row else 0
+
+
+def migrate_add_user_management_features():
+    """Migrate database to add user management and notification features.
+
+    Adds columns:
+    - users.status (default 'active')
+    - users.skills_count (default 0)
+    - skills.is_active (default 1)
+    - skills.is_default_version (default 0)
+
+    Creates notifications table with indexes.
+    """
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+
+        # Add status column to users table
+        cursor.execute("DESCRIBE users")
+        columns = [row["Field"] for row in cursor.fetchall()]
+        if "status" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'")
+            conn.commit()
+            print("Migration: Added status column to users table")
+
+        # Add skills_count column to users table
+        cursor.execute("DESCRIBE users")
+        columns = [row["Field"] for row in cursor.fetchall()]
+        if "skills_count" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN skills_count INT DEFAULT 0")
+            conn.commit()
+            print("Migration: Added skills_count column to users table")
+
+        # Add is_active column to skills table
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+        if "is_active" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN is_active TINYINT(1) DEFAULT 1")
+            conn.commit()
+            print("Migration: Added is_active column to skills table")
+
+        # Add is_default_version column to skills table
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+        if "is_default_version" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN is_default_version TINYINT(1) DEFAULT 0")
+            conn.commit()
+            print("Migration: Added is_default_version column to skills table")
+
+        # Create notifications table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                content TEXT,
+                related_skill_id INT,
+                is_read TINYINT(1) DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (related_skill_id) REFERENCES skills(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        conn.commit()
+
+        # Create indexes for notifications
+        create_index_if_not_exists(
+            cursor,
+            "notifications",
+            "idx_notifications_user_unread",
+            "CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read)"
+        )
+        create_index_if_not_exists(
+            cursor,
+            "notifications",
+            "idx_notifications_user_created",
+            "CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC)"
+        )
+
+        # Create indexes for users table
+        create_index_if_not_exists(
+            cursor,
+            "users",
+            "idx_users_status",
+            "CREATE INDEX idx_users_status ON users(status)"
+        )
+        create_index_if_not_exists(
+            cursor,
+            "users",
+            "idx_users_status_role",
+            "CREATE INDEX idx_users_status_role ON users(status, role)"
+        )
+
+        # Create indexes for skills table
+        create_index_if_not_exists(
+            cursor,
+            "skills",
+            "idx_skills_is_active",
+            "CREATE INDEX idx_skills_is_active ON skills(is_active)"
+        )
+        create_index_if_not_exists(
+            cursor,
+            "skills",
+            "idx_skills_uploader_active",
+            "CREATE INDEX idx_skills_uploader_active ON skills(uploader_id, is_active)"
+        )
+
+        print("Migration: user_management_features migration completed")
+
+
+def create_notification(
+    user_id: int,
+    type: str,
+    title: str,
+    content: Optional[str] = None,
+    related_skill_id: Optional[int] = None
+) -> int:
+    """Create a notification for a user.
+
+    Args:
+        user_id: The user's ID
+        type: Notification type (e.g., 'review_success', 'review_rejected')
+        title: Notification title
+        content: Optional notification content
+        related_skill_id: Optional related skill ID
+
+    Returns:
+        The ID of the created notification
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO notifications (user_id, type, title, content, related_skill_id)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (user_id, type, title, content, related_skill_id)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_user_notifications(
+    user_id: int,
+    unread_only: bool = False,
+    limit: int = 50,
+    offset: int = 0
+) -> Dict[str, Any]:
+    """Get notifications for a user.
+
+    Args:
+        user_id: The user's ID
+        unread_only: If True, only return unread notifications
+        limit: Maximum number of notifications to return
+        offset: Number of notifications to skip for pagination
+
+    Returns:
+        Dictionary containing:
+        - notifications: List of notification records
+        - total: Total count matching the filter
+        - unread_count: Count of unread notifications
+    """
+    with get_connection() as conn:
+        # Get total count
+        if unread_only:
+            total_row = conn.execute(
+                "SELECT COUNT(*) as total FROM notifications WHERE user_id = %s AND is_read = 0",
+                (user_id,)
+            ).fetchone()
+        else:
+            total_row = conn.execute(
+                "SELECT COUNT(*) as total FROM notifications WHERE user_id = %s",
+                (user_id,)
+            ).fetchone()
+
+        total = total_row["total"] if total_row else 0
+
+        # Get unread count
+        unread_row = conn.execute(
+            "SELECT COUNT(*) as count FROM notifications WHERE user_id = %s AND is_read = 0",
+            (user_id,)
+        ).fetchone()
+        unread_count = unread_row["count"] if unread_row else 0
+
+        # Build query
+        if unread_only:
+            query = """
+                SELECT id, user_id, type, title, content, related_skill_id, is_read, created_at
+                FROM notifications
+                WHERE user_id = %s AND is_read = 0
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            rows = conn.execute(query, (user_id, limit, offset)).fetchall()
+        else:
+            query = """
+                SELECT id, user_id, type, title, content, related_skill_id, is_read, created_at
+                FROM notifications
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            rows = conn.execute(query, (user_id, limit, offset)).fetchall()
+
+        notifications = []
+        for row in rows:
+            notifications.append({
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "type": row["type"],
+                "title": row["title"],
+                "content": row["content"],
+                "related_skill_id": row["related_skill_id"],
+                "is_read": row["is_read"],
+                "created_at": row["created_at"]
+            })
+
+        return {
+            "notifications": notifications,
+            "total": total,
+            "unread_count": unread_count
+        }
+
+
+def mark_notification_read(notification_id: int, user_id: int) -> bool:
+    """Mark a notification as read.
+
+    Args:
+        notification_id: The notification's ID
+        user_id: The user's ID (for ownership verification)
+
+    Returns:
+        True if marked as read, False if notification not found or not owned by user
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE notifications
+            SET is_read = 1
+            WHERE id = %s AND user_id = %s
+            """,
+            (notification_id, user_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def mark_all_notifications_read(user_id: int) -> int:
+    """Mark all notifications as read for a user.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        Number of notifications marked as read
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE notifications
+            SET is_read = 1
+            WHERE user_id = %s AND is_read = 0
+            """,
+            (user_id,)
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def get_unread_notifications_count(user_id: int) -> int:
+    """Get count of unread notifications for a user.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        Count of unread notifications
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as count FROM notifications WHERE user_id = %s AND is_read = 0",
+            (user_id,)
+        ).fetchone()
+        return row["count"] if row else 0
+
+
+def cleanup_old_notifications(user_id: int, keep_count: int = 100) -> None:
+    """Delete old notifications keeping only the most recent ones.
+
+    Args:
+        user_id: The user's ID
+        keep_count: Number of recent notifications to keep
+    """
+    with get_connection() as conn:
+        # Find the cutoff point
+        rows = conn.execute(
+            """
+            SELECT id FROM notifications
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (user_id, 1, keep_count)
+        ).fetchall()
+
+        if rows:
+            # Delete all notifications older than the cutoff
+            cutoff_id = rows[0]["id"]
+            conn.execute(
+                "DELETE FROM notifications WHERE user_id = %s AND id < %s",
+                (user_id, cutoff_id)
+            )
+            conn.commit()
+
+
+def update_skill_active_status(skill_id: int, is_active: bool) -> bool:
+    """Update the active status of a skill.
+
+    Args:
+        skill_id: The skill's ID
+        is_active: Whether the skill should be active
+
+    Returns:
+        True if updated, False if skill not found
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE skills
+            SET is_active = %s
+            WHERE id = %s
+            """,
+            (1 if is_active else 0, skill_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def get_skill_active_status(skill_name: str) -> bool:
+    """Get the active status for a skill by name.
+
+    Args:
+        skill_name: The name of the skill
+
+    Returns:
+        True if skill is active (is_active = 1), False if inactive or not found
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT is_active
+            FROM skills
+            WHERE skill_name = %s
+            ORDER BY uploaded_at DESC
+            LIMIT 1
+            """,
+            (skill_name,)
+        ).fetchone()
+
+        return bool(row["is_active"]) if row else True
+
+
+def get_skill_approval_status(skill_name: str) -> bool:
+    """Check if a skill has been approved (status = 'approved').
+
+    Args:
+        skill_name: The name of the skill
+
+    Returns:
+        True if the skill has been approved, False otherwise
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT status
+            FROM skills
+            WHERE skill_name = %s
+            ORDER BY uploaded_at DESC
+            LIMIT 1
+            """,
+            (skill_name,)
+        ).fetchone()
+
+        return row["status"] == "approved" if row else False
+
+
+def get_my_skills(
+    user_id: int,
+    status_filter: str = "all",
+    limit: int = 20,
+    offset: int = 0
+) -> Dict[str, Any]:
+    """Get skills uploaded by a specific user with filtering and pagination.
+
+    Args:
+        user_id: The user's ID
+        status_filter: Filter by status ('all', 'active', 'unlisted', 'pending', 'rejected')
+        limit: Maximum number of records to return
+        offset: Number of records to skip for pagination
+
+    Returns:
+        Dictionary containing:
+        - skills: List of skill records
+        - total: Total count matching the filter
+        - limit: The limit used
+        - offset: The offset used
+    """
+    with get_connection() as conn:
+        # Build base query
+        base_query = "FROM skills WHERE uploader_id = %s"
+        params = [user_id]
+
+        # Add status filter
+        if status_filter == "active":
+            base_query += " AND status = 'approved' AND is_active = 1"
+        elif status_filter == "unlisted":
+            base_query += " AND status = 'approved' AND is_active = 0"
+        elif status_filter == "pending":
+            base_query += " AND status = 'pending'"
+        elif status_filter == "rejected":
+            base_query += " AND status = 'rejected'"
+        # 'all' returns all skills regardless of status
+
+        # Get total count
+        total_row = conn.execute(
+            f"SELECT COUNT(*) as total {base_query}",
+            tuple(params)
+        ).fetchone()
+        total = total_row["total"] if total_row else 0
+
+        # Get paginated results
+        rows = conn.execute(
+            f"""
+            SELECT
+                id, skill_name, version, filename, uploader_id, status,
+                source_type, uploaded_at, reviewed_at, reviewer_id,
+                review_comment, is_active, is_default_version
+            {base_query}
+            ORDER BY uploaded_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            tuple(params + [limit, offset])
+        ).fetchall()
+
+        skills = []
+        for row in rows:
+            skills.append({
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "source_type": row["source_type"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"],
+                "is_active": row["is_active"],
+                "is_default_version": row["is_default_version"]
+            })
+
+        return {
+            "skills": skills,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+
+
+def set_default_skill_version(user_id: int, skill_name: str, skill_id: int) -> bool:
+    """Set a specific skill version as the default for a skill name.
+
+    Unsets is_default_version for all other versions of the same skill
+    owned by the user, then sets the specified version as default.
+
+    Args:
+        user_id: The user's ID (for ownership verification)
+        skill_name: The name of the skill
+        skill_id: The ID of the skill to set as default
+
+    Returns:
+        True if updated successfully, False if skill not found or not owned by user
+    """
+    with get_connection() as conn:
+        # First verify the skill belongs to the user
+        verify_row = conn.execute(
+            """
+            SELECT id FROM skills
+            WHERE id = %s AND uploader_id = %s AND skill_name = %s
+            """,
+            (skill_id, user_id, skill_name)
+        ).fetchone()
+
+        if not verify_row:
+            return False
+
+        # Unset default for all versions of this skill owned by the user
+        conn.execute(
+            """
+            UPDATE skills
+            SET is_default_version = 0
+            WHERE uploader_id = %s AND skill_name = %s
+            """,
+            (user_id, skill_name)
+        )
+
+        # Set the specified version as default
+        cursor = conn.execute(
+            """
+            UPDATE skills
+            SET is_default_version = 1
+            WHERE id = %s AND uploader_id = %s AND skill_name = %s
+            """,
+            (skill_id, user_id, skill_name)
+        )
+        conn.commit()
+
+        return cursor.rowcount > 0
+
+
+def get_skill_versions(user_id: int, skill_name: str) -> List[Dict[str, Any]]:
+    """Get all versions of a skill owned by a user.
+
+    Args:
+        user_id: The user's ID
+        skill_name: The name of the skill
+
+    Returns:
+        List of skill version records sorted newest first
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id, skill_name, version, filename, uploader_id, status,
+                source_type, uploaded_at, reviewed_at, reviewer_id,
+                review_comment, is_active, is_default_version
+            FROM skills
+            WHERE uploader_id = %s AND skill_name = %s
+            ORDER BY uploaded_at DESC
+            """,
+            (user_id, skill_name)
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            results.append({
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "source_type": row["source_type"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"],
+                "is_active": row["is_active"],
+                "is_default_version": row["is_default_version"]
+            })
+
+        return results
+
+
+def get_default_skill_version(skill_name: str) -> Optional[Dict[str, Any]]:
+    """Get the default version of a skill by name.
+
+    Returns the skill record marked as is_default_version=1 with status='approved'.
+    If no default version is set, returns None.
+
+    Args:
+        skill_name: The name of the skill
+
+    Returns:
+        Dictionary with skill record or None if not found
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                id, skill_name, version, filename, uploader_id, status,
+                source_type, uploaded_at, reviewed_at, reviewer_id,
+                review_comment, is_active, is_default_version
+            FROM skills
+            WHERE skill_name = %s
+              AND status = 'approved'
+              AND is_default_version = 1
+            LIMIT 1
+            """,
+            (skill_name,)
+        ).fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "source_type": row["source_type"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"],
+                "is_active": row["is_active"],
+                "is_default_version": row["is_default_version"]
+            }
+        return None
+
+
+def get_all_default_skill_versions() -> Dict[str, Dict[str, Any]]:
+    """Get all default skill versions as a dictionary keyed by skill name.
+
+    Returns a dictionary where keys are skill names and values are the
+    skill records marked as is_default_version=1 with status='approved'.
+
+    Returns:
+        Dictionary mapping skill_name to skill record
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                id, skill_name, version, filename, uploader_id, status,
+                source_type, uploaded_at, reviewed_at, reviewer_id,
+                review_comment, is_active, is_default_version
+            FROM skills
+            WHERE status = 'approved'
+              AND is_default_version = 1
+            """
+        ).fetchall()
+
+        result = {}
+        for row in rows:
+            result[row["skill_name"]] = {
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "source_type": row["source_type"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"],
+                "is_active": row["is_active"],
+                "is_default_version": row["is_default_version"]
+            }
+        return result
+
+
+def delete_skill_version(user_id: int, skill_id: int) -> bool:
+    """Delete a specific skill version.
+
+    Only the owner of the skill can delete it.
+    The physical ZIP file will also be removed from the plugins directory.
+
+    Args:
+        user_id: The user's ID (for ownership verification)
+        skill_id: The ID of the skill to delete
+
+    Returns:
+        True if deleted successfully, False if skill not found or not owned by user
+    """
+    import os
+
+    with get_connection() as conn:
+        # First verify the skill belongs to the user and get filename
+        verify_row = conn.execute(
+            """
+            SELECT id, filename, skill_name, is_default_version
+            FROM skills
+            WHERE id = %s AND uploader_id = %s
+            """,
+            (skill_id, user_id)
+        ).fetchone()
+
+        if not verify_row:
+            return False
+
+        filename = verify_row["filename"]
+        skill_name = verify_row["skill_name"]
+        is_default = verify_row["is_default_version"]
+
+        # If this is the default version, check if there are other versions
+        if is_default:
+            other_versions = conn.execute(
+                """
+                SELECT COUNT(*) as count FROM skills
+                WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                """,
+                (skill_name, user_id, skill_id)
+            ).fetchone()
+
+            # If there are other versions, we need to set a new default
+            if other_versions["count"] > 0:
+                # Set the latest other version as default
+                conn.execute(
+                    """
+                    UPDATE skills
+                    SET is_default_version = 1
+                    WHERE id = (
+                        SELECT id FROM skills
+                        WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                        ORDER BY uploaded_at DESC
+                        LIMIT 1
+                    )
+                    """,
+                    (skill_name, user_id, skill_id)
+                )
+
+        # Delete related notifications first (due to foreign key constraint)
+        conn.execute(
+            """
+            DELETE FROM notifications
+            WHERE related_skill_id = %s
+            """,
+            (skill_id,)
+        )
+
+        # Delete the skill record
+        cursor = conn.execute(
+            """
+            DELETE FROM skills
+            WHERE id = %s AND uploader_id = %s
+            """,
+            (skill_id, user_id)
+        )
+        conn.commit()
+
+        # Delete the physical ZIP file
+        if filename:
+            from pathlib import Path
+            zip_path = Path("./plugins") / filename
+            if zip_path.exists():
+                try:
+                    zip_path.unlink()
+                except Exception as e:
+                    # Log but don't fail the database operation
+                    print(f"Warning: Could not delete file {zip_path}: {e}")
+
+        return cursor.rowcount > 0
+
+
+def batch_unlist_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
+    """Unlist multiple skills at once.
+
+    Args:
+        user_id: The user's ID
+        skill_ids: List of skill IDs to unlist
+
+    Returns:
+        Dictionary with success count and failed IDs
+    """
+    with get_connection() as conn:
+        success_count = 0
+        failed_ids = []
+
+        for skill_id in skill_ids:
+            # Verify ownership
+            verify_row = conn.execute(
+                """
+                SELECT id FROM skills
+                WHERE id = %s AND uploader_id = %s
+                """,
+                (skill_id, user_id)
+            ).fetchone()
+
+            if verify_row:
+                conn.execute(
+                    """
+                    UPDATE skills
+                    SET is_active = 0
+                    WHERE id = %s
+                    """,
+                    (skill_id,)
+                )
+                success_count += 1
+            else:
+                failed_ids.append(skill_id)
+
+        conn.commit()
+
+        return {
+            "success_count": success_count,
+            "failed_ids": failed_ids
+        }
+
+
+def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
+    """Delete multiple skills at once.
+
+    Args:
+        user_id: The user's ID
+        skill_ids: List of skill IDs to delete
+
+    Returns:
+        Dictionary with success count and failed IDs
+    """
+    import os
+    from pathlib import Path
+
+    with get_connection() as conn:
+        success_count = 0
+        failed_ids = []
+        files_to_delete = []
+
+        for skill_id in skill_ids:
+            # Verify ownership and get filename
+            verify_row = conn.execute(
+                """
+                SELECT id, filename, skill_name, is_default_version
+                FROM skills
+                WHERE id = %s AND uploader_id = %s
+                """,
+                (skill_id, user_id)
+            ).fetchone()
+
+            if verify_row:
+                filename = verify_row["filename"]
+                skill_name = verify_row["skill_name"]
+                is_default = verify_row["is_default_version"]
+
+                # If this is the default version, check if there are other versions
+                if is_default:
+                    other_versions = conn.execute(
+                        """
+                        SELECT COUNT(*) as count FROM skills
+                        WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                        """,
+                        (skill_name, user_id, skill_id)
+                    ).fetchone()
+
+                    # If there are other versions, we need to set a new default
+                    if other_versions["count"] > 0:
+                        # Set the latest other version as default
+                        conn.execute(
+                            """
+                            UPDATE skills
+                            SET is_default_version = 1
+                            WHERE id = (
+                                SELECT id FROM skills
+                                WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                                ORDER BY uploaded_at DESC
+                                LIMIT 1
+                            )
+                            """,
+                            (skill_name, user_id, skill_id)
+                        )
+
+                # Delete related notifications first (due to foreign key constraint)
+                conn.execute(
+                    """
+                    DELETE FROM notifications
+                    WHERE related_skill_id = %s
+                    """,
+                    (skill_id,)
+                )
+
+                # Delete the skill record
+                conn.execute(
+                    """
+                    DELETE FROM skills
+                    WHERE id = %s
+                    """,
+                    (skill_id,)
+                )
+
+                # Track file for deletion
+                if filename:
+                    files_to_delete.append(filename)
+
+                success_count += 1
+            else:
+                failed_ids.append(skill_id)
+
+        conn.commit()
+
+        # Delete physical ZIP files
+        plugins_dir = Path("./plugins")
+        for filename in files_to_delete:
+            zip_path = plugins_dir / filename
+            if zip_path.exists():
+                try:
+                    zip_path.unlink()
+                except Exception as e:
+                    print(f"Warning: Could not delete file {zip_path}: {e}")
+
+        return {
+            "success_count": success_count,
+            "failed_ids": failed_ids
+        }
