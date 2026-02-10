@@ -7,6 +7,22 @@ Moves plugins from: plugins/{org}/{collection}/{skill}/
 
 import shutil
 from pathlib import Path
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging, audit_log
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 PLUGINS_DIR = Path("plugins")
 
@@ -16,8 +32,9 @@ def migrate_plugins():
     migrated = 0
     skipped = 0
     errors = 0
+    organizations = []
 
-    print("Scanning for plugins to migrate...\n")
+    logger.info("Scanning for plugins to migrate...")
 
     # Walk through old structure
     for org_dir in PLUGINS_DIR.iterdir():
@@ -29,7 +46,8 @@ def migrate_plugins():
             continue
 
         organization = org_dir.name
-        print(f"[ORG] {organization}")
+        organizations.append(organization)
+        logger.info(f"Processing organization", extra={"organization": organization})
 
         for collection_dir in org_dir.iterdir():
             if not collection_dir.is_dir():
@@ -47,18 +65,27 @@ def migrate_plugins():
                 target_dir = PLUGINS_DIR / collection / plugin_name
 
                 if target_dir.exists():
-                    print(f"  [SKIP] {organization}/{collection}/{plugin_name} -> {collection}/{plugin_name} (target exists)")
+                    logger.debug(f"Plugin already exists, skipping", extra={
+                        "source": f"{organization}/{collection}/{plugin_name}",
+                        "target": f"{collection}/{plugin_name}"
+                    })
                     skipped += 1
                     continue
 
                 # Move the entire plugin directory
-                print(f"  [MOVE] {organization}/{collection}/{plugin_name} -> {collection}/{plugin_name}")
+                logger.info(f"Moving plugin...", extra={
+                    "source": f"{organization}/{collection}/{plugin_name}",
+                    "target": f"{collection}/{plugin_name}"
+                })
                 try:
                     target_dir.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(plugin_dir), str(target_dir))
                     migrated += 1
                 except Exception as e:
-                    print(f"  [ERROR] Failed to move {plugin_name}: {e}")
+                    logger.error(f"Failed to move plugin", extra={
+                        "plugin_name": plugin_name,
+                        "error": str(e)
+                    })
                     errors += 1
 
             # Try to remove empty collection directory
@@ -75,28 +102,25 @@ def migrate_plugins():
         except:
             pass
 
-    print(f"\n{'='*50}")
-    print(f"Migration complete:")
-    print(f"  Moved:   {migrated}")
-    print(f"  Skipped: {skipped}")
-    print(f"  Errors:  {errors}")
-    print(f"\nNew structure: plugins/{{collection}}/{{skill}}/{{version}}.zip")
+    logger.info(f"Migration complete", extra={
+        "migrated": migrated,
+        "skipped": skipped,
+        "errors": errors,
+        "organizations": organizations
+    })
+
+    # 记录审计日志
+    audit_log(
+        logger,
+        action="config_change",
+        user_id="system",
+        change_type="plugin_structure_migration",
+        migrated=migrated,
+        skipped=skipped,
+        errors=errors,
+        result="success" if errors == 0 else "partial"
+    )
 
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("Plugin Structure Migration Tool")
-    print("Migrating: org/collection/skill -> collection/skill")
-    print("=" * 50)
-    print()
-
-    if not PLUGINS_DIR.exists():
-        print(f"Error: {PLUGINS_DIR} not found")
-        exit(1)
-
-    response = input("This will move all plugins to the new structure. Continue? (y/N): ")
-    if response.lower() != 'y':
-        print("Aborted.")
-        exit(0)
-
     migrate_plugins()

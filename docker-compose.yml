@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: skill-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=skills
+      - MYSQL_USER=skill_user
+      - MYSQL_PASSWORD=skill_pass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
   registry:
     build: .
     container_name: skill-registry
@@ -8,6 +22,16 @@ services:
       - "8000:8000"
     volumes:
       - ./plugins:/app/plugins
+    depends_on:
+      - mysql
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=skill_user
+      - DB_PASSWORD=skill_pass
+      - DB_DATABASE=skills
+
+volumes:
+  mysql_data:

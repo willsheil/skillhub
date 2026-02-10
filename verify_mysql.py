@@ -5,6 +5,23 @@
 
 import pymysql
 import sys
+import logging
+import os
+from pathlib import Path
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 # MySQL configuration
 DB_CONFIG = {
@@ -19,85 +36,73 @@ DB_CONFIG = {
 
 def test_connection():
     """测试 MySQL 连接"""
-    print("="*60)
-    print("验证 MySQL 数据库")
-    print("="*60)
-    print()
+    logger.info("="*60)
+    logger.info("验证 MySQL 数据库")
+    logger.info("="*60)
 
     try:
         # 连接到 MySQL
-        print("1. 测试数据库连接...")
+        logger.info("1. 测试数据库连接...")
         conn = pymysql.connect(**DB_CONFIG)
-        print("   ✓ MySQL 连接成功!")
-        print(f"   主机: {DB_CONFIG['host']}:{DB_CONFIG['port']}")
-        print(f"   数据库: {DB_CONFIG['database']}")
-        print()
+        logger.info("MySQL 连接成功!", extra={
+            "host": f"{DB_CONFIG['host']}:{DB_CONFIG['port']}",
+            "database": DB_CONFIG['database']
+        })
 
         cursor = conn.cursor()
 
         # 检查表是否存在
-        print("2. 检查表结构...")
+        logger.info("2. 检查表结构...")
         cursor.execute("SHOW TABLES")
         tables = cursor.fetchall()
-        print(f"   找到 {len(tables)} 个表:")
-        for table in tables:
-            table_name = list(table.values())[0]
-            print(f"   - {table_name}")
-        print()
+        table_names = [list(table.values())[0] for table in tables]
+        logger.info(f"找到 {len(tables)} 个表", extra={"table_count": len(tables), "tables": table_names})
 
         # 统计用户数据
-        print("3. 验证用户数据...")
+        logger.info("3. 验证用户数据...")
         cursor.execute("SELECT COUNT(*) as count FROM users")
         user_count = cursor.fetchone()['count']
-        print(f"   用户总数: {user_count}")
+        logger.info(f"用户总数: {user_count}", extra={"user_count": user_count})
 
         cursor.execute("SELECT employee_id, role FROM users ORDER BY id LIMIT 5")
         users = cursor.fetchall()
-        print("   最新 5 个用户:")
-        for user in users:
-            print(f"   - {user['employee_id']:<15} | {user['role']:<10}")
-        print()
+        user_list = [{"employee_id": u['employee_id'], "role": u['role']} for u in users]
+        logger.info("最新 5 个用户", extra={"users": user_list})
 
         # 验证特定用户
-        print("4. 验证测试账号 (w00545471)...")
+        logger.info("4. 验证测试账号 (w00545471)...")
         cursor.execute("SELECT employee_id, role FROM users WHERE employee_id = %s", ('w00545471',))
         test_user = cursor.fetchone()
         if test_user:
-            print(f"   ✓ 测试账号存在")
-            print(f"   - 工号: {test_user['employee_id']}")
-            print(f"   - 角色: {test_user['role']}")
+            logger.info("测试账号存在", extra={
+                "employee_id": test_user['employee_id'],
+                "role": test_user['role']
+            })
         else:
-            print("   ✗ 测试账号不存在!")
-        print()
+            logger.warning("测试账号不存在!", extra={"employee_id": "w00545471"})
 
         # 统计其他数据
-        print("5. 验证其他数据...")
+        logger.info("5. 验证其他数据...")
         cursor.execute("SELECT COUNT(*) as count FROM downloads")
         download_count = cursor.fetchone()['count']
-        print(f"   下载记录: {download_count} 条")
+        logger.info(f"下载记录: {download_count} 条", extra={"download_count": download_count})
 
         cursor.execute("SELECT COUNT(*) as count FROM skills")
         skill_count = cursor.fetchone()['count']
-        print(f"   Skills: {skill_count} 条")
-        print()
+        logger.info(f"Skills: {skill_count} 条", extra={"skill_count": skill_count})
 
         cursor.close()
         conn.close()
 
-        print("="*60)
-        print("✓ 所有验证通过!")
-        print("="*60)
-        print()
-        print("现在可以启动应用:")
-        print("  conda activate a2a")
-        print("  python main.py")
-        print()
+        logger.info("="*60)
+        logger.info("所有验证通过!")
+        logger.info("="*60)
+        logger.info("现在可以启动应用: conda activate a2a && python main.py")
+
         return True
 
     except Exception as e:
-        print(f"✗ 验证失败: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"验证失败: {e}", exc_info=True, extra={"error": str(e)})
         return False
 
 if __name__ == "__main__":

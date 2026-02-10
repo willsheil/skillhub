@@ -2,8 +2,25 @@ import json
 import zipfile
 from pathlib import Path
 from datetime import datetime
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 PLUGINS_DIR = Path('plugins')
+
 
 def extract_metadata(collection, plugin_name, zip_path):
     try:
@@ -15,7 +32,11 @@ def extract_metadata(collection, plugin_name, zip_path):
                     metadata['collection'] = collection
                     return metadata
     except Exception as e:
-        pass
+        logger.debug(f"Failed to extract metadata", extra={
+            "collection": collection,
+            "plugin_name": plugin_name,
+            "error": str(e)
+        })
     return {
         'name': plugin_name,
         'collection': collection,
@@ -26,10 +47,18 @@ def extract_metadata(collection, plugin_name, zip_path):
 
 plugins = []
 
+logger.info("Scanning plugins directory...")
+
 for collection_dir in PLUGINS_DIR.iterdir():
     if not collection_dir.is_dir():
         continue
+
+    # Skip hidden/temp directories
+    if collection_dir.name.startswith('.') or collection_dir.name.startswith('_'):
+        continue
+
     collection = collection_dir.name
+    logger.debug(f"Processing collection", extra={"collection": collection})
 
     for plugin_dir in collection_dir.iterdir():
         if not plugin_dir.is_dir():
@@ -61,6 +90,8 @@ for collection_dir in PLUGINS_DIR.iterdir():
 
 plugins = sorted(plugins, key=lambda x: (x['collection'], x['name']))
 
+logger.info(f"Found {len(plugins)} plugins across collections")
+
 marketplace = {
     'name': 'private-registry',
     'owner': {
@@ -91,4 +122,8 @@ for plugin in plugins:
 
 with open('marketplace.json', 'w', encoding='utf-8') as f:
     json.dump(marketplace, f, indent=2, ensure_ascii=False)
-print("Generated marketplace.json")
+
+logger.info("Generated marketplace.json", extra={
+    "plugin_count": len(marketplace['plugins']),
+    "output_file": "marketplace.json"
+})

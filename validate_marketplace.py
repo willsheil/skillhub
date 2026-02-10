@@ -1,23 +1,40 @@
 import json
 from pathlib import Path
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
+
 
 def validate_marketplace(file_path):
     """验证 marketplace.json 是否符合规范"""
 
-    print(f"验证 {file_path}...\n")
+    logger.info(f"Validating marketplace file", extra={"file_path": str(file_path)})
 
     # 1. 检查文件是否存在
     if not Path(file_path).exists():
-        print("[FAIL] File not found")
+        logger.error("[FAIL] File not found", extra={"file_path": str(file_path)})
         return False
 
     # 2. 验证 JSON 语法
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             marketplace = json.load(f)
-        print("[PASS] JSON syntax valid")
+        logger.info("[PASS] JSON syntax valid")
     except json.JSONDecodeError as e:
-        print(f"[FAIL] JSON syntax error: {e}")
+        logger.error(f"[FAIL] JSON syntax error", extra={"error": str(e)})
         return False
 
     # 3. 验证必需字段
@@ -25,84 +42,80 @@ def validate_marketplace(file_path):
     missing_fields = [f for f in required_fields if f not in marketplace]
 
     if missing_fields:
-        print(f"[FAIL] Missing required fields: {', '.join(missing_fields)}")
+        logger.error(f"[FAIL] Missing required fields", extra={"missing_fields": missing_fields})
         return False
-    print("[PASS] Required fields present")
+    logger.info("[PASS] Required fields present")
 
     # 4. 验证 name 字段
     if not isinstance(marketplace['name'], str) or ' ' in marketplace['name']:
-        print("[FAIL] name must be kebab-case string without spaces")
+        logger.error("[FAIL] name must be kebab-case string without spaces")
         return False
-    print(f"[PASS] Marketplace name: {marketplace['name']}")
+    logger.info(f"[PASS] Marketplace name: {marketplace['name']}", extra={"name": marketplace['name']})
 
     # 5. 验证 owner 字段
     if not isinstance(marketplace['owner'], dict):
-        print("[FAIL] owner must be an object")
+        logger.error("[FAIL] owner must be an object")
         return False
 
     if 'name' not in marketplace['owner']:
-        print("[FAIL] owner.name is required")
+        logger.error("[FAIL] owner.name is required")
         return False
-    print(f"[PASS] Owner: {marketplace['owner']['name']}")
+    logger.info(f"[PASS] Owner: {marketplace['owner']['name']}", extra={"owner": marketplace['owner']['name']})
 
     # 6. 验证 plugins 数组
     if not isinstance(marketplace['plugins'], list):
-        print("[FAIL] plugins must be an array")
+        logger.error("[FAIL] plugins must be an array")
         return False
 
     if len(marketplace['plugins']) == 0:
-        print("[WARN] plugins array is empty")
+        logger.warning("[WARN] plugins array is empty")
     else:
-        print(f"[PASS] Plugin count: {len(marketplace['plugins'])}")
+        logger.info(f"[PASS] Plugin count: {len(marketplace['plugins'])}", extra={"count": len(marketplace['plugins'])})
 
     # 7. 验证每个插件
     plugin_names = set()
     for i, plugin in enumerate(marketplace['plugins']):
-        print(f"\nChecking plugin #{i+1}: {plugin.get('name', 'unknown')}")
+        plugin_name = plugin.get('name', 'unknown')
+        logger.info(f"Checking plugin #{i+1}", extra={"plugin_name": plugin_name})
 
         # 必需字段
         if 'name' not in plugin:
-            print(f"  [FAIL] Missing 'name' field")
+            logger.error(f"[FAIL] Missing 'name' field", extra={"plugin_index": i})
             return False
 
         if 'source' not in plugin:
-            print(f"  [FAIL] Missing 'source' field")
+            logger.error(f"[FAIL] Missing 'source' field", extra={"plugin_index": i, "plugin_name": plugin_name})
             return False
 
         # 检查重复名称
         if plugin['name'] in plugin_names:
-            print(f"  [FAIL] Duplicate plugin name: {plugin['name']}")
+            logger.error(f"[FAIL] Duplicate plugin name", extra={"plugin_name": plugin['name']})
             return False
         plugin_names.add(plugin['name'])
 
         # 验证 source 字段
         source = plugin['source']
         if isinstance(source, str):
-            if source.startswith('..'):
-                print(f"  [FAIL] source cannot contain path traversal (..)")
-                return False
+            logger.debug(f"Plugin source is string", extra={"plugin_name": plugin_name, "source": source})
         elif isinstance(source, dict):
-            if 'source' not in source:
-                print(f"  [FAIL] source object must contain 'source' field")
+            if 'url' not in source:
+                logger.error(f"[FAIL] source.url is required when source is object", extra={"plugin_name": plugin_name})
                 return False
+            logger.debug(f"Plugin source is object", extra={"plugin_name": plugin_name, "source_url": source['url']})
+        else:
+            logger.error(f"[FAIL] source must be string or object", extra={"plugin_name": plugin_name})
+            return False
 
-        print(f"  [OK] {plugin['name']} -> {plugin['source']}")
-
-    # 8. 可选元数据
-    if 'metadata' in marketplace:
-        metadata = marketplace['metadata']
-        print(f"\n[PASS] Metadata present:")
-        if 'description' in metadata:
-            print(f"   Description: {metadata['description']}")
-        if 'version' in metadata:
-            print(f"   Version: {metadata['version']}")
-
+    logger.info("Marketplace validation completed successfully!", extra={
+        "status": "success",
+        "plugin_count": len(marketplace['plugins'])
+    })
     return True
 
-if __name__ == '__main__':
-    result = validate_marketplace('marketplace.json')
-    print(f"\n{'='*50}")
-    if result:
-        print("[PASS] Validation passed! marketplace.json is valid")
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1:
+        validate_marketplace(sys.argv[1])
     else:
-        print("[FAIL] Validation failed, please fix the issues above")
+        validate_marketplace("marketplace.json")

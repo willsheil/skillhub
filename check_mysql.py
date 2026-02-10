@@ -4,6 +4,22 @@ Check MySQL connection and create database if needed.
 """
 
 import pymysql
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 try:
     # Connect to MySQL server (without database specified)
@@ -14,7 +30,10 @@ try:
         password='root',
         charset='utf8mb4'
     )
-    print("Connected to MySQL server successfully!")
+    logger.info("Connected to MySQL server successfully!", extra={
+        "host": "127.0.0.1",
+        "port": 3306
+    })
 
     # Check if skills database exists
     cursor = conn.cursor()
@@ -22,18 +41,23 @@ try:
     result = cursor.fetchone()
 
     if result:
-        print("Database 'skills' already exists.")
+        logger.info("Database 'skills' already exists.")
     else:
-        print("Creating database 'skills'...")
+        logger.info("Creating database 'skills'...")
         cursor.execute("CREATE DATABASE skills CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-        print("Database 'skills' created successfully!")
+        logger.info("Database 'skills' created successfully!", extra={
+            "database": "skills",
+            "charset": "utf8mb4"
+        })
 
     cursor.close()
     conn.close()
 
 except Exception as e:
-    print(f"Error connecting to MySQL: {e}")
-    print("\nPlease make sure:")
-    print("1. MySQL server is running on 127.0.0.1")
-    print("2. Username is 'root' and password is 'root'")
-    print("3. MySQL client library is installed")
+    logger.error(f"Error connecting to MySQL: {e}", exc_info=True, extra={
+        "error": str(e),
+        "host": "127.0.0.1",
+        "port": 3306,
+        "user": "root"
+    })
+    logger.info("Please make sure MySQL server is running on 127.0.0.1 with username 'root' and password 'root'")

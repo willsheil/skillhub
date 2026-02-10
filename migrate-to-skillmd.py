@@ -17,6 +17,21 @@ import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional
+import logging
+
+# 导入日志配置
+from logging_config import setup_logging, audit_log
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 import yaml
 
@@ -142,7 +157,7 @@ def migrate_skill_zip(zip_path: Path) -> bool:
     Returns:
         True if migration was successful
     """
-    print(f"  Processing: {zip_path.name}")
+    logger.info(f"Processing ZIP file", extra={"zip_file": zip_path.name})
 
     try:
         # Create temporary directory
@@ -156,7 +171,7 @@ def migrate_skill_zip(zip_path: Path) -> bool:
             # Find package.json
             package_json_paths = list(temp_path.rglob('package.json'))
             if not package_json_paths:
-                print(f"    ⚠️  No package.json found, skipping")
+                logger.warning(f"No package.json found, skipping", extra={"zip_file": zip_path.name})
                 return False
 
             package_json_path = package_json_paths[0]
@@ -191,17 +206,23 @@ def migrate_skill_zip(zip_path: Path) -> bool:
             # Replace original ZIP
             shutil.move(new_zip_path, zip_path)
 
-            print(f"    ✅ Migrated: {metadata.get('name', 'unknown')} (author: {metadata.get('author', {})})")
+            skill_name = metadata.get('name', 'unknown')
+            author_info = metadata.get('author', {})
+            logger.info(f"Successfully migrated skill", extra={
+                "skill_name": skill_name,
+                "author": str(author_info),
+                "zip_file": zip_path.name
+            })
             return True
 
     except Exception as e:
-        print(f"    ❌ Failed: {e}")
+        logger.error(f"Migration failed", extra={"zip_file": zip_path.name, "error": str(e)})
         return False
 
 
 def migrate_all_plugins():
     """Migrate all plugins in the plugins directory."""
-    print("🔧 Migrating plugins from package.json to SKILL.md format\n")
+    logger.info("Starting migration from package.json to SKILL.md format")
 
     migrated = 0
     failed = 0
@@ -211,10 +232,10 @@ def migrate_all_plugins():
     zip_files = list(PLUGINS_DIR.glob('*.zip'))
 
     if not zip_files:
-        print("No ZIP files found in plugins directory")
+        logger.warning("No ZIP files found in plugins directory")
         return
 
-    print(f"Found {len(zip_files)} plugin(s) to migrate\n")
+    logger.info(f"Found plugins to migrate", extra={"count": len(zip_files)})
 
     for zip_path in zip_files:
         # Check if already migrated (contains SKILL.md)
@@ -224,17 +245,17 @@ def migrate_all_plugins():
                 has_package_json = any('package.json' in name for name in zf.namelist())
 
                 if has_skill_md and not has_package_json:
-                    print(f"  ⏭️  {zip_path.name}: Already migrated, skipping")
+                    logger.debug(f"Already migrated, skipping", extra={"zip_file": zip_path.name})
                     skipped += 1
                     continue
 
                 if not has_package_json:
-                    print(f"  ⚠️  {zip_path.name}: No package.json found, skipping")
+                    logger.warning(f"No package.json found, skipping", extra={"zip_file": zip_path.name})
                     skipped += 1
                     continue
 
         except zipfile.BadZipFile:
-            print(f"  ❌ {zip_path.name}: Invalid ZIP file")
+            logger.error(f"Invalid ZIP file", extra={"zip_file": zip_path.name})
             failed += 1
             continue
 
@@ -244,11 +265,23 @@ def migrate_all_plugins():
         else:
             failed += 1
 
-    print(f"\n📊 Migration Summary:")
-    print(f"   Migrated: {migrated}")
-    print(f"   Skipped: {skipped}")
-    print(f"   Failed: {failed}")
-    print(f"\n✅ Done!")
+    logger.info(f"Migration summary", extra={
+        "migrated": migrated,
+        "skipped": skipped,
+        "failed": failed
+    })
+
+    # 记录审计日志
+    audit_log(
+        logger,
+        action="config_change",
+        user_id="system",
+        change_type="skill_format_migration",
+        migrated=migrated,
+        skipped=skipped,
+        failed=failed,
+        result="success" if failed == 0 else "partial"
+    )
 
 
 if __name__ == "__main__":

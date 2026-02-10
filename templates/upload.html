@@ -547,30 +547,28 @@
                     body: formData
                 });
 
-                if (!response.ok) {
-                    throw new Error('Upload failed');
-                }
+                // Parse JSON response
+                const data = await response.json();
 
-                const text = await response.text();
+                if (data.success) {
+                    // Show success message
+                    showSuccess(data.message || '上传成功！');
 
-                // Check if response contains success message
-                if (text.includes('successfully uploaded') || text.includes('pending approval')) {
-                    // Reload page to show success message
-                    window.location.href = '/upload?success=true';
+                    // Reset file selection
+                    selectedFile = null;
+                    selectedFileDiv.classList.remove('show');
+                    submitBtn.disabled = true;
+
+                    // Reload upload history after a short delay
+                    setTimeout(() => loadUploadHistory(), 1000);
                 } else {
-                    // Show error from response
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(text, 'text/html');
-                    const errorEl = doc.querySelector('.message.error');
-                    if (errorEl) {
-                        showError(errorEl.textContent);
-                    } else {
-                        showError('上传失败，请重试');
-                    }
+                    // Show error message
+                    showError(data.error || '上传失败，请重试');
                 }
             } catch (error) {
                 console.error('Upload error:', error);
-                showError('上传失败：' + error.message);
+                // Try to parse as JSON if response is not JSON
+                showError('上传失败，请检查文件格式后重试');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = '开始上传';
@@ -589,6 +587,20 @@
 
             // Auto remove after 5 seconds
             setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            // Create success message element
+            const successDiv = document.createElement('div');
+            successDiv.className = 'message success';
+            successDiv.textContent = message;
+
+            // Insert after upload section
+            const uploadSection = document.querySelector('.upload-section');
+            uploadSection.parentNode.insertBefore(successDiv, uploadSection.nextSibling);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => successDiv.remove(), 5000);
         }
 
         // Load upload history

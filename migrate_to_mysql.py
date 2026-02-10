@@ -11,6 +11,22 @@ This script will:
 import sqlite3
 import pymysql
 from pathlib import Path
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 # SQLite configuration
 SQLITE_DB_PATH = Path("./data/registry.db")
@@ -41,7 +57,7 @@ def get_mysql_connection():
 
 def create_mysql_tables():
     """Create all tables in MySQL."""
-    print("Creating tables in MySQL...")
+    logger.info("Creating tables in MySQL...")
 
     with get_mysql_connection() as conn:
         with conn.cursor() as cursor:
@@ -135,18 +151,19 @@ def create_mysql_tables():
                 """)
 
         conn.commit()
-        print("  Tables created successfully!")
+        logger.info("Tables created successfully!", extra={"status": "success"})
 
 
 def migrate_users():
     """Migrate users from SQLite to MySQL."""
-    print("Migrating users...")
+    logger.info("Migrating users...")
 
     with get_sqlite_connection() as sqlite_conn:
         with get_mysql_connection() as mysql_conn:
             sqlite_cursor = sqlite_conn.execute("SELECT * FROM users")
             users = sqlite_cursor.fetchall()
 
+            skipped = 0
             with mysql_conn.cursor() as mysql_cursor:
                 for user in users:
                     try:
@@ -162,15 +179,20 @@ def migrate_users():
                             user['last_login']
                         ))
                     except pymysql.IntegrityError:
-                        print(f"  User {user['employee_id']} already exists, skipping...")
+                        logger.debug(f"User {user['employee_id']} already exists, skipping", extra={"employee_id": user['employee_id']})
+                        skipped += 1
 
             mysql_conn.commit()
-            print(f"  Migrated {len(users)} users")
+            logger.info(f"Migrated users", extra={
+                "total": len(users),
+                "migrated": len(users) - skipped,
+                "skipped": skipped
+            })
 
 
 def migrate_skills():
     """Migrate skills from SQLite to MySQL."""
-    print("Migrating skills...")
+    logger.info("Migrating skills...")
 
     with get_sqlite_connection() as sqlite_conn:
         with get_mysql_connection() as mysql_conn:
@@ -197,12 +219,12 @@ def migrate_skills():
                     ))
 
             mysql_conn.commit()
-            print(f"  Migrated {len(skills)} skills")
+            logger.info(f"Migrated skills", extra={"count": len(skills)})
 
 
 def migrate_downloads():
     """Migrate downloads from SQLite to MySQL."""
-    print("Migrating downloads...")
+    logger.info("Migrating downloads...")
 
     with get_sqlite_connection() as sqlite_conn:
         with get_mysql_connection() as mysql_conn:
@@ -227,12 +249,12 @@ def migrate_downloads():
                     ))
 
             mysql_conn.commit()
-            print(f"  Migrated {len(downloads)} downloads")
+            logger.info(f"Migrated downloads", extra={"count": len(downloads)})
 
 
 def verify_migration():
     """Verify that all data was migrated successfully."""
-    print("\nVerifying migration...")
+    logger.info("Verifying migration...")
 
     with get_sqlite_connection() as sqlite_conn:
         with get_mysql_connection() as mysql_conn:
@@ -242,60 +264,63 @@ def verify_migration():
             mysql_users = mysql_conn.cursor()
             mysql_users.execute("SELECT COUNT(*) as count FROM users")
             mysql_users_count = mysql_users.fetchone()['count']
-            print(f"  Users: SQLite={sqlite_users}, MySQL={mysql_users_count}")
+            logger.info(f"Users count comparison", extra={
+                "sqlite_count": sqlite_users,
+                "mysql_count": mysql_users_count
+            })
 
             # Count skills
             sqlite_skills = sqlite_conn.execute("SELECT COUNT(*) as count FROM skills").fetchone()['count']
             mysql_skills = mysql_conn.cursor()
             mysql_skills.execute("SELECT COUNT(*) as count FROM skills")
             mysql_skills_count = mysql_skills.fetchone()['count']
-            print(f"  Skills: SQLite={sqlite_skills}, MySQL={mysql_skills_count}")
+            logger.info(f"Skills count comparison", extra={
+                "sqlite_count": sqlite_skills,
+                "mysql_count": mysql_skills_count
+            })
 
             # Count downloads
             sqlite_downloads = sqlite_conn.execute("SELECT COUNT(*) as count FROM downloads").fetchone()['count']
             mysql_downloads = mysql_conn.cursor()
             mysql_downloads.execute("SELECT COUNT(*) as count FROM downloads")
             mysql_downloads_count = mysql_downloads.fetchone()['count']
-            print(f"  Downloads: SQLite={sqlite_downloads}, MySQL={mysql_downloads_count}")
+            logger.info(f"Downloads count comparison", extra={
+                "sqlite_count": sqlite_downloads,
+                "mysql_count": mysql_downloads_count
+            })
 
-    print("\nMigration completed successfully!")
+    logger.info("Migration completed successfully!", extra={"status": "success"})
 
 
 def main():
     """Run the complete migration."""
-    print("="*60)
-    print("SQLite to MySQL Migration")
-    print("="*60)
-    print()
+    logger.info("="*60)
+    logger.info("SQLite to MySQL Migration")
+    logger.info("="*60)
 
     # Check if SQLite database exists
     if not SQLITE_DB_PATH.exists():
-        print(f"Error: SQLite database not found at {SQLITE_DB_PATH}")
+        logger.error(f"SQLite database not found", extra={"path": str(SQLITE_DB_PATH)})
         return
 
-    print(f"SQLite database: {SQLITE_DB_PATH}")
-    print(f"MySQL server: {MYSQL_CONFIG['host']}")
-    print(f"MySQL database: {MYSQL_CONFIG['database']}")
-    print()
+    logger.info(f"SQLite database: {SQLITE_DB_PATH}", extra={"sqlite_path": str(SQLITE_DB_PATH)})
+    logger.info(f"MySQL server: {MYSQL_CONFIG['host']}", extra={"mysql_host": MYSQL_CONFIG['host']})
+    logger.info(f"MySQL database: {MYSQL_CONFIG['database']}", extra={"mysql_database": MYSQL_CONFIG['database']})
 
     try:
         # Step 1: Create tables
         create_mysql_tables()
-        print()
 
         # Step 2: Migrate data
         migrate_users()
         migrate_skills()
         migrate_downloads()
-        print()
 
         # Step 3: Verify
         verify_migration()
 
     except Exception as e:
-        print(f"\nError during migration: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error during migration: {e}", exc_info=True, extra={"error": str(e)})
 
 
 if __name__ == "__main__":

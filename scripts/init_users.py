@@ -7,9 +7,25 @@ This script creates test users for development and testing purposes.
 
 import sys
 from pathlib import Path
+import logging
+import os
 
 # Add parent directory to sys.path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# 导入日志配置
+from logging_config import setup_logging, audit_log
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 from database import init_db, get_connection
 
@@ -17,9 +33,9 @@ from database import init_db, get_connection
 def init_users():
     """Initialize test users in the database."""
     # Ensure database tables exist
-    print("Initializing database...")
+    logger.info("Initializing database...")
     init_db()
-    print("Database initialized.")
+    logger.info("Database initialized", extra={"status": "success"})
 
     # Define test users
     test_users = [
@@ -40,9 +56,10 @@ def init_users():
         }
     ]
 
-    print("\nCreating test users...")
+    logger.info("Creating test users...")
     created_count = 0
     skipped_count = 0
+    created_users = []
 
     with get_connection() as conn:
         for user_data in test_users:
@@ -56,7 +73,7 @@ def init_users():
             existing = cursor.fetchone()
 
             if existing:
-                print(f"  [*] User {employee_id} already exists, skipping...")
+                logger.debug(f"User already exists, skipping", extra={"employee_id": employee_id})
                 skipped_count += 1
             else:
                 # Insert the user
@@ -68,30 +85,49 @@ def init_users():
                     (user_data["employee_id"], user_data["api_key"], user_data["role"])
                 )
                 conn.commit()
-                print(f"  + Created user: {employee_id} ({user_data['role']})")
+                logger.info(f"Created test user", extra={
+                    "employee_id": employee_id,
+                    "role": user_data["role"]
+                })
                 created_count += 1
+                created_users.append({
+                    "employee_id": employee_id,
+                    "api_key": user_data["api_key"],
+                    "role": user_data["role"]
+                })
 
-    print(f"\nSummary:")
-    print(f"  Created: {created_count} users")
-    print(f"  Skipped: {skipped_count} users")
-    print(f"  Total:   {len(test_users)} test users configured")
+    logger.info(f"Test users initialization summary", extra={
+        "created": created_count,
+        "skipped": skipped_count,
+        "total": len(test_users)
+    })
 
-    # Print test credentials
-    print("\n" + "="*60)
-    print("TEST CREDENTIALS")
-    print("="*60)
-    print("\nAdmin User:")
-    print("  Employee ID: w00000001")
-    print("  API Key:     sk-test-admin-key-1")
-    print("  Role:        admin")
-    print("\nRegular Users:")
-    print("  Employee ID: w00000002")
-    print("  API Key:     sk-test-user-key-1")
-    print("  Role:        user")
-    print("\n  Employee ID: w00000003")
-    print("  API Key:     sk-test-user-key-2")
-    print("  Role:        user")
-    print("="*60)
+    # 记录审计日志
+    audit_log(
+        logger,
+        action="config_change",
+        user_id="system",
+        change_type="init_test_users",
+        users_created=created_count,
+        result="success"
+    )
+
+    # Log test credentials
+    logger.info("="*60)
+    logger.info("TEST CREDENTIALS")
+    logger.info("="*60)
+    logger.info("Admin User", extra={
+        "employee_id": "w00000001",
+        "api_key": "sk-test-admin-key-1",
+        "role": "admin"
+    })
+    logger.info("Regular Users", extra={
+        "users": [
+            {"employee_id": "w00000002", "api_key": "sk-test-user-key-1", "role": "user"},
+            {"employee_id": "w00000003", "api_key": "sk-test-user-key-2", "role": "user"}
+        ]
+    })
+    logger.info("="*60)
 
 
 if __name__ == "__main__":

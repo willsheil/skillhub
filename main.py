@@ -28,6 +28,17 @@ from starlette.requests import Request
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
+# Import and setup logging configuration
+from logging_config import setup_logging, audit_log, PerformanceTracker
+
+# Initialize logging system
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
 # Configuration
 PLUGINS_DIR = Path(os.getenv("PLUGINS_DIR", "./plugins"))
 PLUGINS_DIR.mkdir(exist_ok=True)
@@ -55,8 +66,8 @@ from database import (
     batch_delete_skills
 )
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Configure logging - get application logger with proper configuration
+logger = logging.getLogger("skillhub")
 
 # Admin credentials (can be overridden via environment variables)
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
@@ -244,7 +255,7 @@ def extract_metadata_from_skill_md(zip_path: Path) -> Optional[dict]:
             return metadata
 
     except Exception as e:
-        print(f"Failed to extract metadata from {zip_path}: {e}")
+        logger.warning(f"Failed to extract metadata from {zip_path}: {e}", extra={"zip_path": str(zip_path)})
         return None
 
 
@@ -659,7 +670,7 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
         )
     except Exception as e:
         # Log error but don't block download
-        print(f"Failed to record download: {e}")
+        logger.warning(f"Failed to record download: {e}", extra={"skill_name": skill_name, "filename": filename})
 
     # Return raw ZIP if requested
     if raw:
@@ -680,7 +691,7 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
             }
         )
     except Exception as e:
-        print(f"Failed to package with installer: {e}")
+        logger.warning(f"Failed to package with installer: {e}", extra={"skill_name": skill_name, "filename": filename})
         # Fallback to raw file if packaging fails
         return FileResponse(
             path=file_path,
@@ -919,7 +930,6 @@ def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
             # Read and parse SKILL.md
             skill_md_path = skill_md_paths[0]
             content = zf.read(skill_md_path).decode('utf-8')
-            print("111",content)
             metadata, _ = parse_skill_md(content)
 
             if metadata is None:
@@ -2238,7 +2248,7 @@ async def batch_download(request: Request):
                 target_zip = PLUGINS_DIR / filename
 
                 if not target_zip.exists():
-                    print(f"Warning: ZIP file not found: {filename}")
+                    logger.warning(f"ZIP file not found: {filename}", extra={"filename": filename})
                     continue
 
                 # Get skill name from filename
@@ -2264,7 +2274,7 @@ async def batch_download(request: Request):
                         'dir': get_skill_dir_name(filename)
                     })
                 except Exception as e:
-                    print(f"Warning: Failed to package {filename}: {e}")
+                    logger.warning(f"Failed to package {filename}: {e}", extra={"filename": filename})
                     # Fallback: add original ZIP at root level
                     zf.write(target_zip, filename)
                     added_skills.append({
@@ -2967,20 +2977,20 @@ async def get_skill_content_api(skill_name: str):
 
     Returns the complete SKILL.md file content (including YAML frontmatter).
     """
-    print(f"[DEBUG] API called with skill_name: '{skill_name}'")
+    logger.debug(f"API called with skill_name: '{skill_name}'", extra={"skill_name": skill_name})
 
     # Find the skill ZIP file
     # First try exact match, then try with version pattern
     skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
-    print(f"[DEBUG] Trying exact match: {skill_zip}, exists: {skill_zip.exists()}")
+    logger.debug(f"Trying exact match: {skill_zip}, exists: {skill_zip.exists()}", extra={"skill_name": skill_name, "zip_path": str(skill_zip)})
 
     if not skill_zip.exists():
         # Try to find a ZIP that starts with skill_name-
         matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
-        print(f"[DEBUG] Pattern match found: {len(matching_zips)} files")
+        logger.debug(f"Pattern match found: {len(matching_zips)} files", extra={"skill_name": skill_name, "match_count": len(matching_zips)})
         if matching_zips:
             skill_zip = matching_zips[0]  # Use the first match
-            print(f"[DEBUG] Using: {skill_zip}")
+            logger.debug(f"Using: {skill_zip}", extra={"skill_name": skill_name, "zip_path": str(skill_zip)})
         else:
             raise HTTPException(status_code=404, detail=f"Skill ZIP file not found for: {skill_name}")
 
@@ -2992,7 +3002,7 @@ async def get_skill_content_api(skill_name: str):
             skill_md_paths = [name for name in zf.namelist()
                              if 'SKILL.md' in name or name.endswith('SKILL.md')]
 
-            print(f"[DEBUG] Found SKILL.md files: {skill_md_paths}")
+            logger.debug(f"Found SKILL.md files: {skill_md_paths}", extra={"skill_name": skill_name, "skill_md_paths": skill_md_paths})
 
             if not skill_md_paths:
                 return {"content": None}
@@ -3001,7 +3011,7 @@ async def get_skill_content_api(skill_name: str):
             skill_md_path = skill_md_paths[0]
             content = zf.read(skill_md_path).decode('utf-8')
 
-            print(f"[DEBUG] SKILL.md content length: {len(content)} bytes")
+            logger.debug(f"SKILL.md content length: {len(content)} bytes", extra={"skill_name": skill_name, "content_length": len(content)})
 
             # Return the complete SKILL.md content (including YAML frontmatter)
             return {"content": content}

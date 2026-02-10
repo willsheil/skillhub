@@ -102,8 +102,11 @@ class GiteaPushServiceV2:
             retry_base_delay: Base delay for retry in seconds (exponential backoff)
             retry_max_delay: Maximum retry delay in seconds
             health_check_interval: Health check interval in seconds
+
+        Note:
+            GiteaClient instances are created per-task for workspace isolation,
+            preventing concurrent push conflicts.
         """
-        self.client = GiteaClient()
         self.interval = interval
         self.max_concurrent_tasks = max_concurrent_tasks
         self.retry_base_delay = retry_base_delay
@@ -205,6 +208,8 @@ class GiteaPushServiceV2:
     async def _execute_push(self, task: PushTask, skill_zip: Path) -> Dict:
         """Execute the push operation with retry.
 
+        Creates a task-specific GiteaClient instance to prevent concurrent conflicts.
+
         Args:
             task: PushTask instance
             skill_zip: Path to skill ZIP file
@@ -213,6 +218,9 @@ class GiteaPushServiceV2:
             Result dict
         """
         max_retries = task.max_retries
+
+        # Create task-specific client for workspace isolation
+        client = GiteaClient(task_id=task.id)
 
         for attempt in range(max_retries):
             try:
@@ -227,11 +235,11 @@ class GiteaPushServiceV2:
                     }
                 )
 
-                # Clone or pull repository
-                repo_path = self.client.clone_or_pull_repo()
+                # Clone or pull repository (uses task-specific workspace)
+                repo_path = client.clone_or_pull_repo()
 
                 # Extract skill to versioned folder
-                folder = self.client.add_skill_folder(
+                folder = client.add_skill_folder(
                     repo_path,
                     skill_zip,
                     task.skill_name,
@@ -240,7 +248,7 @@ class GiteaPushServiceV2:
 
                 # Commit and push
                 start_time = time.time()
-                commit_hash = self.client.commit_and_push(
+                commit_hash = client.commit_and_push(
                     repo_path,
                     f"feat: add {task.skill_name}-{task.version}"
                 )
@@ -465,7 +473,7 @@ class GiteaPushServiceV2:
                         status,
                         COUNT(*) as count
                     FROM gitea_push_tasks
-                    WHERE created_at >= datetime('now', '-1 hour')
+                    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
                     GROUP BY status
                 """).fetchall()
 

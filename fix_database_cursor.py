@@ -6,10 +6,28 @@ PyMySQL requires using cursor.execute() instead of conn.execute()
 """
 
 import re
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 # Read the file
 with open('database.py', 'r', encoding='utf-8') as f:
     content = f.read()
+
+logger.info("Fixing database.py for PyMySQL compatibility...")
 
 # Fix conn.execute() calls to use cursor
 # Pattern 1: with get_connection() as conn: ... conn.execute(...)
@@ -20,6 +38,7 @@ lines = content.split('\n')
 output_lines = []
 in_with_block = False
 indent_level = 0
+fixes_applied = 0
 
 for i, line in enumerate(lines):
     # Check if we're entering a with get_connection() block
@@ -50,10 +69,12 @@ for i, line in enumerate(lines):
             # Add cursor = conn.cursor() if not already added
             if i > 0 and 'cursor = conn.cursor()' not in lines[i-1]:
                 output_lines.append(f"{new_indent}cursor = conn.cursor()")
+                fixes_applied += 1
 
             # Replace conn.execute with cursor.execute
             new_line = f"{new_indent}cursor.execute({execute_args}){rest}"
             output_lines.append(new_line)
+            fixes_applied += 1
             continue
 
     output_lines.append(line)
@@ -62,5 +83,5 @@ for i, line in enumerate(lines):
 with open('database.py', 'w', encoding='utf-8') as f:
     f.write('\n'.join(output_lines))
 
-print("database.py has been updated for PyMySQL compatibility")
-print("Please review the changes and test.")
+logger.info("database.py has been updated for PyMySQL compatibility", extra={"fixes_applied": fixes_applied})
+logger.info("Please review the changes and test.")

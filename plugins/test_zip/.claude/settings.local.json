@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell:*)",
+      "Bash(python process_skills.py:*)",
+      "Bash(python3:*)",
+      "Bash(git config:*)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Bash(git clone:*)",
+      "Bash(timeout:*)",
+      "Bash(dir:*)"
+    ]
+  }
+}

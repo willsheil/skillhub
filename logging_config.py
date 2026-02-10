@@ -389,4 +389,7 @@ if __name__ == "__main__":
     with PerformanceTracker(logger, "test_operation", threshold_ms=100):
         time.sleep(0.05)
 
-    logger.error("Test error", exc_info=Info("Test exception"))
+    try:
+        raise Exception("Test exception")
+    except Exception:
+        logger.error("Test error", exc_info=True)

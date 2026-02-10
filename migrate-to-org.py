@@ -7,6 +7,22 @@ Moves plugins/{skill}/{version}.zip -> plugins/{org}/{collection}/{skill}/{versi
 import shutil
 import argparse
 from pathlib import Path
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging, audit_log
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
 
 PLUGINS_DIR = Path("./plugins")
 
@@ -15,6 +31,7 @@ def migrate_plugins(target_org: str = "default", target_collection: str = "defau
     """Migrate legacy plugins to target organization and collection."""
     migrated = 0
     skipped = 0
+    migrated_plugins = []
 
     for item in list(PLUGINS_DIR.iterdir()):
         if not item.is_dir():
@@ -32,24 +49,47 @@ def migrate_plugins(target_org: str = "default", target_collection: str = "defau
             target_dir = PLUGINS_DIR / target_org / target_collection / item.name
 
             if target_dir.exists():
-                print(f"  ⚠️  {item.name} already exists, skipping")
+                logger.debug(f"Plugin already exists, skipping", extra={
+                    "plugin_name": item.name,
+                    "target": f"{target_org}/{target_collection}/{item.name}"
+                })
                 skipped += 1
                 continue
 
-            print(f"  📦 Migrating {item.name} -> {target_org}/{target_collection}/{item.name}")
+            logger.info(f"Migrating plugin...", extra={
+                "source": item.name,
+                "target": f"{target_org}/{target_collection}/{item.name}"
+            })
             target_dir.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(item), str(target_dir))
             migrated += 1
+            migrated_plugins.append(item.name)
         else:
-            print(f"  ⏭️  Skipping {item.name} (no plugins found or already migrated)")
+            logger.debug(f"Skipping plugin (no plugins found or already migrated)", extra={"plugin_name": item.name})
             skipped += 1
 
-    print(f"\n✅ Migrated {migrated} plugins to {target_org}/{target_collection}/")
-    print(f"   Skipped: {skipped}")
-    print(f"\nNew structure:")
-    print(f"  plugins/{{organization}}/{{collection}}/{{skill-name}}/{{version}}.zip")
-    print(f"\nYou can later reorganize skills into different collections using:")
-    print(f"  mv plugins/default/default/my-skill plugins/default/my-collection/")
+    logger.info(f"Migration completed", extra={
+        "migrated": migrated,
+        "skipped": skipped,
+        "target_org": target_org,
+        "target_collection": target_collection,
+        "migrated_plugins": migrated_plugins
+    })
+
+    logger.info(f"New structure: plugins/{{organization}}/{{collection}}/{{skill-name}}/{{version}}.zip")
+
+    # 记录审计日志
+    audit_log(
+        logger,
+        action="config_change",
+        user_id="system",
+        change_type="plugin_structure_migration",
+        target_org=target_org,
+        target_collection=target_collection,
+        migrated=migrated,
+        skipped=skipped,
+        result="success"
+    )
 
 
 if __name__ == "__main__":

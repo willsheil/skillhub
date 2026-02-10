@@ -67,7 +67,14 @@
       "Bash(ping:*)",
       "Bash(grep:*)",
       "Bash(C:\\\\Users\\\\pickm\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\python.exe:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(D:conda_envsskill_storepython.exe init_test_users.py)",
+      "mcp__plugin_oh-my-claudecode_t__state_write",
+      "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics",
+      "Bash(py -m py_compile:*)",
+      "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics_directory",
+      "Bash(cat:*)",
+      "Bash(node:*)"
     ]
   }
 }

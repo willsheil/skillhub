@@ -5,10 +5,14 @@ Database module for download statistics.
 import os
 import pymysql
 import json
+import logging
 from pathlib import Path
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
+
+# Get logger for this module
+logger = logging.getLogger("skillhub.database")
 
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', '127.0.0.1'),
@@ -105,9 +109,9 @@ def migrate_add_user_id_to_downloads():
         if "user_id" not in columns:
             conn.execute("ALTER TABLE downloads ADD COLUMN user_id INT")
             conn.commit()
-            print("Migration: Added user_id column to downloads table")
+            logger.info("Migration: Added user_id column to downloads table")
         else:
-            print("Migration: user_id column already exists in downloads table")
+            logger.info("Migration: user_id column already exists in downloads table")
 
 
 def migrate_add_source_type_to_skills():
@@ -122,9 +126,9 @@ def migrate_add_source_type_to_skills():
         if "source_type" not in columns:
             conn.execute("ALTER TABLE skills ADD COLUMN source_type VARCHAR(20) DEFAULT 'opensource'")
             conn.commit()
-            print("Migration: Added source_type column to skills table")
+            logger.info("Migration: Added source_type column to skills table")
         else:
-            print("Migration: source_type column already exists in skills table")
+            logger.info("Migration: source_type column already exists in skills table")
 
 
 def migrate_table_engines():
@@ -141,7 +145,7 @@ def migrate_table_engines():
         if result and result.get('ENGINE') != 'InnoDB':
             conn.execute("ALTER TABLE users ENGINE=InnoDB")
             conn.commit()
-            print("Migration: Converted users table to InnoDB")
+            logger.info("Migration: Converted users table to InnoDB")
 
         # Check and convert skills table
         cursor.execute("""
@@ -152,7 +156,7 @@ def migrate_table_engines():
         if result and result.get('ENGINE') != 'InnoDB':
             conn.execute("ALTER TABLE skills ENGINE=InnoDB")
             conn.commit()
-            print("Migration: Converted skills table to InnoDB")
+            logger.info("Migration: Converted skills table to InnoDB")
 
         # Check and convert downloads table
         cursor.execute("""
@@ -163,7 +167,7 @@ def migrate_table_engines():
         if result and result.get('ENGINE') != 'InnoDB':
             conn.execute("ALTER TABLE downloads ENGINE=InnoDB")
             conn.commit()
-            print("Migration: Converted downloads table to InnoDB")
+            logger.info("Migration: Converted downloads table to InnoDB")
 
 
 def init_db():
@@ -302,7 +306,7 @@ def migrate_gitea_push_tasks():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
         conn.commit()
-        print("Migration: gitea_push_tasks table created with enhanced state machine")
+        logger.info("Migration: gitea_push_tasks table created with enhanced state machine")
 
         # Add column to skills table if not exists
         cursor = conn._conn.cursor()
@@ -312,9 +316,9 @@ def migrate_gitea_push_tasks():
         if "latest_push_task_id" not in columns:
             conn.execute("ALTER TABLE skills ADD COLUMN latest_push_task_id INT NULL")
             conn.commit()
-            print("Migration: Added latest_push_task_id column to skills table")
+            logger.info("Migration: Added latest_push_task_id column to skills table")
         else:
-            print("Migration: latest_push_task_id column already exists in skills table")
+            logger.info("Migration: latest_push_task_id column already exists in skills table")
 
 
 def migrate_gitea_reserved_status():
@@ -338,22 +342,22 @@ def migrate_gitea_reserved_status():
         if "reserved_at" not in columns:
             conn.execute("ALTER TABLE gitea_push_tasks ADD COLUMN reserved_at TIMESTAMP NULL AFTER created_at")
             conn.commit()
-            print("Migration: Added reserved_at column to gitea_push_tasks table")
+            logger.info("Migration: Added reserved_at column to gitea_push_tasks table")
         else:
-            print("Migration: reserved_at column already exists in gitea_push_tasks table")
+            logger.info("Migration: reserved_at column already exists in gitea_push_tasks table")
 
         # Add worker_id column
         if "worker_id" not in columns:
             conn.execute("ALTER TABLE gitea_push_tasks ADD COLUMN worker_id VARCHAR(50) NULL AFTER reserved_at")
             conn.commit()
-            print("Migration: Added worker_id column to gitea_push_tasks table")
+            logger.info("Migration: Added worker_id column to gitea_push_tasks table")
         else:
-            print("Migration: worker_id column already exists in gitea_push_tasks table")
+            logger.info("Migration: worker_id column already exists in gitea_push_tasks table")
 
         # Update ENUM to include new statuses
         # MySQL doesn't support modifying ENUM directly, need to recreate
-        print("Migration: Status enum expansion requires manual recreation or use migrate_gitea_push_tasks()")
-        print("  For new installations, the full schema includes: pending, reserved, pushing, success, failed, retry_pending")
+        logger.info("Migration: Status enum expansion requires manual recreation or use migrate_gitea_push_tasks()")
+        logger.info("  For new installations, the full schema includes: pending, reserved, pushing, success, failed, retry_pending")
 
 
 @contextmanager
@@ -1271,7 +1275,7 @@ def migrate_add_user_management_features():
         if "status" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'")
             conn.commit()
-            print("Migration: Added status column to users table")
+            logger.info("Migration: Added status column to users table")
 
         # Add skills_count column to users table
         cursor.execute("DESCRIBE users")
@@ -1279,7 +1283,7 @@ def migrate_add_user_management_features():
         if "skills_count" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN skills_count INT DEFAULT 0")
             conn.commit()
-            print("Migration: Added skills_count column to users table")
+            logger.info("Migration: Added skills_count column to users table")
 
         # Add is_active column to skills table
         cursor.execute("DESCRIBE skills")
@@ -1287,7 +1291,7 @@ def migrate_add_user_management_features():
         if "is_active" not in columns:
             conn.execute("ALTER TABLE skills ADD COLUMN is_active TINYINT(1) DEFAULT 1")
             conn.commit()
-            print("Migration: Added is_active column to skills table")
+            logger.info("Migration: Added is_active column to skills table")
 
         # Add is_default_version column to skills table
         cursor.execute("DESCRIBE skills")
@@ -1295,7 +1299,7 @@ def migrate_add_user_management_features():
         if "is_default_version" not in columns:
             conn.execute("ALTER TABLE skills ADD COLUMN is_default_version TINYINT(1) DEFAULT 0")
             conn.commit()
-            print("Migration: Added is_default_version column to skills table")
+            logger.info("Migration: Added is_default_version column to skills table")
 
         # Create notifications table
         conn.execute("""
@@ -1356,7 +1360,7 @@ def migrate_add_user_management_features():
             "CREATE INDEX idx_skills_uploader_active ON skills(uploader_id, is_active)"
         )
 
-        print("Migration: user_management_features migration completed")
+        logger.info("Migration: user_management_features migration completed")
 
 
 def create_notification(
@@ -1991,7 +1995,7 @@ def delete_skill_version(user_id: int, skill_id: int) -> bool:
                     zip_path.unlink()
                 except Exception as e:
                     # Log but don't fail the database operation
-                    print(f"Warning: Could not delete file {zip_path}: {e}")
+                    logger.warning(f"Could not delete file {zip_path}: {e}", extra={"zip_path": str(zip_path)})
 
         return cursor.rowcount > 0
 
@@ -2138,7 +2142,7 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
                 try:
                     zip_path.unlink()
                 except Exception as e:
-                    print(f"Warning: Could not delete file {zip_path}: {e}")
+                    logger.warning(f"Could not delete file {zip_path}: {e}", extra={"zip_path": str(zip_path)})
 
         return {
             "success_count": success_count,
