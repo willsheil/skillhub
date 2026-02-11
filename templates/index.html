@@ -491,6 +491,15 @@
             font-size: 14px;
         }
 
+        .download-count {
+            font-size: 13px;
+            font-weight: 500;
+            color: #64748b;
+            min-width: 16px;
+            display: inline-block;
+            text-align: center;
+        }
+
         .card-actions {
             display: flex;
             gap: 8px;
@@ -884,8 +893,8 @@
                     <div class="card-footer">
                         <div class="card-stats">
                             <div class="stat-item">
-                                <span class="download-icon">⬇</span>
-                                <span>${downloadCount}</span>
+                                <span class="download-icon">⬇️</span>
+                                <span class="download-count">${downloadCount}</span>
                             </div>
                         </div>
                         <div class="card-actions">
@@ -951,10 +960,12 @@
                         downloadStats[item.skill_name] = item.downloads;
                     });
                 }
+                console.log('Download stats:', downloadStats);
 
                 allSkills.forEach(skill => {
                     skill.download_count = downloadStats[skill.name] || 0;
                 });
+                console.log('Skills with download counts:', allSkills.map(s => ({name: s.name, download_count: s.download_count})));
 
                 sortSkills();
                 filteredSkills = [...allSkills];
