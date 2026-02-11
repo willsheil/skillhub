@@ -1240,20 +1240,40 @@
                         // Show API key for new user
                         document.getElementById('apiKeyValue').textContent = result.data.api_key;
                         document.getElementById('apiKeyDisplay').style.display = 'block';
+                        // Change save button to close button
+                        saveBtn.textContent = '关闭';
+                        saveBtn.classList.remove('btn-primary');
+                        saveBtn.classList.add('btn-secondary');
+                        // Change button click handler to close modal
+                        saveBtn.onclick = function() {
+                            closeModal('userModal');
+                            loadUsers();
+                            // Reset button for next time
+                            saveBtn.onclick = null;
+                            saveBtn.classList.remove('btn-secondary');
+                            saveBtn.classList.add('btn-primary');
+                        };
                     } else {
                         closeModal('userModal');
                         await loadUsers();
                     }
                 } else {
                     showToast(result.detail || '操作失败', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalText;
                 }
 
             } catch (error) {
                 console.error('Save failed:', error);
                 showToast('操作失败: ' + error.message, 'error');
-            } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = originalText;
+            } finally {
+                // Don't reset button if showing API key (it's now a close button)
+                if (!document.getElementById('apiKeyDisplay').style.display || document.getElementById('apiKeyDisplay').style.display === 'none') {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = originalText;
+                }
             }
         }
 
