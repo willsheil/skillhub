@@ -60,7 +60,7 @@ from database import (
     get_skill_versions, get_user_notifications, get_unread_notifications_count,
     mark_notification_read, mark_all_notifications_read, cleanup_old_notifications,
     get_users_list, create_user, update_user_role, disable_user,
-    enable_user, reset_user_api_key, get_user_skills_count,
+    enable_user, delete_user, reset_user_api_key, get_user_skills_count,
     get_default_skill_version, get_all_default_skill_versions,
     get_skill_approval_status, delete_skill_version, batch_unlist_skills,
     batch_delete_skills
