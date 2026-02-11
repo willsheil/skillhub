@@ -1113,7 +1113,8 @@
                 ? '<span class="badge badge-role-admin">管理员</span>'
                 : '<span class="badge badge-role-user">普通用户</span>';
 
-            const statusBadge = user.is_disabled
+            const isDisabled = user.status === 'disabled';
+            const statusBadge = isDisabled
                 ? '<span class="badge badge-status-disabled">已禁用</span>'
                 : '<span class="badge badge-status-active">已启用</span>';
 
@@ -1124,7 +1125,7 @@
             actionButtons += `<button class="icon-btn" onclick="editUser(${user.id}, '${user.employee_id}', '${user.role}')" title="编辑用户信息">✏️</button>`;
 
             // Status toggle button with clear visual state
-            if (user.is_disabled) {
+            if (isDisabled) {
                 actionButtons += `<button class="icon-btn status-enable" onclick="toggleUserStatus(${user.id}, '${user.employee_id}', true)" title="启用用户">▶️</button>`;
             } else {
                 actionButtons += `<button class="icon-btn status-disable" onclick="toggleUserStatus(${user.id}, '${user.employee_id}', false)" title="禁用用户">⏸️</button>`;
@@ -1137,7 +1138,7 @@
 
             return `
                 <tr data-user-id="${user.id}">
-                    <td><span class="employee-id">${user.employee_id}</span></td>
+                    <td><span class="employee_id">${user.employee_id}</span></td>
                     <td>${roleBadge}</td>
                     <td>${statusBadge}</td>
                     <td><span class="badge badge-count">${user.skills_count || 0}</span></td>

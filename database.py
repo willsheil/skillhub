@@ -545,7 +545,7 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT id, employee_id, api_key, role, created_at, last_login
+            SELECT id, employee_id, api_key, role, status, skills_count, created_at, last_login
             FROM users
             WHERE id = %s
             """,
@@ -558,6 +558,8 @@ def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
                 "employee_id": row["employee_id"],
                 "api_key": row["api_key"],
                 "role": row["role"],
+                "status": row["status"],
+                "skills_count": row["skills_count"],
                 "created_at": row["created_at"],
                 "last_login": row["last_login"]
             }
