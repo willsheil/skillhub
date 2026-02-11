@@ -1091,15 +1091,47 @@
 
         function handleSort() {
             const value = document.getElementById('sortSelect').value;
-            // Split from the right to handle multi-word field names like "upload_time_desc"
-            const lastUnderscoreIndex = value.lastIndexOf('_');
-            const field = value.substring(0, lastUnderscoreIndex);
-            const order = value.substring(lastUnderscoreIndex + 1);
+            // Parse the value format: field_order (e.g., "upload_time_desc", "downloads_desc", "name_asc")
+            const parts = value.split('_');
+            const order = parts.pop(); // Get last part as order
+            const field = parts.join('_'); // Join remaining parts as field name
             currentSort = { field, order };
 
-            sortSkills();
+            // First filter skills based on current search and category
             const query = document.getElementById('searchInput').value.toLowerCase().trim();
             filterSkills(query);
+
+            // Then sort the filtered skills
+            const { field: sortField, order: sortOrder } = currentSort;
+            const multiplier = sortOrder === 'asc' ? 1 : -1;
+
+            filteredSkills.sort((a, b) => {
+                let valA, valB;
+
+                switch (sortField) {
+                    case 'upload_time':
+                        valA = a.versions && a.versions.length > 0 ?
+                            new Date(a.versions[a.versions.length - 1].updated_at) : new Date(0);
+                        valB = b.versions && b.versions.length > 0 ?
+                            new Date(b.versions[b.versions.length - 1].updated_at) : new Date(0);
+                        break;
+                    case 'downloads':
+                        valA = a.download_count || 0;
+                        valB = b.download_count || 0;
+                        break;
+                    case 'name':
+                        valA = (a.metadata?.name || a.name).toLowerCase();
+                        valB = (b.metadata?.name || b.name).toLowerCase();
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (valA < valB) return -1 * multiplier;
+                if (valA > valB) return 1 * multiplier;
+                return 0;
+            });
+
             currentPage = 1;
             renderCards();
             updatePagination();
