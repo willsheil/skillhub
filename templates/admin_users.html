@@ -401,6 +401,18 @@
             color: var(--danger);
         }
 
+        .icon-btn.status-enable:hover {
+            border-color: var(--success);
+            color: var(--success);
+            background: #f0fdf4;
+        }
+
+        .icon-btn.status-disable:hover {
+            border-color: #f59e0b;
+            color: #f59e0b;
+            background: #fffbeb;
+        }
+
         /* Pagination */
         .pagination {
             display: flex;
@@ -889,7 +901,8 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" id="modalFooter">
+                <button class="btn btn-secondary" id="resetKeyBtn" style="display: none;" onclick="showResetKeyModalInline()">重置密钥</button>
                 <button class="btn btn-primary" id="saveUserBtn">保存</button>
             </div>
         </div>
@@ -993,6 +1006,9 @@
                 saveBtn.classList.remove('btn-secondary');
                 saveBtn.classList.add('btn-primary');
                 saveBtn.onclick = null;
+
+                // Hide reset key button
+                document.getElementById('resetKeyBtn').style.display = 'none';
             }
         }
 
@@ -1097,10 +1113,23 @@
                 ? '<span class="badge badge-status-disabled">已禁用</span>'
                 : '<span class="badge badge-status-active">已启用</span>';
 
-            const canDelete = user.skills_count === 0;
-            const deleteBtn = canDelete
-                ? `<button class="icon-btn delete" onclick="deleteUser(${user.id}, '${user.employee_id}')" title="删除">🗑</button>`
-                : `<button class="icon-btn" disabled title="用户有技能，无法删除">🗑</button>`;
+            // Build action buttons - simplified and clearer
+            let actionButtons = '';
+
+            // Edit button (opens modal with role change and key reset options)
+            actionButtons += `<button class="icon-btn" onclick="editUser(${user.id}, '${user.employee_id}', '${user.role}')" title="编辑用户信息">✏️</button>`;
+
+            // Status toggle button with clear visual state
+            if (user.is_disabled) {
+                actionButtons += `<button class="icon-btn status-enable" onclick="toggleUserStatus(${user.id}, '${user.employee_id}', true)" title="启用用户">▶️</button>`;
+            } else {
+                actionButtons += `<button class="icon-btn status-disable" onclick="toggleUserStatus(${user.id}, '${user.employee_id}', false)" title="禁用用户">⏸️</button>`;
+            }
+
+            // Delete button - only show when can delete, hide otherwise for cleaner UI
+            if (user.skills_count === 0) {
+                actionButtons += `<button class="icon-btn delete" onclick="deleteUser(${user.id}, '${user.employee_id}')" title="删除用户">🗑️</button>`;
+            }
 
             return `
                 <tr data-user-id="${user.id}">
@@ -1112,12 +1141,7 @@
                     <td>${formatDate(user.last_login)}</td>
                     <td>
                         <div class="action-buttons">
-                            <button class="icon-btn" onclick="editUser(${user.id}, '${user.employee_id}', '${user.role}')" title="编辑">✏</button>
-                            <button class="icon-btn" onclick="toggleUserStatus(${user.id}, '${user.employee_id}', ${!user.is_disabled})" title="${user.is_disabled ? '启用' : '禁用'}">
-                                ${user.is_disabled ? '▶' : '⏸'}
-                            </button>
-                            <button class="icon-btn" onclick="showResetKeyModal(${user.id}, '${user.employee_id}')" title="重置密钥">🔑</button>
-                            ${deleteBtn}
+                            ${actionButtons}
                         </div>
                     </td>
                 </tr>
@@ -1176,6 +1200,9 @@
             saveBtn.classList.add('btn-primary');
             saveBtn.onclick = null;
 
+            // Hide reset key button for new user
+            document.getElementById('resetKeyBtn').style.display = 'none';
+
             openModal('userModal');
         }
 
@@ -1187,6 +1214,18 @@
             document.getElementById('employeeId').disabled = true;
             document.getElementById('userRole').value = role;
             document.getElementById('apiKeyDisplay').style.display = 'none';
+
+            // Reset save button state
+            const saveBtn = document.getElementById('saveUserBtn');
+            saveBtn.textContent = '保存';
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('btn-secondary');
+            saveBtn.classList.add('btn-primary');
+            saveBtn.onclick = null;
+
+            // Show reset key button for editing existing user
+            document.getElementById('resetKeyBtn').style.display = 'inline-flex';
+
             openModal('userModal');
         }
 
@@ -1333,6 +1372,18 @@
         function showResetKeyModal(id, employeeId) {
             document.getElementById('resetKeyUserId').value = id;
             openModal('resetKeyModal');
+        }
+
+        // Show reset key modal from within edit modal
+        function showResetKeyModalInline() {
+            const userId = document.getElementById('userId').value;
+            const employeeId = document.getElementById('employeeId').value;
+            if (userId) {
+                // Close edit modal first
+                closeModal('userModal');
+                // Show reset key confirmation modal
+                showResetKeyModal(userId, employeeId);
+            }
         }
 
         // Reset API key
