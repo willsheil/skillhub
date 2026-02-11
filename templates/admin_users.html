@@ -987,6 +987,14 @@
                 document.getElementById('apiKeyDisplay').style.display = 'none';
                 document.querySelectorAll('.inline-error').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll('.form-input, .form-select').forEach(el => el.classList.remove('error'));
+
+                // Reset save button to original state
+                const saveBtn = document.getElementById('saveUserBtn');
+                saveBtn.textContent = '保存';
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('btn-secondary');
+                saveBtn.classList.add('btn-primary');
+                saveBtn.onclick = null;
             }
         }
 
@@ -1161,6 +1169,15 @@
             document.getElementById('employeeId').disabled = false;
             document.getElementById('employeeId').required = true;
             document.getElementById('apiKeyDisplay').style.display = 'none';
+
+            // Reset save button to ensure correct state
+            const saveBtn = document.getElementById('saveUserBtn');
+            saveBtn.textContent = '保存';
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('btn-secondary');
+            saveBtn.classList.add('btn-primary');
+            saveBtn.onclick = null;
+
             openModal('userModal');
         }
 
