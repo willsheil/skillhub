@@ -963,7 +963,19 @@
                 console.log('Download stats:', downloadStats);
 
                 allSkills.forEach(skill => {
-                    skill.download_count = downloadStats[skill.name] || 0;
+                    // Try exact match first
+                    let count = downloadStats[skill.name] || 0;
+
+                    // If not found, try to match by prefix (stats may have version suffix)
+                    if (count === 0) {
+                        for (const [statName, downloads] of Object.entries(downloadStats)) {
+                            if (statName.startsWith(skill.name + '-')) {
+                                count += downloads; // Sum all versions
+                            }
+                        }
+                    }
+
+                    skill.download_count = count;
                 });
                 console.log('Skills with download counts:', allSkills.map(s => ({name: s.name, download_count: s.download_count})));
 
