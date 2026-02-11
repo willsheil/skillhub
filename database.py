@@ -505,12 +505,12 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
         api_key: The API key for authentication
 
     Returns:
-        User dictionary if found, None otherwise
+        User dictionary if found and enabled, None otherwise
     """
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT id, employee_id, api_key, role, created_at, last_login
+            SELECT id, employee_id, api_key, role, created_at, last_login, status
             FROM users
             WHERE employee_id = %s AND api_key = %s
             """,
@@ -518,13 +518,17 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
         ).fetchone()
 
         if row:
+            # Check if user is disabled
+            if row.get("status") == "disabled":
+                return None
             return {
                 "id": row["id"],
                 "employee_id": row["employee_id"],
                 "api_key": row["api_key"],
                 "role": row["role"],
                 "created_at": row["created_at"],
-                "last_login": row["last_login"]
+                "last_login": row["last_login"],
+                "status": row["status"]
             }
         return None
 
@@ -1203,6 +1207,27 @@ def enable_user(user_id: int) -> bool:
             """
             UPDATE users
             SET status = 'active'
+            WHERE id = %s
+            """,
+            (user_id,)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def delete_user(user_id: int) -> bool:
+    """Permanently delete a user.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        True if deleted, False if user not found
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            DELETE FROM users
             WHERE id = %s
             """,
             (user_id,)

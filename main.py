@@ -3406,15 +3406,15 @@ async def api_update_user_role(
         )
 
 
-@app.delete("/api/admin/users/{user_id}")
+@app.patch("/api/admin/users/{user_id}/disable")
 async def api_disable_user(
     user_id: int,
     request: Request,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
-    """Disable (soft delete) a user.
+    """Disable a user.
 
-    Prevents disabling if user has active skills (skills_count > 0).
+    Prevents login but keeps the user in the system.
     Prevents disabling self.
     """
     try:
@@ -3432,14 +3432,6 @@ async def api_disable_user(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
-            )
-
-        # Check if user has active skills
-        skills_count = get_user_skills_count(user_id)
-        if skills_count > 0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Cannot disable user with {skills_count} active skill(s). Please reassign or remove skills first."
             )
 
         # Disable user
@@ -3466,6 +3458,68 @@ async def api_disable_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to disable user: {str(e)}"
+        )
+
+
+@app.delete("/api/admin/users/{user_id}")
+async def api_delete_user(
+    user_id: int,
+    request: Request,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Permanently delete a user.
+
+    Only allowed if user has no skills (skills_count == 0).
+    Prevents deleting self.
+    """
+    try:
+        # Prevent deleting self
+        current_user_id = request.session.get("user_id")
+        if current_user_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot delete your own account"
+            )
+
+        # Check if user exists
+        user = get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Check if user has active skills
+        skills_count = get_user_skills_count(user_id)
+        if skills_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cannot delete user with {skills_count} skill(s). Please remove skills first."
+            )
+
+        # Delete user
+        success = delete_user(user_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Failed to delete user"
+            )
+
+        return {
+            "success": True,
+            "data": {
+                "id": user_id,
+                "employee_id": user["employee_id"]
+            },
+            "message": "User deleted successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete user: {str(e)}"
         )
 
 

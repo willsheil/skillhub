@@ -999,6 +999,10 @@
                 document.querySelectorAll('.inline-error').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll('.form-input, .form-select').forEach(el => el.classList.remove('error'));
 
+                // Reset form fields disabled state
+                document.getElementById('employeeId').disabled = false;
+                document.getElementById('userRole').disabled = false;
+
                 // Reset save button to original state
                 const saveBtn = document.getElementById('saveUserBtn');
                 saveBtn.textContent = '保存';
@@ -1340,18 +1344,9 @@
             }
 
             try {
-                let response;
-                if (enable) {
-                    // Enable uses PATCH
-                    response = await fetch(`/api/admin/users/${id}/enable`, {
-                        method: 'PATCH'
-                    });
-                } else {
-                    // Disable uses DELETE
-                    response = await fetch(`/api/admin/users/${id}`, {
-                        method: 'DELETE'
-                    });
-                }
+                const response = await fetch(`/api/admin/users/${id}/${enable ? 'enable' : 'disable'}`, {
+                    method: 'PATCH'
+                });
 
                 const result = await response.json();
 
@@ -1403,8 +1398,40 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showToast('API Key 重置成功', 'success');
+                    // Close reset confirmation modal
                     closeModal('resetKeyModal');
+
+                    // Show the new API key in a modal
+                    const newApiKey = result.data?.api_key;
+                    if (newApiKey) {
+                        document.getElementById('apiKeyValue').textContent = newApiKey;
+                        document.getElementById('apiKeyDisplay').style.display = 'block';
+
+                        // Change save button to close button
+                        const saveBtn = document.getElementById('saveUserBtn');
+                        saveBtn.textContent = '关闭';
+                        saveBtn.classList.remove('btn-primary');
+                        saveBtn.classList.add('btn-secondary');
+                        saveBtn.onclick = function() {
+                            closeModal('userModal');
+                            loadUsers();
+                            // Reset button for next time
+                            saveBtn.onclick = null;
+                            saveBtn.classList.remove('btn-secondary');
+                            saveBtn.classList.add('btn-primary');
+                        };
+
+                        // Open user modal to show the API key
+                        document.getElementById('modalTitle').textContent = 'API Key 已重置';
+                        document.getElementById('userId').value = '';
+                        document.getElementById('employeeId').value = '';
+                        document.getElementById('employeeId').disabled = true;
+                        document.getElementById('userRole').value = '';
+                        document.getElementById('userRole').disabled = true;
+                        document.getElementById('resetKeyBtn').style.display = 'none';
+                        openModal('userModal');
+                    }
+
                     await loadUsers();
                 } else {
                     showToast(result.detail || '重置失败', 'error');
