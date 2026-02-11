@@ -509,6 +509,7 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
             "name": metadata.get("name", skill_name),
             "version": spec_version if spec_version else (version if version != "unknown" else "1.0.0"),
             "description": metadata.get("description", "No description available"),
+            "author": metadata.get("author"),  # Include author field
             "license": metadata.get("license"),
             "compatibility": metadata.get("compatibility"),
             "metadata": skill_metadata,

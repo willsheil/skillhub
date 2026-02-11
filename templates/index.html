@@ -826,23 +826,15 @@
 
         // Get author name
         function getAuthorName(skill) {
-            // Try multiple possible locations for author data
+            // Author is now at skill.metadata.author (directly from YAML frontmatter)
             const meta = skill.metadata || {};
+            const author = meta.author;
 
-            // Check direct author field (from YAML frontmatter)
-            if (meta.author) {
-                if (typeof meta.author === 'object' && meta.author !== null) {
-                    return meta.author.name || '未知';
+            if (author) {
+                if (typeof author === 'object' && author !== null) {
+                    return author.name || '未知';
                 }
-                return meta.author;
-            }
-
-            // Check nested in metadata field
-            if (meta.metadata && meta.metadata.author) {
-                if (typeof meta.metadata.author === 'object' && meta.metadata.author !== null) {
-                    return meta.metadata.author.name || '未知';
-                }
-                return meta.metadata.author;
+                return author;
             }
 
             return '未知';
