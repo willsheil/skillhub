@@ -1413,14 +1413,25 @@
                         saveBtn.textContent = '关闭';
                         saveBtn.classList.remove('btn-primary');
                         saveBtn.classList.add('btn-secondary');
-                        saveBtn.onclick = function() {
+
+                        // Clone the button to remove all event listeners
+                        const newSaveBtn = saveBtn.cloneNode(true);
+                        saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+
+                        // Add click handler to new button
+                        newSaveBtn.addEventListener('click', function() {
                             closeModal('userModal');
                             loadUsers();
                             // Reset button for next time
-                            saveBtn.onclick = null;
-                            saveBtn.classList.remove('btn-secondary');
-                            saveBtn.classList.add('btn-primary');
-                        };
+                            newSaveBtn.textContent = '保存';
+                            newSaveBtn.classList.remove('btn-secondary');
+                            newSaveBtn.classList.add('btn-primary');
+                            // Re-attach the original saveUser listener
+                            newSaveBtn.addEventListener('click', saveUser);
+                        });
+
+                        // Update the reference for later use
+                        // Note: We need to handle this carefully as the element is replaced
 
                         // Open user modal to show the API key
                         document.getElementById('modalTitle').textContent = 'API Key 已重置';
