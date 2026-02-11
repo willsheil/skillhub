@@ -826,11 +826,26 @@
 
         // Get author name
         function getAuthorName(skill) {
-            const author = skill.metadata?.metadata?.author;
-            if (typeof author === 'object' && author !== null) {
-                return author.name || '未知';
+            // Try multiple possible locations for author data
+            const meta = skill.metadata || {};
+
+            // Check direct author field (from YAML frontmatter)
+            if (meta.author) {
+                if (typeof meta.author === 'object' && meta.author !== null) {
+                    return meta.author.name || '未知';
+                }
+                return meta.author;
             }
-            return author || '未知';
+
+            // Check nested in metadata field
+            if (meta.metadata && meta.metadata.author) {
+                if (typeof meta.metadata.author === 'object' && meta.metadata.author !== null) {
+                    return meta.metadata.author.name || '未知';
+                }
+                return meta.metadata.author;
+            }
+
+            return '未知';
         }
 
         // Generate category tags
