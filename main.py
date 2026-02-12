@@ -453,7 +453,7 @@ def scan_plugins() -> List[dict]:
                     "version": row["version"],
                     "license": None,
                     "compatibility": None,
-                    "metadata": {"version": row["version"]},
+                    "metadata": {"version": row["version"], "author": "未知"},
                     "allowed_tools": None
                 }
 
@@ -505,14 +505,16 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
             skill_metadata = {}
 
         # Normalize metadata format per Agent Skills spec
+        # Author is in metadata.author from SKILL.md
+        author = skill_metadata.get("author") or metadata.get("author")
         normalized = {
             "name": metadata.get("name", skill_name),
             "version": spec_version if spec_version else (version if version != "unknown" else "1.0.0"),
             "description": metadata.get("description", "No description available"),
-            "author": metadata.get("author"),  # Include author field
+            "author": author,  # Include author field
             "license": metadata.get("license"),
             "compatibility": metadata.get("compatibility"),
-            "metadata": skill_metadata,
+            "metadata": {**skill_metadata, "author": author},  # Include author in metadata for frontend
             "allowed_tools": metadata.get("allowed-tools")
         }
         return normalized
@@ -557,7 +559,7 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
         "description": "No description available",
         "license": None,
         "compatibility": None,
-        "metadata": {}
+        "metadata": {"author": "未知"}
     }
 
 
