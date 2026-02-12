@@ -520,10 +520,17 @@ def get_stats_with_author(
     # Get download stats
     stats = get_download_stats(start_date, end_date)
 
-    # Add author to each ranking
+    # Filter rankings to only include skills that still exist (active)
+    # This prevents deleted/inactive skills from appearing in hot rankings
+    filtered_rankings = []
+    valid_skill_names = set(skill_author_map.keys())
     for ranking in stats["rankings"]:
-        ranking["author"] = skill_author_map.get(ranking["skill_name"], "Unknown")
+        # Only include skills that are still in the plugins list (active)
+        if ranking["skill_name"] in valid_skill_names:
+            ranking["author"] = skill_author_map.get(ranking["skill_name"], "Unknown")
+            filtered_rankings.append(ranking)
 
+    stats["rankings"] = filtered_rankings
     return stats
 
 
