@@ -1,0 +1,15 @@
+                    });
+                }
+                // Render skills table
+                function renderSkillsTable(skills = []) {
+                    if (skills.length === 0) {
+                        const emptyMsg = currentSearchQuery ? '未找到匹配的技能' : '暂无技能';
+                        content.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-text">${emptyMsg}</div>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    let html = `

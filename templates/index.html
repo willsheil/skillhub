@@ -705,7 +705,7 @@
                 <div class="search-box">
                     <div class="search-badge">
                         <span class="sparkle">✨</span>
-                        <span>AI搜索</span>
+                        <span>搜索</span>
                     </div>
                     <input type="text" class="search-input" id="searchInput" placeholder="搜索技能名称、描述、作者..." oninput="handleSearch()">
                 </div>
@@ -737,7 +737,7 @@
         <div class="container" id="hotTodaySection">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">今日热门</h2>
+                    <h2 class="section-title">最近30天的热门</h2>
                     <p class="section-subtitle">最受欢迎的技能</p>
                 </div>
             </div>
@@ -817,18 +817,21 @@
 
         // Generate skill icon emoji
         function generateSkillIcon(skill) {
-            const name = (skill.metadata?.name || skill.name).toLowerCase();
+            // Handle undefined or null metadata safely - ensure we always have a string
+            const metadataName = skill.metadata?.name;
+            const name = metadataName || skill.name || '';
+            const nameLower = name.toLowerCase();
 
-            if (name.includes('代码') || name.includes('code')) return '💻';
-            if (name.includes('安全') || name.includes('security')) return '🔒';
-            if (name.includes('分析') || name.includes('analysis')) return '📊';
-            if (name.includes('搜索') || name.includes('search')) return '🔍';
-            if (name.includes('效率') || name.includes('productivity')) return '⚡';
-            if (name.includes('ai') || name.includes('智能')) return '🤖';
-            if (name.includes('文件') || name.includes('file')) return '📁';
-            if (name.includes('网络') || name.includes('network')) return '🌐';
-            if (name.includes('测试') || name.includes('test')) return '🧪';
-            if (name.includes('工具') || name.includes('tool')) return '🛠️';
+            if (nameLower.includes('代码') || nameLower.includes('code')) return '💻';
+            if (nameLower.includes('安全') || nameLower.includes('security')) return '🔒';
+            if (nameLower.includes('分析') || nameLower.includes('analysis')) return '📊';
+            if (nameLower.includes('搜索') || nameLower.includes('search')) return '🔍';
+            if (nameLower.includes('效率') || nameLower.includes('productivity')) return '⚡';
+            if (nameLower.includes('ai') || nameLower.includes('智能')) return '🤖';
+            if (nameLower.includes('文件') || nameLower.includes('file')) return '📁';
+            if (nameLower.includes('网络') || nameLower.includes('network')) return '🌐';
+            if (nameLower.includes('测试') || nameLower.includes('test')) return '🧪';
+            if (nameLower.includes('工具') || nameLower.includes('tool')) return '🛠️';
 
             return '📦';
         }
@@ -852,12 +855,13 @@
         // Generate category tags
         function generateTags(skill) {
             const tags = [];
-            const desc = (skill.metadata?.description || '').toLowerCase();
+            const desc = skill.metadata?.description;
+            const descLower = (desc !== undefined && desc !== null) ? desc.toLowerCase() : '';
 
-            if (desc.includes('效率') || desc.includes('自动')) tags.push('效率工具');
-            else if (desc.includes('分析') || desc.includes('数据')) tags.push('数据分析');
-            else if (desc.includes('安全') || desc.includes('测试')) tags.push('安全检测');
-            else if (desc.includes('ai') || desc.includes('智能')) tags.push('AI助手');
+            if (descLower && descLower.includes('效率') || descLower.includes('自动')) tags.push('效率工具');
+            else if (descLower && descLower.includes('分析') || descLower.includes('数据')) tags.push('数据分析');
+            else if (descLower && descLower.includes('安全') || descLower.includes('测试')) tags.push('安全检测');
+            else if (descLower && descLower.includes('ai') || descLower.includes('智能')) tags.push('AI助手');
             else tags.push('工具');
 
             return tags.slice(0, 2).map(tag => `<span class="tag">${tag}</span>`).join('');
@@ -868,7 +872,9 @@
             const icon = generateSkillIcon(skill);
             const author = getAuthorName(skill);
             const latestVersion = skill.versions && skill.versions.length > 0 ? skill.versions[0] : null;
-            const sourceTypeConfig = getSourceTypeConfig(skill.source_type || 'opensource');
+            // Handle undefined or null source_type safely
+            const sourceType = skill.source_type || 'opensource';
+            const sourceTypeConfig = getSourceTypeConfig(sourceType);
             const tags = generateTags(skill);
             const downloadCount = skill.download_count || 0;
 
@@ -912,15 +918,17 @@
             return sourceTypeConfig[sourceType] || sourceTypeConfig['opensource'];
         }
 
-        // Render hot today section (top skills by downloads)
+        // Global variable to store hot skills data from API
+        let hotSkillsData = [];
+
+        // Render hot today section (top skills by downloads in last 30 days)
         function renderHotToday() {
             const grid = document.getElementById('hotTodayGrid');
             if (!grid) return;
 
-            // Get top 6 skills by download count
-            const hotSkills = [...allSkills]
-                .sort((a, b) => (b.download_count || 0) - (a.download_count || 0))
-                .slice(0, 6);
+            // hotSkillsData is set by loadData() from /api/stats/top
+            // Format: {skill_name: 'api-processing-798-3.1.0', downloads: 2, author: 'w59217063'}
+            const hotSkills = hotSkillsData || [];
 
             if (hotSkills.length === 0) {
                 grid.innerHTML = `
@@ -932,7 +940,46 @@
                 return;
             }
 
-            grid.innerHTML = hotSkills.map(skill => `
+            // Map hot skills to full skill objects from allSkills
+            // Extract base name from versioned skill_name (e.g., 'api-processing-798' from 'api-processing-798-3.1.0')
+            const hotSkillsWithFullData = hotSkills.map(hotSkill => {
+                // Extract base name by removing version suffix (everything after and including the last dash followed by digits)
+                const skillNameParts = hotSkill.skill_name.split('-');
+                // The version pattern is typically: NAME-VERSION (e.g., api-processing-798-3.1.0)
+                // We need to find where the version starts (usually the last segment or two)
+                // Try to match by exact skill_name first, then by prefix
+                let fullSkill = allSkills.find(s => s.name === hotSkill.skill_name);
+
+                if (!fullSkill) {
+                    // Try to find by prefix match (remove version suffix)
+                    // Skill names can have format: name-version or name-id-version
+                    // Try progressively shorter prefixes
+                    for (let i = 1; i < skillNameParts.length; i++) {
+                        const prefix = skillNameParts.slice(0, -i).join('-');
+                        fullSkill = allSkills.find(s => s.name === prefix);
+                        if (fullSkill) break;
+                    }
+                }
+
+                if (fullSkill) {
+                    // Return full skill object with download count from stats
+                    return {
+                        ...fullSkill,
+                        download_count: hotSkill.downloads
+                    };
+                }
+
+                // Fallback: create minimal skill object
+                return {
+                    name: hotSkill.skill_name,
+                    metadata: { name: hotSkill.skill_name, description: '暂无描述' },
+                    versions: [],
+                    source_type: 'opensource',
+                    download_count: hotSkill.downloads
+                };
+            });
+
+            grid.innerHTML = hotSkillsWithFullData.map(skill => `
                 <div class="card">
                     ${generateCardHTML(skill)}
                 </div>
@@ -952,7 +999,17 @@
                 allSkills = skillsResult.data || [];
 
                 const statsResponse = await fetch('/api/stats/top');
+                if (!statsResponse.ok) {
+                    console.error('API request failed:', statsResponse.status);
+                    // Set empty data to prevent errors
+                    hotSkillsData = [];
+                    return;
+                }
                 const statsResult = await statsResponse.json();
+
+                // Store hot skills data globally for renderHotToday()
+                hotSkillsData = statsResult.rankings || [];
+                console.log('Hot skills (last 30 days, top 6):', hotSkillsData);
 
                 downloadStats = {};
                 if (statsResult.rankings) {
@@ -1099,6 +1156,16 @@
             currentPage = 1;
             renderCards();
             updatePagination();
+
+            // Hide/show hot today section based on search query
+            const hotTodaySection = document.getElementById('hotTodaySection');
+            if (hotTodaySection) {
+                if (query) {
+                    hotTodaySection.style.display = 'none';
+                } else {
+                    hotTodaySection.style.display = 'block';
+                }
+            }
         }
 
         function filterSkills(query) {

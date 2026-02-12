@@ -433,12 +433,14 @@ function generateActionButtons(skill, skillName) {
         `;
     }
 
-    // Delete button (always available for any status)
-    buttons += `
-        <button class="btn-action danger" onclick="event.stopPropagation(); deleteSkill(${skill.id}, '${encodeURIComponent(skillName)}', '${skill.version}')" style="margin-left: 4px;">
-            删除
-        </button>
-    `;
+    // Delete button (admin only)
+    if (window.currentUserRole === 'admin') {
+        buttons += `
+            <button class="btn-action danger" onclick="event.stopPropagation(); deleteSkill(${skill.id}, '${encodeURIComponent(skillName)}', '${skill.version}')" style="margin-left: 4px;">
+                删除
+            </button>
+        `;
+    }
 
     return `<div class="skill-actions">${buttons}</div>`;
 }

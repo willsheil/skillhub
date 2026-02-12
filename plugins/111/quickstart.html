@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一键安装 auditing-python-security-1.0.2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #10B981, #059669);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 24px;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #171717;
+            margin-bottom: 8px;
+        }
+
+        .version {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .platform {
+            background: #f3f4f6;
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .platform strong {
+            color: #10B981;
+        }
+
+        .steps {
+            text-align: left;
+            margin-bottom: 24px;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .step:last-child {
+            border-bottom: none;
+        }
+
+        .step-number {
+            width: 28px;
+            height: 28px;
+            background: #10B981;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #171717;
+            margin-bottom: 4px;
+        }
+
+        .step-desc {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            margin-bottom: 12px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #64748b;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #a1a1aa;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+
+        .success {
+            display: none;
+        }
+
+        .success.show {
+            display: block;
+        }
+
+        .success-icon {
+            font-size: 60px;
+            margin-bottom: 16px;
+        }
+
+        .success h2 {
+            color: #10B981;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="installPage">
+        <div class="icon">📦</div>
+        <h1>auditing-python-security-1.0.2</h1>
+        <div class="version">版本 1.0.2</div>
+
+        <div class="platform" id="platformInfo">
+            检测到系统: <strong id="osName">...</strong>
+        </div>
+
+        <div class="steps">
+            <div class="step" data-platform="windows">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">双击运行安装脚本</div>
+                    <div class="step-desc">在当前文件夹中找到 <code>install.bat</code> 并双击运行</div>
+                </div>
+            </div>
+            <div class="step" data-platform="mac,linux">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">打开终端</div>
+                    <div class="step-desc">在当前文件夹中打开终端</div>
+                </div>
+            </div>
+            <div class="step" data-platform="mac,linux">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">运行安装命令</div>
+                    <div class="step-desc"><code>chmod +x install.sh && ./install.sh</code></div>
+                </div>
+            </div>
+            <div class="step" data-platform="all">
+                <div class="step-number" id="finalStepNum">2</div>
+                <div class="step-content">
+                    <div class="step-title">重启 Claude Code</div>
+                    <div class="step-desc">安装完成后重启 Claude Code 即可使用新技能</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="runInstaller()">一键安装</button>
+
+        <button class="btn btn-secondary" onclick="openFolder()">打开安装脚本位置</button>
+
+        <div class="note">
+            提示: 设置 <code>CLAUDE_SKILLS_PATH</code> 环境变量可让安装脚本自动识别路径
+        </div>
+    </div>
+
+    <div class="container success" id="successPage">
+        <div class="success-icon">✅</div>
+        <h2>安装完成!</h2>
+        <p style="color: #64748b; margin-bottom: 20px;">请重启 Claude Code 以加载新技能</p>
+        <button class="btn btn-primary" onclick="window.close()">关闭此页面</button>
+    </div>
+
+    <script>
+        // Detect platform
+        function detectPlatform() {
+            const ua = window.navigator.userAgent;
+            if (ua.includes('Win')) return 'windows';
+            if (ua.includes('Mac')) return 'mac';
+            if (ua.includes('Linux')) return 'linux';
+            return 'unknown';
+        }
+
+        // Show platform-specific steps
+        function showPlatformSteps() {
+            const platform = detectPlatform();
+            const osNames = {
+                'windows': 'Windows',
+                'mac': 'macOS',
+                'linux': 'Linux',
+                'unknown': '未知系统'
+            };
+
+            document.getElementById('osName').textContent = osNames[platform];
+
+            // Filter steps based on platform
+            document.querySelectorAll('.step').forEach(step => {
+                const stepPlatform = step.dataset.platform;
+                if (stepPlatform === 'all' || stepPlatform.includes(platform)) {
+                    step.style.display = 'flex';
+                } else {
+                    step.style.display = 'none';
+                }
+            });
+
+            // Update final step number
+            const visibleSteps = document.querySelectorAll('.step[style*="flex"]');
+            const finalNum = visibleSteps.length;
+            document.getElementById('finalStepNum').textContent = finalNum;
+        }
+
+        // Run installer
+        function runInstaller() {
+            const platform = detectPlatform();
+
+            if (platform === 'windows') {
+                // Try to run install.bat
+                try {
+                    const activeX = new ActiveXObject('WScript.Shell');
+                    activeX.Run('install.bat');
+                    showSuccess();
+                } catch (e) {
+                    alert('请手动双击 install.bat 文件进行安装');
+                }
+            } else {
+                alert('请在终端中运行: chmod +x install.sh && ./install.sh');
+            }
+        }
+
+        // Open folder (limited functionality)
+        function openFolder() {
+            alert('请在文件管理器中打开当前文件夹，找到安装脚本');
+        }
+
+        // Show success page
+        function showSuccess() {
+            document.getElementById('installPage').style.display = 'none';
+            document.getElementById('successPage').classList.add('show');
+        }
+
+        // Initialize
+        showPlatformSteps();
+    </script>
+</body>
+</html>

@@ -958,7 +958,9 @@
         </div>
         <div class="batch-actions-buttons">
             <button class="btn-action" onclick="batchUnlistSkills()">批量下架</button>
+            {% if user and user.role == 'admin' %}
             <button class="btn-action danger" onclick="batchDeleteSkills()">批量删除</button>
+            {% endif %}
             <button class="btn-action" onclick="cancelSelection()">取消选择</button>
         </div>
     </div>
@@ -983,6 +985,10 @@
         </div>
     </div>
 
-    <script src="/static/js/skill-management.js?v=3"></script>
+    <script src="/static/js/skill-management.js?v=4"></script>
+    <script>
+        // Pass user role to frontend
+        window.currentUserRole = '{{ user.role if user else "user" }}';
+    </script>
 </body>
 </html>

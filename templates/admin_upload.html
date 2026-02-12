@@ -759,6 +759,24 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Upload History Section -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: #8b5cf6;">📋</div>
+                    <div>
+                        <div class="card-title">我的上传记录</div>
+                        <div class="card-description">查看最近上传的技能记录</div>
+                    </div>
+                </div>
+                <div class="card-content">
+                    <div id="historyContent">
+                        <div class="empty-state" style="text-align: center; padding: 40px; color: #737373;">
+                            <div>加载中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -917,6 +935,104 @@
                 }
             }
         });
+
+        // Load upload history
+        async function loadUploadHistory() {
+            try {
+                const response = await fetch('/api/user/uploads');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error('Failed to load uploads');
+                }
+
+                const uploads = result.data || [];
+
+                if (uploads.length === 0) {
+                    document.getElementById('historyContent').innerHTML = `
+                        <div class="empty-state" style="text-align: center; padding: 40px; color: #737373;">
+                            <div>暂无上传记录</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const table = document.createElement('table');
+                table.style.cssText = 'width: 100%; border-collapse: collapse;';
+                table.innerHTML = `
+                    <thead>
+                        <tr style="background: #f5f5f5; border-bottom: 2px solid #e5e5e5;">
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">Skill 名称</th>
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">版本</th>
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">上传时间</th>
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${uploads.map(upload => `
+                            <tr style="border-bottom: 1px solid #e5e5e5;">
+                                <td style="padding: 12px;">
+                                    <div style="font-weight: 500;">${upload.skill_name}</div>
+                                </td>
+                                <td style="padding: 12px;">
+                                    <span style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${upload.version}</span>
+                                </td>
+                                <td style="padding: 12px; color: #737373;">
+                                    ${formatUploadDate(upload.uploaded_at)}
+                                </td>
+                                <td style="padding: 12px;">
+                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; background: ${getStatusColor(upload.status)}; color: white;">
+                                        ${getStatusText(upload.status)}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
+
+                document.getElementById('historyContent').innerHTML = '';
+                document.getElementById('historyContent').appendChild(table);
+
+            } catch (error) {
+                console.error('Failed to load uploads:', error);
+                document.getElementById('historyContent').innerHTML = `
+                    <div class="empty-state" style="text-align: center; padding: 40px; color: #ef4444;">
+                        <div>加载失败</div>
+                    </div>
+                `;
+            }
+        }
+
+        function formatUploadDate(dateStr) {
+            const date = new Date(dateStr);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': '待审核',
+                'approved': '已通过',
+                'rejected': '已拒绝'
+            };
+            return statusMap[status] || status;
+        }
+
+        function getStatusColor(status) {
+            const colorMap = {
+                'pending': '#f59e0b',
+                'approved': '#10b981',
+                'rejected': '#ef4444'
+            };
+            return colorMap[status] || '#737373';
+        }
+
+        // Load history on page load
+        document.addEventListener('DOMContentLoaded', loadUploadHistory);
     </script>
 </body>
 </html>

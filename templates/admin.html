@@ -211,6 +211,38 @@
             border-bottom: none;
         }
 
+        /* Search Box Styles */
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border: 1px solid #eaeaea;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #eaeaea;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            color: #171717;
+            background: #ffffff;
+        }
+
+        .search-box input::placeholder {
+            color: #9ca3af;
+        }
+
+        .search-box input:focus {
+            border-color: #f97316;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+        }
+
         .data-table tbody tr:hover {
             background: #fafafa;
         }
@@ -249,6 +281,15 @@
             border: none;
             outline: none;
             transition: all 0.15s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd6;
         }
 
         .btn-success {
@@ -786,32 +827,53 @@
             }
         }
 
-        // Load skills management
-        async function loadSkillsManagement() {
+        // Store original skills data for filtering (module scope)
+        let originalSkills = [];
+        let currentSearchQuery = '';
+
+        // Search filter function (global scope)
+        function handleAdminSearch() {
+            const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
+            currentSearchQuery = query;
+            const filteredSkills = originalSkills.filter(skill => {
+                if (!query) return true;
+                const searchFields = [
+                    skill.skill_name.toLowerCase(),
+                    skill.version.toLowerCase(),
+                    skill.uploader_name ? skill.uploader_name.toLowerCase() : ''
+                ];
+                return searchFields.some(field => field.includes(query));
+            });
+            renderSkillsTable(filteredSkills);
+        }
+
+        // Render skills table (global scope)
+        function renderSkillsTable(skills = []) {
             const content = document.getElementById('skillsContent');
 
-            try {
-                const response = await fetch('/api/admin/skills?limit=100');
-                const result = await response.json();
+            // Preserve search input value before re-rendering
+            const searchInput = document.getElementById('adminSearchInput');
+            const searchValue = searchInput ? searchInput.value : '';
 
-                if (!result.success) {
-                    throw new Error(result.detail || '加载失败');
-                }
+            if (skills.length === 0) {
+                const emptyMsg = currentSearchQuery ? '未找到匹配的技能' : '暂无技能';
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-text">${emptyMsg}</div>
+                    </div>
+                `;
+                return;
+            }
 
-                const skills = result.data || [];
-
-                if (skills.length === 0) {
-                    content.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-text">暂无技能</div>
+            let html = `
+                    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+                        <div class="search-box" style="flex: 1; min-width: 300px;">
+                            <span style="font-size: 14px; color: #64748b;">🔍</span>
+                            <input type="text" id="adminSearchInput" placeholder="搜索技能名称、上传者..."
+                                value="${searchValue}"
+                                style="flex: 1; padding: 8px 12px; border: 1px solid #eaeaea; border-radius: 8px; font-size: 14px; outline: none;"
+                                oninput="handleAdminSearch()">
                         </div>
-                    `;
-                    return;
-                }
-
-                // Render skills table
-                let html = `
-                    <div style="margin-bottom: 16px;">
                         <button class="btn btn-primary" onclick="loadSkillsManagement()">刷新</button>
                     </div>
                     <table class="data-table">
@@ -830,57 +892,93 @@
                         <tbody>
                 `;
 
-                const sourceTypeLabels = {
-                    'opensource': '开源',
-                    'icsl': 'ICSL自研',
-                    'huawei': '华为自研'
-                };
+            const sourceTypeLabels = {
+                'opensource': '开源',
+                'icsl': 'ICSL自研',
+                'huawei': '华为自研'
+            };
 
-                const statusLabels = {
-                    'pending': '待审核',
-                    'approved': '已通过',
-                    'rejected': '已拒绝'
-                };
+            const statusLabels = {
+                'pending': '待审核',
+                'approved': '已通过',
+                'rejected': '已拒绝'
+            };
 
-                const statusColors = {
-                    'pending': '#f59e0b',
-                    'approved': '#10b981',
-                    'rejected': '#ef4444'
-                };
+            const statusColors = {
+                'pending': '#f59e0b',
+                'approved': '#10b981',
+                'rejected': '#ef4444'
+            };
 
-                for (const skill of skills) {
-                    const uploadedAt = new Date(skill.uploaded_at).toLocaleString('zh-CN');
-                    const sourceTypeLabel = sourceTypeLabels[skill.source_type] || skill.source_type;
-                    const statusLabel = statusLabels[skill.status] || skill.status;
-
-                    html += `
-                        <tr data-skill-id="${skill.id}">
-                            <td>${skill.id}</td>
-                            <td>${skill.skill_name}</td>
-                            <td>${skill.version}</td>
-                            <td>
-                                <select class="source-type-select" data-skill-id="${skill.id}" onchange="updateSourceType(${skill.id}, this.value)">
-                                    <option value="opensource" ${skill.source_type === 'opensource' ? 'selected' : ''}>开源</option>
-                                    <option value="icsl" ${skill.source_type === 'icsl' ? 'selected' : ''}>ICSL自研</option>
-                                    <option value="huawei" ${skill.source_type === 'huawei' ? 'selected' : ''}>华为自研</option>
-                                </select>
-                            </td>
-                            <td><span style="color: ${statusColors[skill.status] || '#64748b'}">${statusLabel}</span></td>
-                            <td>${skill.uploader_name || '-'}</td>
-                            <td>${uploadedAt}</td>
-                            <td>
-                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="editSkill(${skill.id})">编辑</button>
-                            </td>
-                        </tr>
-                    `;
-                }
+            for (const skill of skills) {
+                const uploadedAt = new Date(skill.uploaded_at).toLocaleString('zh-CN');
+                const sourceTypeLabel = sourceTypeLabels[skill.source_type] || skill.source_type;
+                const statusLabel = statusLabels[skill.status] || skill.status;
 
                 html += `
+                    <tr data-skill-id="${skill.id}">
+                        <td>${skill.id}</td>
+                        <td>${skill.skill_name}</td>
+                        <td>${skill.version}</td>
+                        <td>
+                            <select class="source-type-select" data-skill-id="${skill.id}" onchange="updateSourceType(${skill.id}, this.value)">
+                                <option value="opensource" ${skill.source_type === 'opensource' ? 'selected' : ''}>开源</option>
+                                <option value="icsl" ${skill.source_type === 'icsl' ? 'selected' : ''}>ICSL自研</option>
+                                <option value="huawei" ${skill.source_type === 'huawei' ? 'selected' : ''}>华为自研</option>
+                            </select>
+                        </td>
+                        <td><span style="color: ${statusColors[skill.status] || '#64748b'}">${statusLabel}</span></td>
+                        <td>${skill.uploader_name || '-'}</td>
+                        <td>${uploadedAt}</td>
+                        <td>
+                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="editSkill(${skill.id})">编辑</button>
+                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" onclick="deleteAdminSkill(${skill.id}, '${encodeURIComponent(skill.skill_name)}', '${skill.version}')">删除</button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            html += `
                         </tbody>
                     </table>
                 `;
 
-                content.innerHTML = html;
+            content.innerHTML = html;
+        }
+
+        // Load skills management
+        async function loadSkillsManagement() {
+            const content = document.getElementById('skillsContent');
+            const searchInput = document.getElementById('adminSearchInput');
+            const searchValue = searchInput ? searchInput.value : '';
+
+            try {
+                const response = await fetch('/api/admin/skills?limit=100');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.detail || '加载失败');
+                }
+
+                const skills = result.data || [];
+
+                // Check empty state BEFORE rendering
+                if (skills.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-text">暂无技能</div>
+                        </div>
+                    `;
+                    // Clear originalSkills since no data exists
+                    originalSkills = [];
+                    return;
+                }
+
+                // Store original skills data for filtering
+                originalSkills = skills;
+
+                // Render the table (will preserve search input value internally)
+                renderSkillsTable(skills);
 
             } catch (error) {
                 console.error('Failed to load skills:', error);
@@ -889,6 +987,8 @@
                         <div class="empty-state-text">加载失败: ${error.message}</div>
                     </div>
                 `;
+                // Clear originalSkills on error to prevent filtering stale data
+                originalSkills = [];
             }
         }
 
@@ -922,9 +1022,33 @@
             }
         }
 
-        // Edit skill (placeholder for future functionality)
-        function editSkill(skillId) {
-            showMessage('编辑功能开发中...', 'info');
+        // Delete skill
+        async function deleteAdminSkill(skillId, skillName, version) {
+            if (!confirm(`确定要删除 ${decodeURIComponent(skillName)}@${version} 吗？\n\n删除后无法恢复！`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/my-skills/${skillId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || '删除失败');
+                }
+
+                showMessage('技能已删除', 'success');
+
+                // Clear search and refresh to show all data
+                document.getElementById('adminSearchInput').value = '';
+                currentSearchQuery = '';
+                loadSkillsManagement();
+
+            } catch (error) {
+                console.error('Error deleting skill:', error);
+                showMessage('删除失败: ' + error.message, 'error');
+            }
         }
 
         // Load stats

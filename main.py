@@ -1615,11 +1615,11 @@ async def api_batch_unlist_skills(
 async def api_batch_delete_skills(
     request_data: BatchOperationRequest,
     request: Request,
-    _: bool = Depends(require_auth)
+    _: bool = Depends(require_admin)
 ):
-    """Delete multiple skills at once.
+    """Delete multiple skills at once (admin only).
 
-    User must own all the skills to delete them. The physical ZIP files will also be removed.
+    Only admin users can delete any skills. The physical ZIP files will also be removed.
     """
     try:
         user_id = request.session.get("user_id")
@@ -1864,11 +1864,11 @@ async def api_get_skill_versions(
 async def api_delete_skill(
     skill_id: int,
     request: Request,
-    _: bool = Depends(require_auth)
+    _: bool = Depends(require_admin)
 ):
-    """Delete a skill version.
+    """Delete a skill version (admin only).
 
-    User must own the skill to delete it. The physical ZIP file will also be removed.
+    Only admin users can delete any skill. The physical ZIP file will also be removed.
     If this is the default version and there are other versions, another version will be set as default.
     """
     try:
@@ -1887,15 +1887,9 @@ async def api_delete_skill(
                 detail=f"Skill {skill_id} not found"
             )
 
-        # Verify ownership
-        if skill["uploader_id"] != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't own this skill"
-            )
-
-        # Delete the skill
-        success = delete_skill_version(user_id, skill_id)
+        # Admin can delete any skill, no ownership check needed
+        # Delete the skill (pass is_admin=True to skip ownership check)
+        success = delete_skill_version(user_id, skill_id, is_admin=True)
 
         if not success:
             raise HTTPException(
@@ -2206,9 +2200,9 @@ async def upload_batch(
 @app.delete("/admin/plugins/{filename}")
 async def delete_plugin(
     filename: str,
-    _: bool = Depends(require_auth)
+    _: bool = Depends(require_admin)
 ):
-    """Delete a plugin (requires auth)."""
+    """Delete a plugin (admin only)."""
     file_path = PLUGINS_DIR / filename
 
     if not file_path.exists():

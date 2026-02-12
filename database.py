@@ -7,7 +7,7 @@ import pymysql
 import json
 import logging
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
 from contextlib import contextmanager
 
@@ -405,9 +405,15 @@ def record_download(
 
 def get_download_stats(
     start_date: Optional[date] = None,
-    end_date: Optional[date] = None
+    end_date: Optional[date] = None,
+    days: Optional[int] = None
 ) -> Dict[str, Any]:
     """Get download statistics for a date range.
+
+    Args:
+        start_date: Start date (YYYY-MM-DD), defaults to 30 days ago
+        end_date: End date (YYYY-MM-DD), defaults to today
+        days: Number of days for range (default 30), max 90
 
     Returns:
         {
@@ -418,11 +424,15 @@ def get_download_stats(
             ]
         }
     """
-    # Default to all time if no dates provided
-    if start_date is None:
-        start_date = date(1970, 1, 1)
-    if end_date is None:
+    # Default to last 30 days if no dates provided
+    if start_date is None and end_date is None:
+        start_date = date.today() - timedelta(days=30)
         end_date = date.today()
+
+    # Override end_date if days is specified
+    if days is not None:
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days)
 
     with get_connection() as conn:
         # Get total downloads
@@ -436,7 +446,7 @@ def get_download_stats(
 
         total_downloads = total_row["total"] if total_row else 0
 
-        # Get rankings by skill
+        # Get rankings by skill (limited to top 6)
         rankings = []
         rows = conn.execute(
             """
@@ -447,6 +457,7 @@ def get_download_stats(
             WHERE DATE(downloaded_at) BETWEEN %s AND %s
             GROUP BY skill_name
             ORDER BY download_count DESC
+            LIMIT 6
             """,
             (start_date.isoformat(), end_date.isoformat())
         ).fetchall()
@@ -483,9 +494,28 @@ def get_stats_with_author(
     for plugin in plugins:
         skill_name = plugin.get("name", "")
         metadata = plugin.get("metadata", {})
-        author = metadata.get("author", {})
-        author_name = author.get("name", "Unknown") if isinstance(author, dict) else "Unknown"
+
+        # Author can be in multiple locations:
+        # 1. metadata.author (top-level in YAML frontmatter)
+        # 2. metadata.metadata.author (inside metadata section in YAML frontmatter)
+        author = metadata.get("author") or metadata.get("metadata", {}).get("author")
+
+        # Handle different author formats
+        if isinstance(author, dict):
+            author_name = author.get("name", "Unknown")
+        elif isinstance(author, str) and author:
+            author_name = author
+        else:
+            author_name = "Unknown"
+
+        # Map both base name and versioned names (from versions array)
         skill_author_map[skill_name] = author_name
+        for version_info in plugin.get("versions", []):
+            filename = version_info.get("filename", "")
+            # Remove .zip extension to match skill_name in downloads table
+            if filename.endswith(".zip"):
+                versioned_name = filename[:-4]
+                skill_author_map[versioned_name] = author_name
 
     # Get download stats
     stats = get_download_stats(start_date, end_date)
@@ -1934,31 +1964,44 @@ def get_all_default_skill_versions() -> Dict[str, Dict[str, Any]]:
         return result
 
 
-def delete_skill_version(user_id: int, skill_id: int) -> bool:
+def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) -> bool:
     """Delete a specific skill version.
 
-    Only the owner of the skill can delete it.
+    Only the owner of the skill can delete it, unless user is admin.
     The physical ZIP file will also be removed from the plugins directory.
 
     Args:
-        user_id: The user's ID (for ownership verification)
+        user_id: The user's ID (for ownership verification, ignored if is_admin=True)
         skill_id: The ID of the skill to delete
+        is_admin: If True, skip ownership check (admin can delete any skill)
 
     Returns:
         True if deleted successfully, False if skill not found or not owned by user
     """
     import os
+    from pathlib import Path
 
     with get_connection() as conn:
-        # First verify the skill belongs to the user and get filename
-        verify_row = conn.execute(
-            """
-            SELECT id, filename, skill_name, is_default_version
-            FROM skills
-            WHERE id = %s AND uploader_id = %s
-            """,
-            (skill_id, user_id)
-        ).fetchone()
+        # Admin users can delete any skill - get skill info without ownership check
+        # Non-admin users must own the skill
+        if is_admin:
+            verify_row = conn.execute(
+                """
+                SELECT id, filename, skill_name, is_default_version, uploader_id
+                FROM skills
+                WHERE id = %s
+                """,
+                (skill_id,)
+            ).fetchone()
+        else:
+            verify_row = conn.execute(
+                """
+                SELECT id, filename, skill_name, is_default_version
+                FROM skills
+                WHERE id = %s AND uploader_id = %s
+                """,
+                (skill_id, user_id)
+            ).fetchone()
 
         if not verify_row:
             return False
@@ -1966,33 +2009,61 @@ def delete_skill_version(user_id: int, skill_id: int) -> bool:
         filename = verify_row["filename"]
         skill_name = verify_row["skill_name"]
         is_default = verify_row["is_default_version"]
+        uploader_id = verify_row.get("uploader_id", user_id)
 
         # If this is the default version, check if there are other versions
         if is_default:
-            other_versions = conn.execute(
-                """
-                SELECT COUNT(*) as count FROM skills
-                WHERE skill_name = %s AND uploader_id = %s AND id != %s
-                """,
-                (skill_name, user_id, skill_id)
-            ).fetchone()
+            # For admin, check all other versions regardless of uploader
+            # For non-admin, only check versions from same uploader
+            if is_admin:
+                other_versions = conn.execute(
+                    """
+                        SELECT COUNT(*) as count FROM skills
+                        WHERE skill_name = %s AND id != %s
+                        """,
+                    (skill_name, skill_id)
+                ).fetchone()
+            else:
+                other_versions = conn.execute(
+                    """
+                        SELECT COUNT(*) as count FROM skills
+                        WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                        """,
+                    (skill_name, uploader_id, skill_id)
+                ).fetchone()
 
             # If there are other versions, we need to set a new default
             if other_versions["count"] > 0:
-                # Set the latest other version as default
-                conn.execute(
-                    """
-                    UPDATE skills
-                    SET is_default_version = 1
-                    WHERE id = (
-                        SELECT id FROM skills
-                        WHERE skill_name = %s AND uploader_id = %s AND id != %s
-                        ORDER BY uploaded_at DESC
-                        LIMIT 1
+                # For admin, set latest version as default regardless of uploader
+                # For non-admin, only set versions from same uploader as default
+                if is_admin:
+                    conn.execute(
+                        """
+                            UPDATE skills
+                            SET is_default_version = 1
+                            WHERE id = (
+                                SELECT id FROM skills
+                                WHERE skill_name = %s AND id != %s
+                                ORDER BY uploaded_at DESC
+                                LIMIT 1
+                            )
+                            """,
+                        (skill_name, skill_id)
                     )
-                    """,
-                    (skill_name, user_id, skill_id)
-                )
+                else:
+                    conn.execute(
+                        """
+                            UPDATE skills
+                            SET is_default_version = 1
+                            WHERE id = (
+                                SELECT id FROM skills
+                                WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                                ORDER BY uploaded_at DESC
+                                LIMIT 1
+                            )
+                            """,
+                        (skill_name, uploader_id, skill_id)
+                    )
 
         # Delete related notifications first (due to foreign key constraint)
         conn.execute(
@@ -2004,18 +2075,41 @@ def delete_skill_version(user_id: int, skill_id: int) -> bool:
         )
 
         # Delete the skill record
-        cursor = conn.execute(
-            """
-            DELETE FROM skills
-            WHERE id = %s AND uploader_id = %s
-            """,
-            (skill_id, user_id)
-        )
+        # For admin, delete by id only (no ownership check needed)
+        # For non-admin, check uploader_id to ensure ownership
+        if is_admin:
+            cursor = conn.execute(
+                """
+                    DELETE FROM skills
+                    WHERE id = %s
+                    """,
+                (skill_id,)
+            )
+        else:
+            cursor = conn.execute(
+                """
+                    DELETE FROM skills
+                    WHERE id = %s AND uploader_id = %s
+                    """,
+                (skill_id, user_id)
+            )
+
         conn.commit()
+
+        # Delete related download records
+        # The downloads table stores skill_name with version (e.g., 'api-processing-798-3.1.0')
+        # So we need to delete by filename pattern to catch all download records
+        # Use LIKE to match any downloads with this filename as base
+        conn.execute(
+            """
+            DELETE FROM downloads
+            WHERE filename LIKE %s
+            """,
+            (f"{filename}%",)
+        )
 
         # Delete the physical ZIP file
         if filename:
-            from pathlib import Path
             zip_path = Path("./plugins") / filename
             if zip_path.exists():
                 try:
@@ -2091,14 +2185,14 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
         files_to_delete = []
 
         for skill_id in skill_ids:
-            # Verify ownership and get filename
+            # Admin can delete any skill, no ownership check needed
             verify_row = conn.execute(
                 """
-                SELECT id, filename, skill_name, is_default_version
+                SELECT id, filename, skill_name, is_default_version, uploader_id
                 FROM skills
-                WHERE id = %s AND uploader_id = %s
+                WHERE id = %s
                 """,
-                (skill_id, user_id)
+                (skill_id,)
             ).fetchone()
 
             if verify_row:
@@ -2111,9 +2205,9 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
                     other_versions = conn.execute(
                         """
                         SELECT COUNT(*) as count FROM skills
-                        WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                        WHERE skill_name = %s AND id != %s
                         """,
-                        (skill_name, user_id, skill_id)
+                        (skill_name, skill_id)
                     ).fetchone()
 
                     # If there are other versions, we need to set a new default
@@ -2125,12 +2219,12 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
                             SET is_default_version = 1
                             WHERE id = (
                                 SELECT id FROM skills
-                                WHERE skill_name = %s AND uploader_id = %s AND id != %s
+                                WHERE skill_name = %s AND id != %s
                                 ORDER BY uploaded_at DESC
                                 LIMIT 1
                             )
                             """,
-                            (skill_name, user_id, skill_id)
+                            (skill_name, skill_id)
                         )
 
                 # Delete related notifications first (due to foreign key constraint)
