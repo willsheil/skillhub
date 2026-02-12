@@ -629,17 +629,15 @@ async def marketplace_json(request: Request):
 
 
 @app.get("/plugins/{filename}")
-async def download_plugin(filename: str, request: Request, raw: bool = False):
-    """Download plugin ZIP file.
+async def download_plugin(filename: str, request: Request):
+    """Download plugin ZIP file (original uploaded file).
 
     Args:
         filename: Name of the plugin file
         request: HTTP request
-        raw: If True, return original ZIP without installer scripts
 
     Returns:
-        ZIP file with installer scripts included (by default)
-        or original ZIP if raw=True
+        Original ZIP file as uploaded by the user
     """
     # Require authentication
     user_id = request.session.get("user_id")
@@ -654,7 +652,7 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
     # Get skill name from filename (version is now in SKILL.md metadata)
     skill_name = filename[:-4] if filename.endswith('.zip') else filename
 
-    # Extract version from SKILL.md inside the ZIP
+    # Extract version from SKILL.md inside the ZIP for download tracking
     metadata = extract_metadata_from_skill_md(file_path)
     if metadata and metadata.get("metadata"):
         version = metadata.get("metadata", {}).get("version", "unknown")
@@ -675,32 +673,12 @@ async def download_plugin(filename: str, request: Request, raw: bool = False):
         # Log error but don't block download
         logger.warning(f"Failed to record download: {e}", extra={"skill_name": skill_name, "filename": filename})
 
-    # Return raw ZIP if requested
-    if raw:
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="application/zip"
-        )
-
-    # Package with installer scripts
-    try:
-        zip_data = package_skill_with_installer(file_path, skill_name, version)
-        return Response(
-            content=zip_data,
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
-            }
-        )
-    except Exception as e:
-        logger.warning(f"Failed to package with installer: {e}", extra={"skill_name": skill_name, "filename": filename})
-        # Fallback to raw file if packaging fails
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="application/zip"
-        )
+    # Return original ZIP file
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/zip"
+    )
 
 
 @app.get("/api/skills")
@@ -2235,10 +2213,10 @@ async def batch_download(request: Request):
         if not selected_filenames:
             raise HTTPException(400, "No skills selected")
 
-        # Create ZIP in memory
+        # Create ZIP in memory - packaging original ZIP files only
         zip_buffer = BytesIO()
 
-        added_skills = []  # Track successfully added skills for install-all scripts
+        added_count = 0
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             for filename in selected_filenames:
@@ -2248,57 +2226,14 @@ async def batch_download(request: Request):
                     logger.warning(f"ZIP file not found: {filename}", extra={"filename": filename})
                     continue
 
-                # Get skill name from filename
-                skill_name = filename[:-4] if filename.endswith('.zip') else filename
+                # Add original ZIP file directly to batch package
+                zf.write(target_zip, filename)
+                added_count += 1
 
-                # Extract version from SKILL.md inside the ZIP
-                skill_metadata = extract_metadata_from_skill_md(target_zip)
-                if skill_metadata and skill_metadata.get("metadata"):
-                    version = skill_metadata.get("metadata", {}).get("version", "unknown")
-                else:
-                    version = "unknown"
-
-                # Add skill to batch package (without individual installer scripts)
-                try:
-                    # Extract original ZIP contents directly to skill directory
-                    with zipfile.ZipFile(target_zip, 'r') as skill_zf:
-                        for item in skill_zf.namelist():
-                            zf.writestr(f"{skill_name}/{item}", skill_zf.read(item))
-
-                    added_skills.append({
-                        'name': skill_name,
-                        'version': version,
-                        'dir': get_skill_dir_name(filename)
-                    })
-                except Exception as e:
-                    logger.warning(f"Failed to package {filename}: {e}", extra={"filename": filename})
-                    # Fallback: add original ZIP at root level
-                    zf.write(target_zip, filename)
-                    added_skills.append({
-                        'name': skill_name,
-                        'version': version,
-                        'dir': get_skill_dir_name(filename),
-                        'fallback': True
-                    })
-
-            if len(added_skills) == 0:
+            if added_count == 0:
                 raise HTTPException(404, "No valid skill files found")
 
-            # Add install-all scripts at root level
-            if len(added_skills) > 0:
-                # Generate install-all.bat (with UTF-8 BOM for Windows)
-                install_all_bat = generate_install_all_bat(added_skills)
-                zf.writestr('install-all.bat', install_all_bat.encode('utf-8-sig'))
-
-                # Generate install-all.sh (UTF-8 without BOM is fine for Linux/Mac)
-                install_all_sh = generate_install_all_sh(added_skills)
-                zf.writestr('install-all.sh', install_all_sh.encode('utf-8'))
-
-                # Add batch README
-                batch_readme = generate_batch_readme(added_skills)
-                zf.writestr('README.txt', batch_readme.encode('utf-8'))
-
-        # Get ZIP data
+        # Get ZIP data - returning original ZIP files only
         zip_data = zip_buffer.getvalue()
 
         # Return response with ZIP data
