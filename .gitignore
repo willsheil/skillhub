@@ -15,7 +15,7 @@ __pycache__/
 .omc/
 
 # Plugins (optional, depending on your deployment strategy)
-# plugins/
+plugins/
 
 # Git worktrees
 .worktrees/
