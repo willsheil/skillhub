@@ -11,6 +11,8 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+.claude/
+.omc/
 
 # Plugins (optional, depending on your deployment strategy)
 # plugins/
