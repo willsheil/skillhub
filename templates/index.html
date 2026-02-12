@@ -980,10 +980,21 @@
             });
 
             grid.innerHTML = hotSkillsWithFullData.map(skill => `
-                <div class="card">
+                <div class="skill-card" data-skill-id="${skill.name}">
                     ${generateCardHTML(skill)}
                 </div>
             `).join('');
+
+            // Add click event listeners to hot skill cards
+            document.querySelectorAll('#hotTodayGrid .skill-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('a') || e.target.closest('.btn-download')) {
+                        return;
+                    }
+                    const skillName = card.dataset.skillId;
+                    window.location.href = `/skill/${encodeURIComponent(skillName)}`;
+                });
+            });
         }
 
         // Load data
