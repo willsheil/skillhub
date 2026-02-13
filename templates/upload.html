@@ -363,6 +363,43 @@
             font-size: 13px;
         }
 
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 24px 0;
+        }
+
+        .page-btn {
+            padding: 8px 14px;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            background: white;
+            color: #171717;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
         /* Mode Selector Buttons */
         .mode-btn {
             flex: 1;
@@ -449,20 +486,27 @@
                 </div>
             </div>
         </div>
+
+        <div class="pagination" id="pagination" style="display: none;"></div>
     </div>
 
     <script>
+        // Pagination state
+        let currentPage = 1;
+        let perPage = 20;
+        let totalPages = 1;
+
         // Load upload history
         async function loadUploadHistory() {
             try {
-                const response = await fetch('/api/user/uploads');
+                const response = await fetch(`/api/user/uploads?page=${currentPage}&per_page=${perPage}`);
                 const result = await response.json();
 
                 if (!result.success) {
                     throw new Error('Failed to load uploads');
                 }
 
-                const uploads = result.data || [];
+                const uploads = result.data.uploads || [];
 
                 if (uploads.length === 0) {
                     document.getElementById('historyContent').innerHTML = `
@@ -509,6 +553,12 @@
                 document.getElementById('historyContent').innerHTML = '';
                 document.getElementById('historyContent').appendChild(table);
 
+                // Handle pagination metadata
+                if (result.pagination) {
+                    totalPages = result.pagination.total_pages;
+                    renderPagination();
+                }
+
             } catch (error) {
                 console.error('Failed to load uploads:', error);
                 document.getElementById('historyContent').innerHTML = `
@@ -545,6 +595,35 @@
                 'rejected': '#ef4444'
             };
             return colorMap[status] || '#737373';
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'flex';
+
+            let html = `
+                <button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>
+            `;
+
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            html += `
+                <button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadUploadHistory();
         }
 
         // Load history on page load

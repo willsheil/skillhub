@@ -115,6 +115,8 @@ app = FastAPI(title="Skill Registry", version="1.0.0", lifespan=lifespan)
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
+# Import modular routers
+
 # Static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -1293,37 +1295,6 @@ async def api_user_downloads(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch downloads: {str(e)}"
-        )
-
-
-@app.get("/api/user/uploads")
-async def api_user_uploads(
-    request: Request,
-    _: bool = Depends(require_auth)
-):
-    """Get the current user's upload history."""
-    try:
-        user_id = request.session.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated"
-            )
-
-        uploads = get_user_uploads(user_id)
-
-        return {
-            "success": True,
-            "data": uploads,
-            "count": len(uploads)
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch uploads: {str(e)}"
         )
 
 
@@ -3176,6 +3147,52 @@ async def api_get_gitea_tasks(
         )
 
 
+# ==================== User Uploads Pagination Endpoint ====================
+
+@app.get("/api/user/uploads")
+async def api_user_uploads_paginated(
+    request: Request,
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
+    _: bool = Depends(require_auth)
+):
+    """Get the current user's upload history with pagination."""
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        offset = (page - 1) * per_page
+        result = get_user_uploads(user_id, limit=per_page, offset=offset)
+        uploads = result["uploads"]
+        total = result["total"]
+        total_pages = (total + per_page - 1) // per_page
+
+        return {
+            "success": True,
+            "data": {
+                "uploads": uploads,
+                "total": total
+            },
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch uploads: {str(e)}"
+        )
+
 # ==================== User Management API Endpoints ====================
 
 @app.get("/api/admin/users")
@@ -3577,6 +3594,3 @@ async def gitea_tasks_page(request: Request):
     })
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=28000)

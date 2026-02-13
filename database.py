@@ -547,7 +547,7 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT id, employee_id, api_key, role, created_at, last_login, status
+            SELECT id, employee_id, api_key, role, created_at, last_login
             FROM users
             WHERE employee_id = %s AND api_key = %s
             """,
@@ -555,17 +555,13 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
         ).fetchone()
 
         if row:
-            # Check if user is disabled
-            if row.get("status") == "disabled":
-                return None
             return {
                 "id": row["id"],
                 "employee_id": row["employee_id"],
                 "api_key": row["api_key"],
                 "role": row["role"],
                 "created_at": row["created_at"],
-                "last_login": row["last_login"],
-                "status": row["status"]
+                "last_login": row["last_login"]
             }
         return None
 
@@ -800,16 +796,30 @@ def update_skill_status(
         conn.commit()
 
 
-def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
-    """Get all uploads by a specific user.
+def get_user_uploads(user_id: int, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+    """Get all uploads by a specific user with pagination.
 
     Args:
         user_id: The user's ID
+        limit: Maximum number of records to return
+        offset: Number of records to skip for pagination
 
     Returns:
-        List of skill dictionaries uploaded by the user
+        Dictionary containing:
+        - uploads: List of skill dictionaries uploaded by the user
+        - total: Total count of uploads
+        - limit: The limit used
+        - offset: The offset used
     """
     with get_connection() as conn:
+        # Get total count
+        total_row = conn.execute(
+            "SELECT COUNT(*) as total FROM skills WHERE uploader_id = %s",
+            (user_id,)
+        ).fetchone()
+        total = total_row["total"] if total_row else 0
+
+        # Get paginated results
         rows = conn.execute(
             """
             SELECT
@@ -826,13 +836,15 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
                 review_comment
             FROM skills
             WHERE uploader_id = %s
+            ORDER BY uploaded_at DESC
+            LIMIT %s OFFSET %s
             """,
-            (user_id,)
+            (user_id, limit, offset)
         ).fetchall()
 
-        results = []
+        uploads = []
         for row in rows:
-            results.append({
+            uploads.append({
                 "id": row["id"],
                 "skill_name": row["skill_name"],
                 "version": row["version"],
@@ -846,7 +858,12 @@ def get_user_uploads(user_id: int) -> List[Dict[str, Any]]:
                 "review_comment": row["review_comment"]
             })
 
-        return results
+        return {
+            "uploads": uploads,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
 
 
 def get_user_downloads(
