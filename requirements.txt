@@ -10,3 +10,7 @@ pytest
 requests
 pymysql
 itsdangerous
+# ORM Migration
+tortoise-orm
+aerich
+fastapi-tortoise
