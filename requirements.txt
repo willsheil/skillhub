@@ -1,6 +1,6 @@
 python-dotenv
 fastapi
-uvicorn
+uvicorn[standard]
 jinja2
 starlette
 python-multipart
@@ -11,7 +11,7 @@ requests
 pymysql
 itsdangerous
 # ORM Migration
-tortoise-orm
+tortoise[asyncmy]
 aerich
 # ORM + FastAPI 集成
 fastapi-tortoise-crud
