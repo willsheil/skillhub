@@ -1,5 +1,7 @@
 """
 环境诊断脚本
+
+检查当前的 Python 环境和依赖状态
 """
 
 import sys
@@ -30,10 +32,12 @@ def check_python():
     # Python 版本
     version = sys.version_info
     print(f"Python 版本: {version.major}.{version.minor}.{version.micro}")
-    print(f"Python 路径: {sys.executable}")
     print(f"Python 可执行文件: {sys.executable}")
 
-    # 检查当前目录
+    # Python 路径
+    print(f"Python 路径: {sys.executable}")
+
+    # Python 当前目录
     import os
     cwd = os.getcwd()
     print(f"当前目录: {cwd}")
@@ -44,9 +48,9 @@ def check_python():
         with open(req_file, "r", encoding="utf-8") as f:
             content = f.read()
         print(f"\nrequirements.txt 存在:")
-        print(content[:500] if len(content) > 500 else content)
+        print(f"{content[:500]}")
     else:
-        print("错误: 无法读取 requirements.txt")
+        print("错误: requirements.txt 不存在")
 
     # 检查已安装的包
     installed_packages = [
@@ -68,6 +72,7 @@ def check_python():
         "fnmatch"
     ]
 
+    print("\n已安装的包:")
     for package in installed_packages:
         try:
             __import__(package)
@@ -76,30 +81,43 @@ def check_python():
         except ImportError:
             print(f"  ✗ {package} (未安装)")
 
-    # 检查 tortoise 导入
-    print(f"\nTortoise ORM 检查:")
+    # 检查 Tortoise ORM
+    print("\nTortoise ORM 检查:")
     try:
         import tortoise
         print(f"  ✓ tortoise 已安装")
-        print(f"  tortoise 版本: {tortoise.__version__}")
+        print(f"  版本: {tortoise.__version__}")
     except ImportError:
         print(f"  ✗ tortoise 未安装")
 
-    # 检查连接模块
+    # 检查 Tortoise connections 模块
     try:
         from tortoise import connections
         print(f"  ✓ connections 模块可用")
-        except ImportError:
-            print(f"  ✗ connections 模块不可用")
+    except ImportError:
+        print(f"  ✗ connections 模块不可用")
 
-    # 检查 fastapi 集成
+    # 检查 fastapi-tortoise-crud
     try:
-        from tortoise.contrib.fastapi import register_tortoise
-        print(f"  ✓ register_tortoise 可用")
-        except ImportError:
-            print(f"  ✗ register_tortoise 不可用")
+        from fastapi_tortoise
+        print(f"  ✓ fastapi-tortoise-crud 已安装")
+    except ImportError:
+        print(f"  ✗ fastapi-tortoise-crud 未安装")
 
-    print(f"\n" + "=" * 60)
+    # 检查 db_config.py 中的导入
+    try:
+        from core import db_config
+        if os.path.exists("core/db_config.py"):
+            with open("core/db_config.py", "r", encoding="utf-8") as f:
+                content = f.read()
+                if "from tortoise import connections" in content:
+                    print(f"  ✓ db_config.py 已正确导入 connections")
+                else:
+                    print(f"  ✗ db_config.py 导入有问题")
+
+    print("\n" + "=" * 60)
     print("诊断完成！")
-    print(f"\n如果 tortoise 导入正常，请重新运行: python main.py")
-    print(f"\n如果仍有错误，请将以上输出发送给开发者")
+    print("=" * 60)
+    print("\n如果 Tortoise 导入正常，请重新运行: python main.py")
+    print("\n如果仍有错误，请将完整输出发送给开发者")
+    print("=" * 60)
