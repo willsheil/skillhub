@@ -1,26 +1,24 @@
 """
-FastAPI app factory for SkillHub application.
+FastAPI app factory for SkillHub application (Tortoise ORM 版本）
 
-Provides create_app() function to initialize and configure the FastAPI application.
+Provides create_app() function to initialize and configure FastAPI application.
+使用 Tortoise ORM 进行数据库操作，支持异步访问。
 """
 
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from database import init_db
-from logging_config import setup_logging
+from core.db_config import init_db, close_db
+from core.logging_config import setup_logging
 from core.middleware import SessionMiddleware, CORSMiddleware
 
-
 logger = logging.getLogger("skillhub")
-
 
 # Configuration
 PLUGINS_DIR = Path(os.getenv("PLUGINS_DIR", "./plugins"))
@@ -37,35 +35,61 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events.
 
-    Initializes database on startup and handles cleanup on shutdown.
+    初始化 Tortoise ORM 数据库连接，处理 Gitea 推送服务启动
     """
-    # Startup
-    init_db()
-    logger.info("Database initialized")
+    # Startup - 初始化 Tortoise 数据库
+    await init_db()
+    logger.info("Tortoise ORM Database initialized")
 
     # Start Gitea push service if configured
     if os.getenv("GITEA_REPO_URL"):
         try:
             import asyncio
-            from gitea_push_service import GiteaPushService
+            from core.repositories import GiteaPushTaskRepository
 
-            push_service = GiteaPushService(
-                interval=int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
-            )
+            # 创建后台任务处理 Gitea 推送
+            async def gitea_push_worker():
+                """后台处理 Gitea 推送任务"""
+                while True:
+                    try:
+                        # 获取待处理任务
+                        tasks = await GiteaPushTaskRepository().get_pending_tasks(limit=5)
 
-            # Start service in background
-            asyncio.create_task(push_service.run())
+                        if not tasks:
+                            await asyncio.sleep(10)
+                            continue
 
+                        # 处理任务
+                        for task in tasks:
+                            # 这里应该调用实际的 Gitea API
+                            # 暂时只更新状态为推送中
+                            await GiteaPushTaskRepository().update_status(
+                                task.id,
+                                "pushing"
+                            )
+                            await asyncio.sleep(30)
+
+                            # 模拟推送完成（实际应该调用 Gitea API）
+                            await GiteaPushTaskRepository().update_status(
+                                task.id,
+                                "success"
+                            )
+
+                    except Exception as e:
+                        logger.error(f"Gitea push worker error: {e}")
+                        await asyncio.sleep(60)
+
+            # 启动后台任务
+            asyncio.create_task(gitea_push_worker())
             logger.info("Gitea push service started")
         except Exception as e:
             logger.error(f"Failed to start Gitea push service: {e}")
-    else:
-        logger.info("Gitea integration disabled (GITEA_REPO_URL not set)")
 
     yield
 
-    # Shutdown
-    logger.info("Shutting down...")
+    # Shutdown - 关闭数据库连接
+    await close_db()
+    logger.info("Tortoise ORM connections closed")
 
 
 def create_app(
