@@ -3,7 +3,7 @@ Tortoise ORM 数据库配置和连接管理
 """
 
 import os
-from tortoise import connections
+from tortoise.contrib.fastapi import connections
 from tortoise.contrib.fastapi import register_tortoise
 from contextlib import asynccontextmanager
 
