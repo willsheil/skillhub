@@ -110,11 +110,51 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
 
 
-app = FastAPI(title="Skill Registry", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="SkillHub API",
+    description="Claude Code 技能插件管理系统 API",
+    version="1.0.0",
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
+    lifespan=lifespan
+)
 
 # Register external API v1 router
 from api.v1.routes import router as api_v1_router
 app.include_router(api_v1_router)
+
+# 配置 API Key 安全方案
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="SkillHub External API",
+        version="1.0.0",
+        routes=app.routes,
+    )
+
+    # 添加安全方案
+    openapi_schema["components"]["securitySchemes"] = {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+            "description": "请输入您的 API Key"
+        }
+    }
+
+    # 全局应用安全方案
+    for path in openapi_schema["paths"].values():
+        for operation in path.values():
+            operation["security"] = [{"ApiKeyAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
