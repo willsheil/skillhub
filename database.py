@@ -6,6 +6,7 @@ import os
 import pymysql
 import json
 import logging
+import secrets
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
@@ -2316,3 +2317,102 @@ def init_external_api_tables():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
         conn.commit()
+
+
+def create_api_key(user_id: int, name: str = None, rate_limit: int = 100) -> Optional[Dict[str, Any]]:
+    """创建新的 API Key"""
+    api_key = f"sk_{secrets.token_urlsafe(32)}"
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO external_api_keys (user_id, api_key, name, rate_limit)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, api_key, name, rate_limit)
+            )
+            conn.commit()
+
+            return {
+                'id': cursor.lastrowid,
+                'api_key': api_key,
+                'user_id': user_id,
+                'name': name,
+                'rate_limit': rate_limit,
+                'is_active': 1
+            }
+    except Exception as e:
+        logger.error(f"创建 API Key 失败: {e}")
+        return None
+
+
+def verify_api_key(api_key: str) -> Optional[Dict[str, Any]]:
+    """验证 API Key 并返回信息"""
+    with get_connection() as conn:
+        result = conn.execute(
+            """
+            SELECT id, user_id, api_key, name, is_active, rate_limit
+            FROM external_api_keys
+            WHERE api_key = %s AND is_active = 1
+            """,
+            (api_key,)
+        ).fetchone()
+
+        if result:
+            # 更新最后使用时间
+            conn.execute(
+                "UPDATE external_api_keys SET last_used_at = NOW() WHERE id = %s",
+                (result['id'],)
+            )
+            conn.commit()
+            return dict(result)
+
+        return None
+
+
+def get_api_key_info(api_key: str) -> Optional[Dict[str, Any]]:
+    """获取 API Key 详细信息"""
+    with get_connection() as conn:
+        result = conn.execute(
+            """
+            SELECT * FROM external_api_keys WHERE api_key = %s
+            """,
+            (api_key,)
+        ).fetchone()
+
+        return dict(result) if result else None
+
+
+def deactivate_api_key(api_key_id: int) -> bool:
+    """停用 API Key"""
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE external_api_keys SET is_active = 0 WHERE id = %s",
+                (api_key_id,)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"停用 API Key 失败: {e}")
+        return False
+
+
+def log_api_call(api_key_id: int, endpoint: str, method: str,
+                 params: str = None, ip_address: str = None,
+                 status_code: int = None, response_time_ms: int = None):
+    """记录 API 调用日志"""
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO api_call_logs
+                (api_key_id, endpoint, method, params, ip_address, status_code, response_time_ms)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (api_key_id, endpoint, method, params, ip_address, status_code, response_time_ms)
+            )
+            conn.commit()
+    except Exception as e:
+        logger.error(f"记录 API 调用日志失败: {e}")
