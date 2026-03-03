@@ -262,6 +262,7 @@ def init_db():
     migrate_gitea_push_tasks()
     migrate_add_source_type_to_skills()
     migrate_add_user_management_features()
+    migrate_add_skill_description_and_metadata()
 
 
 def migrate_gitea_push_tasks():
@@ -1426,6 +1427,43 @@ def migrate_add_user_management_features():
         )
 
         logger.info("Migration: user_management_features migration completed")
+
+
+def migrate_add_skill_description_and_metadata():
+    """Migrate database to add description and metadata columns to skills table.
+
+    Adds columns:
+    - skills.description (TEXT, nullable)
+    - skills.metadata (TEXT, nullable, JSON format)
+
+    These columns are needed for the external API to provide skill details.
+    """
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+
+        # Check existing columns
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        # Add description column to skills table
+        if "description" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN description TEXT")
+            conn.commit()
+            logger.info("Migration: Added description column to skills table")
+
+        # Add metadata column to skills table
+        if "metadata" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN metadata TEXT")
+            conn.commit()
+            logger.info("Migration: Added metadata column to skills table")
+
+        # Add created_at column if not exists (for ordering)
+        if "created_at" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            conn.commit()
+            logger.info("Migration: Added created_at column to skills table")
+
+        logger.info("Migration: skill_description_and_metadata migration completed")
 
 
 def create_notification(
