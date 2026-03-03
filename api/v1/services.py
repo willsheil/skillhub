@@ -78,6 +78,16 @@ def get_skills_list(
         except:
             metadata = {}
 
+        # 确保必需字段存在，提供默认值
+        metadata = {
+            "version": metadata.get("version", row['version']),
+            "author": metadata.get("author", "Unknown"),
+            "tags": metadata.get("tags", []),
+            "category": metadata.get("category"),
+            "license": metadata.get("license"),
+            "compatibility": metadata.get("compatibility")
+        }
+
         # 获取所有版本
         versions = _get_skill_versions(row['skill_name'])
 
@@ -148,6 +158,16 @@ def get_skill_detail(skill_name: str) -> Optional[Dict[str, Any]]:
             metadata = json.loads(row['metadata']) if row['metadata'] else {}
         except:
             metadata = {}
+
+        # 确保必需字段存在，提供默认值
+        metadata = {
+            "version": metadata.get("version", row['version']),
+            "author": metadata.get("author", "Unknown"),
+            "tags": metadata.get("tags", []),
+            "category": metadata.get("category"),
+            "license": metadata.get("license"),
+            "compatibility": metadata.get("compatibility")
+        }
 
         # 获取所有版本详情
         versions = _get_skill_version_details(skill_name)

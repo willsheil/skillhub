@@ -112,6 +112,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Skill Registry", version="1.0.0", lifespan=lifespan)
 
+# Register external API v1 router
+from api.v1.routes import router as api_v1_router
+app.include_router(api_v1_router)
+
 # Add session middleware
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 

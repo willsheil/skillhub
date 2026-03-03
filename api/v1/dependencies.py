@@ -5,7 +5,7 @@ from database import verify_api_key, get_api_key_info
 # 速率限制内存存储（生产环境建议使用 Redis）
 _rate_limit_store = {}
 
-def verify_api_key_header(x_api_key: str = Header(..., alias="X-API-Key")) -> dict:
+def verify_api_key_header(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> dict:
     """验证 API Key 依赖注入
 
     Raises:
