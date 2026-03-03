@@ -2276,3 +2276,43 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
             "success_count": success_count,
             "failed_ids": failed_ids
         }
+
+
+def init_external_api_tables():
+    """初始化外部 API 相关的数据库表"""
+    with get_connection() as conn:
+        # 创建 external_api_keys 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS external_api_keys (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                api_key VARCHAR(64) UNIQUE NOT NULL,
+                name VARCHAR(100),
+                is_active TINYINT(1) DEFAULT 1,
+                rate_limit INT DEFAULT 100,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_used_at TIMESTAMP NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                INDEX idx_api_key (api_key),
+                INDEX idx_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        # 创建 api_call_logs 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_call_logs (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                api_key_id INT NOT NULL,
+                endpoint VARCHAR(255) NOT NULL,
+                method VARCHAR(10) NOT NULL,
+                params TEXT,
+                ip_address VARCHAR(45),
+                status_code INT,
+                response_time_ms INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (api_key_id) REFERENCES external_api_keys(id),
+                INDEX idx_api_key_time (api_key_id, created_at),
+                INDEX idx_endpoint (endpoint)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        conn.commit()
