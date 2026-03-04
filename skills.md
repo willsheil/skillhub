@@ -250,5 +250,5 @@ Use the [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills
 ```bash  theme={null}
 skills-ref validate ./my-skill
 ```
-
+/plugin marketplace add alwinpaul1/claude-hud-enhanced
 This checks that your `SKILL.md` frontmatter is valid and follows all naming conventions.

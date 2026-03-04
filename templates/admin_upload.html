@@ -912,11 +912,44 @@
             });
         });
 
-        // Form validation
-        document.getElementById('single-form').addEventListener('submit', function(e) {
+        // Form validation and AJAX submission
+        document.getElementById('single-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
             if (!singleFile.files.length) {
-                e.preventDefault();
-                alert('请选择一个 ZIP 文件');
+                showAlert('请选择一个 ZIP 文件', 'error');
+                return;
+            }
+
+            const formData = new FormData(this);
+            const submitBtn = document.getElementById('single-submit');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>⏳</span><span>上传中...</span>';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(`成功上传 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    clearSingleFile();
+                    loadUploadHistory();
+                } else if (result.error === 'MISSING_FIELDS') {
+                    // 显示补充信息对话框
+                    showMissingFieldsModal(result.data);
+                } else {
+                    showAlert(result.error || '上传失败', 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAlert('上传失败: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>⬆️</span><span>上传 Skill</span>';
             }
         });
 
@@ -1029,6 +1062,175 @@
                 'rejected': '#ef4444'
             };
             return colorMap[status] || '#737373';
+        }
+
+        // Alert functions
+        function showAlert(message, type = 'info') {
+            // Remove existing alerts
+            const existingAlerts = document.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+
+            // Create new alert
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <span class="alert-icon">${type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ️'}</span>
+                <span>${message}</span>
+            `;
+
+            // Insert after the header
+            const header = document.querySelector('.header');
+            header.after(alert);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Missing fields modal
+        let currentTempFileId = null;
+        let currentSourceType = 'opensource';
+
+        function showMissingFieldsModal(data) {
+            currentTempFileId = data.temp_file_id;
+            currentSourceType = document.querySelector('#single-file-list .source-type-select')?.value || 'opensource';
+
+            const missingFields = data.missing_fields || [];
+            const metadata = data.metadata || {};
+
+            // Check what fields are missing
+            const needsVersion = missingFields.includes('metadata.version');
+            const needsAuthor = missingFields.includes('metadata.author');
+
+            // Build form HTML
+            let formHTML = `
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #737373; margin-bottom: 16px;">
+                        ZIP 文件中缺少以下必填字段，请补充：
+                    </p>
+                    <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border: 1px solid #fbbf24; margin-bottom: 16px;">
+                        <div style="font-weight: 600; color: #92400e; margin-bottom: 8px;">缺失字段：</div>
+                        <div style="color: #78350f;">
+                            ${needsVersion ? '<div>• metadata.version (版本号，如: 1.0.0)</div>' : ''}
+                            ${needsAuthor ? '<div>• metadata.author (作者ID，如: w12345678)</div>' : ''}
+                        </div>
+                    </div>
+                </div>
+                <form id="metadata-form">
+                    ${needsVersion ? `
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #171717;">
+                                版本号 <span style="color: #ef4444;">*</span>
+                            </label>
+                            <input type="text" id="input-version" placeholder="1.0.0" required
+                                style="width: 100%; padding: 12px; border: 2px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                            <div style="font-size: 12px; color: #737373; margin-top: 4px;">格式: 主版本.次版本.修订号 (如: 1.0.0)</div>
+                        </div>
+                    ` : ''}
+                    ${needsAuthor ? `
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 6px; color: #171717;">
+                                作者ID <span style="color: #ef4444;">*</span>
+                            </label>
+                            <input type="text" id="input-author" placeholder="w12345678" required
+                                style="width: 100%; padding: 12px; border: 2px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                            <div style="font-size: 12px; color: #737373; margin-top: 4px;">格式: 小写字母 + 8位数字 (如: w12345678)</div>
+                        </div>
+                    ` : ''}
+                    ${!needsVersion ? `<input type="hidden" id="input-version" value="${metadata.version || ''}">` : ''}
+                    ${!needsAuthor ? `<input type="hidden" id="input-author" value="${metadata.author || ''}">` : ''}
+                </form>
+            `;
+
+            // Create modal
+            const modalHTML = `
+                <div id="metadata-modal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
+                    <div style="background: white; border: 2px solid #171717; border-radius: 16px; max-width: 480px; width: 100%; max-height: 90vh; overflow-y: auto;">
+                        <div style="padding: 24px;">
+                            <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 16px; color: #171717;">补充信息</h2>
+                            ${formHTML}
+                            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                                <button type="button" onclick="closeMetadataModal()"
+                                    style="flex: 1; padding: 12px; border: 2px solid #e5e5e5; background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                                    取消
+                                </button>
+                                <button type="button" onclick="submitMissingFields()"
+                                    style="flex: 1; padding: 12px; background: #f97316; color: white; border: 2px solid #171717; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                                    确认并上传
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to page
+            const modalContainer = document.createElement('div');
+            modalContainer.innerHTML = modalHTML;
+            document.body.appendChild(modalContainer);
+        }
+
+        function closeMetadataModal() {
+            const modal = document.getElementById('metadata-modal');
+            if (modal) {
+                modal.parentElement.remove();
+            }
+            currentTempFileId = null;
+        }
+
+        async function submitMissingFields() {
+            const versionInput = document.getElementById('input-version');
+            const authorInput = document.getElementById('input-author');
+            const version = versionInput ? versionInput.value : '';
+            const author = authorInput ? authorInput.value : '';
+
+            // Validation
+            if (!version) {
+                alert('请输入版本号');
+                return;
+            }
+            if (!author) {
+                alert('请输入作者ID');
+                return;
+            }
+
+            // Author format validation
+            if (!/^[a-z]\d{8}$/.test(author)) {
+                alert('作者ID格式错误：必须是小写字母 + 8位数字（如：w12345678）');
+                return;
+            }
+
+            // Disable buttons
+            const buttons = document.querySelectorAll('#metadata-modal button');
+            buttons.forEach(btn => btn.disabled = true);
+
+            try {
+                const formData = new FormData();
+                formData.append('temp_file_id', currentTempFileId);
+                formData.append('version', version);
+                formData.append('author', author);
+                formData.append('source_type', currentSourceType);
+
+                const response = await fetch('/api/upload/complete', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeMetadataModal();
+                    showAlert(`成功上传 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    clearSingleFile();
+                    loadUploadHistory();
+                } else {
+                    alert(result.error || '上传失败');
+                }
+            } catch (error) {
+                console.error('Complete upload error:', error);
+                alert('上传失败: ' + error.message);
+            } finally {
+                buttons.forEach(btn => btn.disabled = false);
+            }
         }
 
         // Load history on page load
