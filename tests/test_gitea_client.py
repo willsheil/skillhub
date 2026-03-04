@@ -31,8 +31,8 @@ def test_gitea_client_initialization(monkeypatch):
 
     assert client.repo_url == "https://localhost:3000/test/repo.git"
     assert client.token == "test_token_123"
-    assert client.temp_dir.exists()
-    assert client.temp_dir.name == "gitea_sync"
+    assert client.temp_base.exists()
+    assert client.temp_base.name == "gitea_sync"
     # New: check git config attributes
     assert client.git_user_name == "Skill Registry"
     assert client.git_user_email == "registry@local"
@@ -78,7 +78,7 @@ def test_gitea_client_temp_dir_creation(monkeypatch, tmp_path):
     client = GiteaClient()
 
     # Temp dir should be created
-    assert client.temp_dir.exists()
+    assert client.temp_base.exists()
 
 
 def test_exception_hierarchy():
@@ -135,7 +135,7 @@ def test_clone_or_pull_repo(monkeypatch):
 
     # Should not raise
     repo_path = client.clone_or_pull_repo()
-    assert repo_path == client.temp_dir / "repo"
+    assert repo_path == client.temp_base / "repo"
 
 
 def test_ensure_git_config(monkeypatch, tmp_path):

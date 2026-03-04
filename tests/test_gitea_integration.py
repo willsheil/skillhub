@@ -1,14 +1,44 @@
 import pytest
 from gitea_integration import create_push_task
-from database import get_connection
+from database import get_connection, init_db
+
+
+@pytest.fixture(autouse=True)
+def setup_database():
+    """Setup test database before each test."""
+    init_db()
+    # Clean up any existing test data
+    with get_connection() as conn:
+        conn.execute("DELETE FROM gitea_push_tasks WHERE skill_name LIKE 'test-gitea-%'")
+        conn.execute("DELETE FROM skills WHERE skill_name LIKE 'test-gitea-%'")
+        conn.execute("DELETE FROM users WHERE employee_id LIKE 'test-gitea-%'")
+        conn.commit()
+    yield
+    # Cleanup after test
+    with get_connection() as conn:
+        conn.execute("DELETE FROM gitea_push_tasks WHERE skill_name LIKE 'test-gitea-%'")
+        conn.execute("DELETE FROM skills WHERE skill_name LIKE 'test-gitea-%'")
+        conn.execute("DELETE FROM users WHERE employee_id LIKE 'test-gitea-%'")
+        conn.commit()
+
 
 def test_create_push_task():
-    # Create a test skill first
+    # Create a test user first
+    with get_connection() as conn:
+        cursor = conn.execute("""
+            INSERT INTO users (employee_id, api_key, role)
+            VALUES (%s, %s, %s)
+        """, ("test-gitea-user", "test-key", "user"))
+        user_id = cursor.lastrowid
+        conn.commit()
+
+    # Create a test skill with unique name
+    skill_name = "test-gitea-push-skill"
     with get_connection() as conn:
         cursor = conn.execute("""
             INSERT INTO skills (skill_name, version, filename, uploader_id, status)
-            VALUES ('test-skill', '1.0.0', 'test.zip', 1, 'approved')
-        """)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (skill_name, '1.0.0', 'test.zip', user_id, 'approved'))
         skill_id = cursor.lastrowid
         conn.commit()
 
@@ -25,6 +55,6 @@ def test_create_push_task():
         """, (task_id,)).fetchone()
 
         assert row is not None
-        assert row['skill_name'] == 'test-skill'
+        assert row['skill_name'] == skill_name
         assert row['version'] == '1.0.0'
         assert row['status'] == 'pending'

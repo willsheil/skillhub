@@ -173,8 +173,14 @@ def get_skill_detail(skill_name: str) -> Optional[Dict[str, Any]]:
             "description": row['description'] or "",
             "metadata": metadata,
             "source_type": row['source_type'],
-            "version": row['version'],
-            "filename": row['filename']
+            "versions": [
+                {
+                    "version": row['version'],
+                    "filename": row['filename'],
+                    "is_default": True,
+                    "download_url": f"/api/v1/skills/{skill_name}/download"
+                }
+            ]
         }
 
 def _get_skill_version_details(skill_name: str) -> List[Dict[str, Any]]:

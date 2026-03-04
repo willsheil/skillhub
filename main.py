@@ -1898,6 +1898,7 @@ async def upload_plugin(
     request: Request,
     file: UploadFile = File(...),
     source_type: str = Form(default="opensource"),
+    overwrite: bool = Form(default=False),
     _: bool = Depends(require_auth)
 ):
     """Upload a single skill ZIP file (requires auth).
@@ -2015,17 +2016,63 @@ async def upload_plugin(
                     status_code=status.HTTP_403_FORBIDDEN,
                     content={"success": False, "error": error_msg}
                 )
-            # Skill exists and belongs to user, return special response for frontend to confirm
-            return JSONResponse(
-                status_code=status.HTTP_409_CONFLICT,
-                content={
-                    "success": False,
-                    "error": "SKILL_EXISTS",
-                    "message": f"技能 {skill_name} 已存在，是否覆盖更新？",
-                    "skill_name": skill_name,
-                    "existing_version": existing_skill["version"]
-                }
-            )
+            # Skill exists and belongs to user
+            # If overwrite flag is True, proceed with update; otherwise ask for confirmation
+            if not overwrite:
+                return JSONResponse(
+                    status_code=status.HTTP_409_CONFLICT,
+                    content={
+                        "success": False,
+                        "error": "SKILL_EXISTS",
+                        "message": f"技能 {skill_name} 已存在（当前版本: {existing_skill['version']}），是否覆盖更新？",
+                        "skill_name": skill_name,
+                        "existing_version": existing_skill["version"]
+                    }
+                )
+            # If overwrite is True, update the existing record instead of creating a new one
+            # Delete the old pending file if exists
+            old_filename = f"{skill_name}-{existing_skill['version']}.zip"
+            old_pending_path = PENDING_DIR / old_filename
+            if old_pending_path.exists():
+                old_pending_path.unlink()
+
+            # Update existing record with new version and file
+            from database import get_connection
+            with get_connection() as conn:
+                conn.execute(
+                    """
+                    UPDATE skills
+                    SET version = %s, filename = %s, status = 'pending',
+                        uploader_id = %s, source_type = %s
+                    WHERE id = %s
+                    """,
+                    (version, target_filename, user_id, source_type, existing_skill['id'])
+                )
+                conn.commit()
+            skill_id = existing_skill['id']
+
+            # Copy file to pending location
+            shutil.copy(temp_zip, target_path)
+
+            # Return success response
+            success_msg = f"成功更新 {result['name']}@{result['version']}，等待管理员审核"
+
+            if "admin" in request.headers.get("referer", ""):
+                return templates.TemplateResponse("admin_upload.html", {
+                    "request": request,
+                    "success": success_msg,
+                    "error": None
+                })
+            else:
+                return JSONResponse(
+                    content={
+                        "success": True,
+                        "message": success_msg,
+                        "skill_name": result['name'],
+                        "version": result['version'],
+                        "skill_id": skill_id
+                    }
+                )
 
         # Copy file to pending location
         shutil.copy(temp_zip, target_path)

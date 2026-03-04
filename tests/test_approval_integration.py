@@ -9,13 +9,28 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+from starlette.middleware.sessions import SessionMiddleware
+from main import app, get_current_user, require_auth, require_admin
 from database import get_connection, init_db, create_user, get_user_by_credentials
 import tempfile
 import zipfile
 import io
 
-client = TestClient(app)
+# Add SessionMiddleware for tests
+app.add_middleware(SessionMiddleware, secret_key="test-secret-key")
+
+# Override authentication for tests - completely skip checks
+async def override_require_admin_skip():
+    return True
+
+app.dependency_overrides[require_admin] = override_require_admin_skip
+
+# Use TestClient with session context
+def make_client_with_session():
+    """Create a TestClient with admin session."""
+    return TestClient(app)
+
+client = make_client_with_session()
 
 
 def create_test_skill_zip(skill_name: str = "test-skill", version: str = "1.0.0") -> bytes:
@@ -60,24 +75,44 @@ def setup_database():
     with get_connection() as conn:
         conn.execute("DELETE FROM gitea_push_tasks WHERE skill_name LIKE 'test-%'")
         conn.execute("DELETE FROM skills WHERE skill_name LIKE 'test-%'")
-        conn.execute("DELETE FROM users WHERE username LIKE 'test-%'")
+        conn.execute("DELETE FROM users WHERE employee_id LIKE 'test-%'")
         conn.commit()
     yield
     # Cleanup after test
     with get_connection() as conn:
         conn.execute("DELETE FROM gitea_push_tasks WHERE skill_name LIKE 'test-%'")
         conn.execute("DELETE FROM skills WHERE skill_name LIKE 'test-%'")
-        conn.execute("DELETE FROM users WHERE username LIKE 'test-%'")
+        conn.execute("DELETE FROM users WHERE employee_id LIKE 'test-%'")
         conn.commit()
 
 
-def test_approval_creates_push_task():
+def test_approval_creates_push_task(monkeypatch):
     """Test that approving a skill creates a Gitea push task."""
+    # Mock request.session to return test user data
+    class MockSession(dict):
+        def get(self, key, default=None):
+            if key == "user_id":
+                return 1
+            elif key == "role":
+                return "admin"
+            return super().get(key, default)
+
+    def mock_request():
+        req = type('MockRequest', (), {})()
+        req.session = MockSession()
+        return req
+
+    # Patch main.py to use mock session
+    import main
+    monkeypatch.setattr(main, "Request", lambda: mock_request())
+
     # Create test user
     with get_connection() as conn:
+        # Clean up first to avoid duplicates
+        conn.execute("DELETE FROM users WHERE employee_id = 'test_approver'")
         cursor = conn.execute("""
-            INSERT INTO users (username, password_hash, role)
-            VALUES ('test_approver', 'hash', 'admin')
+            INSERT INTO users (employee_id, api_key, role)
+            VALUES ('test_approver', 'key_test_approver', 'admin')
         """)
         uploader_id = cursor.lastrowid
         conn.commit()
@@ -117,16 +152,17 @@ def test_approval_creates_push_task():
         assert task["status"] == "pending"
 
 
-def test_approval_non_blocking_on_gitea_error(monitored_io):
+def test_approval_non_blocking_on_gitea_error():
     """Test that approval succeeds even if Gitea push task creation fails."""
     # This test verifies that the approval workflow is resilient to Gitea integration failures
     # by using a mock that simulates an error in create_push_task
 
     # Create test user
     with get_connection() as conn:
+        conn.execute("DELETE FROM users WHERE employee_id = 'test_approver2'")
         cursor = conn.execute("""
-            INSERT INTO users (username, password_hash, role)
-            VALUES ('test_approver2', 'hash', 'admin')
+            INSERT INTO users (employee_id, api_key, role)
+            VALUES ('test_approver2', 'key_test_approver2', 'admin')
         """)
         uploader_id = cursor.lastrowid
         conn.commit()
@@ -177,9 +213,10 @@ def test_rejection_does_not_create_push_task():
     """Test that rejecting a skill does NOT create a Gitea push task."""
     # Create test user
     with get_connection() as conn:
+        conn.execute("DELETE FROM users WHERE employee_id = 'test_rejecter'")
         cursor = conn.execute("""
-            INSERT INTO users (username, password_hash, role)
-            VALUES ('test_rejecter', 'hash', 'admin')
+            INSERT INTO users (employee_id, api_key, role)
+            VALUES ('test_rejecter', 'key_test_rejecter', 'admin')
         """)
         uploader_id = cursor.lastrowid
         conn.commit()

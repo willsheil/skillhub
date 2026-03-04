@@ -10,12 +10,23 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+from main import app, get_current_user, require_auth
 from database import get_connection, init_db
 import tempfile
 import zipfile
 import io
 
+# 覆盖认证依赖
+def override_get_current_user(request):
+    return {"id": 1, "employee_id": "test-batch-user", "role": "user"}
+
+def override_require_auth(request):
+    # 设置测试用户 session
+    request.session["user_id"] = 1
+    return True
+
+app.dependency_overrides[get_current_user] = override_get_current_user
+app.dependency_overrides[require_auth] = override_require_auth
 client = TestClient(app)
 
 

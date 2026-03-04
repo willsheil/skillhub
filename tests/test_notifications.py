@@ -11,10 +11,21 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from main import app
+from main import app, get_current_user, require_auth
 from database import get_connection, init_db
 import datetime
 
+# 覆盖认证依赖
+def override_get_current_user(request):
+    return {"id": 1, "employee_id": "test-notify-user", "role": "user"}
+
+def override_require_auth(request):
+    # 设置测试用户 session
+    request.session["user_id"] = 1
+    return True
+
+app.dependency_overrides[get_current_user] = override_get_current_user
+app.dependency_overrides[require_auth] = override_require_auth
 client = TestClient(app)
 
 
@@ -113,8 +124,8 @@ def test_notification_on_approval():
 def test_notification_on_rejection():
     """Test that rejection creates a notification for the uploader."""
     # Create uploader
-    uploader_id = create_test_user("test-notify-reject-uploader", "user")
-    create_test_user("test-notify-reject-admin", "admin")  # For admin check
+    uploader_id = create_test_user("test-notify-r-uploader", "user")
+    create_test_user("test-notify-r-admin", "admin")  # For admin check
 
     # Create a pending skill
     skill_id = create_test_skill(uploader_id, "test-notify-rejection")
