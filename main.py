@@ -911,6 +911,27 @@ async def admin_users_page(request: Request):
     })
 
 
+@app.get("/admin/api-keys", response_class=HTMLResponse)
+async def admin_api_keys_page(request: Request):
+    """Display API Keys management page (requires admin)."""
+    # Get current user
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Check admin role
+    if user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return templates.TemplateResponse("admin_api_keys.html", {
+        "request": request,
+        "user": user
+    })
+
+
 def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
     """Validate a skill ZIP file according to Agent Skills specification.
 
@@ -3608,6 +3629,160 @@ async def api_reset_user_api_key(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reset API key: {str(e)}"
+        )
+
+
+# ==================== API Key Management Routes ====================
+
+@app.get("/api/admin/api-keys")
+async def api_get_api_keys(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None, max_length=50),
+    status_filter: Optional[str] = Query(None, regex="^(active|inactive)$"),
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """获取 API Keys 列表（管理员）"""
+    try:
+        result = get_api_keys_list(
+            page=page,
+            per_page=per_page,
+            search=search,
+            status_filter=status_filter
+        )
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch API keys: {str(e)}"
+        )
+
+
+@app.post("/api/admin/api-keys")
+async def api_create_api_key(
+    request: Request,
+    user_id: int = Form(...),
+    name: str = Form(None, max_length=100),
+    rate_limit: int = Form(100, ge=1, le=1000),
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """创建新的 API Key（管理员）"""
+    try:
+        # 验证用户存在
+        user = get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # 创建 API Key
+        api_key_info = create_api_key(user_id, name, rate_limit)
+        if not api_key_info:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create API key"
+            )
+
+        return {
+            "success": True,
+            "data": {
+                **api_key_info,
+                "employee_id": user["employee_id"]
+            },
+            "message": "API Key created successfully. Save the key now as it won't be shown again."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create API key: {str(e)}"
+        )
+
+
+@app.delete("/api/admin/api-keys/{api_key_id}")
+async def api_delete_api_key(
+    api_key_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """删除 API Key（管理员）"""
+    try:
+        success = delete_api_key(api_key_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="API Key not found"
+            )
+
+        return {
+            "success": True,
+            "message": "API Key deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete API key: {str(e)}"
+        )
+
+
+@app.put("/api/admin/api-keys/{api_key_id}/toggle")
+async def api_toggle_api_key(
+    api_key_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """切换 API Key 状态（启用/禁用）"""
+    try:
+        result = toggle_api_key_status(api_key_id)
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="API Key not found"
+            )
+
+        return {
+            "success": True,
+            "data": result,
+            "message": f"API Key {'enabled' if result['is_active'] else 'disabled'} successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to toggle API key: {str(e)}"
+        )
+
+
+@app.get("/api/admin/api-keys/{api_key_id}/stats")
+async def api_get_api_key_stats(
+    api_key_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """获取 API Key 调用统计（管理员）"""
+    try:
+        stats = get_api_key_stats(api_key_id)
+        if not stats:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="API Key not found"
+            )
+
+        return {
+            "success": True,
+            "data": stats
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get API key stats: {str(e)}"
         )
 
 

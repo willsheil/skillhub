@@ -2454,3 +2454,152 @@ def log_api_call(api_key_id: int, endpoint: str, method: str,
             conn.commit()
     except Exception as e:
         logger.error(f"记录 API 调用日志失败: {e}")
+
+
+def get_api_keys_list(page: int = 1, per_page: int = 20, search: str = None,
+                       status_filter: str = None) -> Dict[str, Any]:
+    """获取 API Keys 列表（分页、搜索、过滤）"""
+    try:
+        with get_connection() as conn:
+            # 构建 WHERE 条件
+            conditions = []
+            params = []
+
+            if search:
+                conditions.append("(eak.name LIKE %s OR u.employee_id LIKE %s)")
+                params.extend([f"%{search}%", f"%{search}%"])
+
+            if status_filter == "active":
+                conditions.append("eak.is_active = 1")
+            elif status_filter == "inactive":
+                conditions.append("eak.is_active = 0")
+
+            where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+            # 获取总数
+            count_query = f"""
+                SELECT COUNT(*) as total
+                FROM external_api_keys eak
+                LEFT JOIN users u ON eak.user_id = u.id
+                {where_clause}
+            """
+            total_result = conn.execute(count_query, params).fetchone()
+            total = total_result['total'] if total_result else 0
+
+            # 获取数据
+            offset = (page - 1) * per_page
+            data_query = f"""
+                SELECT eak.*, u.employee_id
+                FROM external_api_keys eak
+                LEFT JOIN users u ON eak.user_id = u.id
+                {where_clause}
+                ORDER BY eak.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            params.extend([per_page, offset])
+            items = conn.execute(data_query, params).fetchall()
+
+            return {
+                "items": [dict(item) for item in items],
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+                "total_pages": (total + per_page - 1) // per_page
+            }
+    except Exception as e:
+        logger.error(f"获取 API Keys 列表失败: {e}")
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": 0
+        }
+
+
+def delete_api_key(api_key_id: int) -> bool:
+    """删除 API Key"""
+    try:
+        with get_connection() as conn:
+            conn.execute("DELETE FROM external_api_keys WHERE id = %s", (api_key_id,))
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.error(f"删除 API Key 失败: {e}")
+        return False
+
+
+def toggle_api_key_status(api_key_id: int) -> Optional[Dict[str, Any]]:
+    """切换 API Key 状态（启用/禁用）"""
+    try:
+        with get_connection() as conn:
+            # 获取当前状态
+            result = conn.execute(
+                "SELECT is_active FROM external_api_keys WHERE id = %s",
+                (api_key_id,)
+            ).fetchone()
+
+            if not result:
+                return None
+
+            new_status = 0 if result['is_active'] == 1 else 1
+
+            conn.execute(
+                "UPDATE external_api_keys SET is_active = %s WHERE id = %s",
+                (new_status, api_key_id)
+            )
+            conn.commit()
+
+            return {"id": api_key_id, "is_active": new_status}
+    except Exception as e:
+        logger.error(f"切换 API Key 状态失败: {e}")
+        return None
+
+
+def get_api_key_stats(api_key_id: int) -> Optional[Dict[str, Any]]:
+    """获取 API Key 调用统计"""
+    try:
+        with get_connection() as conn:
+            # 总调用次数
+            total_calls = conn.execute(
+                "SELECT COUNT(*) as count FROM api_call_logs WHERE api_key_id = %s",
+                (api_key_id,)
+            ).fetchone()
+
+            # 成功调用次数（状态码 2xx）
+            success_calls = conn.execute(
+                "SELECT COUNT(*) as count FROM api_call_logs WHERE api_key_id = %s AND status_code >= 200 AND status_code < 300",
+                (api_key_id,)
+            ).fetchone()
+
+            # 最后调用时间
+            last_call = conn.execute(
+                "SELECT MAX(created_at) as last_call FROM api_call_logs WHERE api_key_id = %s",
+                (api_key_id,)
+            ).fetchone()
+
+            # 今日调用次数
+            today_calls = conn.execute(
+                "SELECT COUNT(*) as count FROM api_call_logs WHERE api_key_id = %s AND DATE(created_at) = CURDATE()",
+                (api_key_id,)
+            ).fetchone()
+
+            # 最近7天调用趋势
+            trend = conn.execute("""
+                SELECT DATE(created_at) as date, COUNT(*) as count
+                FROM api_call_logs
+                WHERE api_key_id = %s AND created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            """, (api_key_id,)).fetchall()
+
+            return {
+                "total_calls": total_calls['count'] if total_calls else 0,
+                "success_calls": success_calls['count'] if success_calls else 0,
+                "last_call": last_call['last_call'].isoformat() if last_call and last_call['last_call'] else None,
+                "today_calls": today_calls['count'] if today_calls else 0,
+                "trend": [{"date": str(row['date']), "count": row['count']} for row in trend]
+            }
+    except Exception as e:
+        logger.error(f"获取 API Key 统计失败: {e}")
+        return None

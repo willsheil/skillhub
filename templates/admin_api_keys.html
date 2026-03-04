@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Keys 管理 - Skill Registry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #10B981;
+            --primary-hover: #059669;
+            --primary-light: rgba(16, 185, 129, 0.1);
+            --border: #eaeaea;
+            --text: #171717;
+            --text-muted: #64748b;
+            --bg: #fafafa;
+            --surface: #ffffff;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --success: #10b981;
+            --info: #3b82f6;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            background: var(--bg);
+            color: var(--primary);
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .user-info {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .user-info strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding-top: 80px;
+            padding-bottom: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+
+        /* Page Header */
+        .page-header {
+            margin-bottom: 24px;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--primary);
+        }
+
+        .breadcrumb-separator {
+            color: var(--border);
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* Action Bar */
+        .action-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px 10px 40px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--bg);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            background: var(--surface);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 10px 36px 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--surface);
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            transition: all 0.2s ease;
+        }
+
+        .filter-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* Table Container */
+        .table-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table th {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .data-table th:not(:last-child) {
+            border-right: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tbody tr {
+            transition: background 0.15s ease;
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--bg);
+        }
+
+        .api-key-value {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        .api-key-masked {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-status-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-status-inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .icon-btn.delete:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .icon-btn.status-enable:hover {
+            border-color: var(--success);
+            color: var(--success);
+            background: #f0fdf4;
+        }
+
+        .icon-btn.status-disable:hover {
+            border-color: var(--warning);
+            color: var(--warning);
+            background: #fffbeb;
+        }
+
+        .icon-btn.stats:hover {
+            border-color: var(--info);
+            color: var(--info);
+            background: #eff6ff;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 24px 0;
+        }
+
+        .page-btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 36px;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            animation: modalSlideIn 0.2s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: none;
+            font-size: 24px;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .required {
+            color: var(--danger);
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            color: var(--text);
+            background: var(--surface);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .api-key-display {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .api-key-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .api-key-value-full {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text);
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .copy-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .copy-btn.copied {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Stats Modal */
+        .stats-modal {
+            max-width: 560px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .stat-trend {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        /* Loading */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-description {
+            font-size: 14px;
+        }
+
+        /* Message Toast */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            animation: toastSlideIn 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 280px;
+        }
+
+        @keyframes toastSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .toast-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .toast-error {
+            background: var(--danger);
+            color: white;
+        }
+
+        .toast-info {
+            background: var(--info);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/admin" class="navbar-brand">
+            <div class="logo-icon">S</div>
+            <span>管理后台</span>
+        </a>
+        <div class="navbar-nav">
+            <a href="/admin" class="nav-link">技能管理</a>
+            <a href="/admin/users" class="nav-link">用户管理</a>
+            <a href="/admin/api-keys" class="nav-link active">API Keys</a>
+            <span class="user-info">管理员: <strong>{{ user.employee_id }}</strong></span>
+            <a href="/" class="nav-link">首页</a>
+            <a href="/logout" class="nav-link">退出</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="breadcrumb">
+                <a href="/admin">管理后台</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>API Keys 管理</span>
+            </div>
+            <h1 class="page-title">API Keys 管理</h1>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索名称或工号...">
+            </div>
+            <div class="filter-group">
+                <select class="filter-select" id="statusFilter">
+                    <option value="">全部状态</option>
+                    <option value="active">启用</option>
+                    <option value="inactive">禁用</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="addKeyBtn">
+                <span>+</span>
+                <span>创建 API Key</span>
+            </button>
+        </div>
+
+        <!-- Table Container -->
+        <div class="table-container" id="tableContainer">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+    </main>
+
+    <!-- Create API Key Modal -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">创建 API Key</h3>
+                <button class="modal-close" onclick="closeModal('createModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createForm">
+                    <div class="form-group">
+                        <label class="form-label">
+                            选择用户
+                            <span class="required">*</span>
+                        </label>
+                        <select class="form-select" id="userId" required>
+                            <option value="">请选择用户</option>
+                        </select>
+                        <div class="form-hint">API Key 将关联到所选用户</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">名称</label>
+                        <input type="text" class="form-input" id="keyName" placeholder="例如：生产环境API" maxlength="100">
+                        <div class="form-hint">可选，用于标识此 API Key 的用途</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            速率限制（次/分钟）
+                            <span class="required">*</span>
+                        </label>
+                        <input type="number" class="form-input" id="rateLimit" value="100" min="1" max="1000" required>
+                        <div class="form-hint">每个 API Key 每分钟最多调用次数</div>
+                    </div>
+
+                    <div class="api-key-display" id="apiKeyDisplay" style="display: none;">
+                        <div class="api-key-label">API Key（请妥善保存）</div>
+                        <div class="api-key-value-full">
+                            <span id="apiKeyValue">-</span>
+                            <button type="button" class="copy-btn" onclick="copyApiKey()">
+                                <span id="copyBtnText">复制</span>
+                            </button>
+                        </div>
+                        <div class="form-hint">关闭窗口后将无法再次查看此密钥</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" id="createModalFooter">
+                <button class="btn btn-secondary" onclick="closeModal('createModal')">取消</button>
+                <button class="btn btn-primary" id="createBtn">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div class="modal-overlay" id="statsModal">
+        <div class="modal stats-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">API Key 调用统计</h3>
+                <button class="modal-close" onclick="closeModal('statsModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="statsContent">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <div>加载中...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('statsModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">删除 API Key</h3>
+                <button class="modal-close" onclick="closeModal('deleteModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 12px;">确定要删除此 API Key 吗？</p>
+                <p style="color: var(--text-muted); font-size: 13px;">删除后，使用此密钥的所有 API 请求将立即失效。</p>
+                <input type="hidden" id="deleteKeyId">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('deleteModal')">取消</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // State
+        let apiKeys = [];
+        let users = [];
+        let currentPage = 1;
+        const pageSize = 20;
+        let searchTimeout = null;
+        let currentFilters = {
+            search: '',
+            status: ''
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+            loadApiKeys();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentFilters.search = e.target.value;
+                    currentPage = 1;
+                    loadApiKeys();
+                }, 300);
+            });
+
+            document.getElementById('statusFilter').addEventListener('change', (e) => {
+                currentFilters.status = e.target.value;
+                currentPage = 1;
+                loadApiKeys();
+            });
+
+            document.getElementById('addKeyBtn').addEventListener('click', () => {
+                openCreateModal();
+            });
+
+            document.getElementById('createBtn').addEventListener('click', createApiKey);
+            document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDelete);
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users?per_page=1000');
+                const result = await response.json();
+                if (result.success) {
+                    users = result.data.items;
+                }
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        }
+
+        async function loadApiKeys() {
+            const tableContainer = document.getElementById('tableContainer');
+            tableContainer.innerHTML = `
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <div>加载中...</div>
+                </div>
+            `;
+
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    per_page: pageSize,
+                    ...(currentFilters.search && { search: currentFilters.search }),
+                    ...(currentFilters.status && { status_filter: currentFilters.status })
+                });
+
+                const response = await fetch(`/api/admin/api-keys?${params}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    apiKeys = result.data.items;
+                    renderTable(apiKeys);
+                    renderPagination(result.data.total, result.data.total_pages);
+                } else {
+                    throw new Error(result.message || '加载失败');
+                }
+            } catch (error) {
+                tableContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <div class="empty-title">加载失败</div>
+                        <div class="empty-description">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderTable(keys) {
+            const tableContainer = document.getElementById('tableContainer');
+
+            if (keys.length === 0) {
+                tableContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔑</div>
+                        <div class="empty-title">暂无 API Keys</div>
+                        <div class="empty-description">点击上方按钮创建第一个 API Key</div>
+                    </div>
+                `;
+                return;
+            }
+
+            tableContainer.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>名称</th>
+                            <th>API Key</th>
+                            <th>速率限制</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>最后使用</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${keys.map(key => `
+                            <tr>
+                                <td><strong>${key.employee_id || '-'}</strong></td>
+                                <td>${key.name || '-'}</td>
+                                <td><span class="api-key-masked">${maskApiKey(key.api_key)}</span></td>
+                                <td>${key.rate_limit} 次/分</td>
+                                <td>
+                                    <span class="badge ${key.is_active ? 'badge-status-active' : 'badge-status-inactive'}">
+                                        ${key.is_active ? '启用' : '禁用'}
+                                    </span>
+                                </td>
+                                <td>${formatDate(key.created_at)}</td>
+                                <td>${formatDate(key.last_used_at)}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="icon-btn stats" onclick="showStats(${key.id})" title="统计">📊</button>
+                                        <button class="icon-btn ${key.is_active ? 'status-disable' : 'status-enable'}"
+                                                onclick="toggleStatus(${key.id}, ${key.is_active})"
+                                                title="${key.is_active ? '禁用' : '启用'}">
+                                            ${key.is_active ? '⏸️' : '▶️'}
+                                        </button>
+                                        <button class="icon-btn delete" onclick="showDeleteModal(${key.id})" title="删除">🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderPagination(total, totalPages) {
+            const pagination = document.getElementById('pagination');
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+
+            // Prev button
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">‹</button>`;
+
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<span>...</span>`;
+                }
+            }
+
+            // Next button
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">›</button>`;
+
+            pagination.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadApiKeys();
+        }
+
+        function openCreateModal() {
+            const modal = document.getElementById('createModal');
+            const select = document.getElementById('userId');
+            const display = document.getElementById('apiKeyDisplay');
+            const footer = document.getElementById('createModalFooter');
+
+            // Populate users select
+            select.innerHTML = '<option value="">请选择用户</option>' +
+                users.map(u => `<option value="${u.id}">${u.employee_id} (${u.role === 'admin' ? '管理员' : '用户'})</option>`).join('');
+
+            // Reset form
+            document.getElementById('keyName').value = '';
+            document.getElementById('rateLimit').value = '100';
+            display.style.display = 'none';
+            footer.style.display = '';
+
+            modal.classList.add('active');
+        }
+
+        async function createApiKey() {
+            const userId = document.getElementById('userId').value;
+            const name = document.getElementById('keyName').value;
+            const rateLimit = parseInt(document.getElementById('rateLimit').value);
+
+            if (!userId) {
+                showToast('请选择用户', 'error');
+                return;
+            }
+
+            const createBtn = document.getElementById('createBtn');
+            createBtn.disabled = true;
+            createBtn.textContent = '创建中...';
+
+            try {
+                const formData = new FormData();
+                formData.append('user_id', userId);
+                formData.append('name', name || '');
+                formData.append('rate_limit', rateLimit);
+
+                const response = await fetch('/api/admin/api-keys', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show the API key
+                    document.getElementById('apiKeyValue').textContent = result.data.api_key;
+                    document.getElementById('apiKeyDisplay').style.display = 'block';
+                    document.getElementById('createModalFooter').style.display = 'none';
+
+                    showToast('API Key 创建成功！请立即保存', 'success');
+                    loadApiKeys();
+                } else {
+                    throw new Error(result.message || '创建失败');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                createBtn.disabled = false;
+                createBtn.textContent = '创建';
+            }
+        }
+
+        function copyApiKey() {
+            const apiKey = document.getElementById('apiKeyValue').textContent;
+            navigator.clipboard.writeText(apiKey).then(() => {
+                const btn = document.getElementById('copyBtnText');
+                btn.textContent = '已复制';
+                setTimeout(() => {
+                    btn.textContent = '复制';
+                }, 2000);
+            });
+        }
+
+        async function toggleStatus(id, currentStatus) {
+            try {
+                const response = await fetch(`/api/admin/api-keys/${id}/toggle`, {
+                    method: 'PUT'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    loadApiKeys();
+                } else {
+                    throw new Error(result.message || '操作失败');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function showDeleteModal(id) {
+            document.getElementById('deleteKeyId').value = id;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        async function confirmDelete() {
+            const id = document.getElementById('deleteKeyId').value;
+
+            try {
+                const response = await fetch(`/api/admin/api-keys/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('API Key 已删除', 'success');
+                    closeModal('deleteModal');
+                    loadApiKeys();
+                } else {
+                    throw new Error(result.message || '删除失败');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function showStats(id) {
+            const modal = document.getElementById('statsModal');
+            const content = document.getElementById('statsContent');
+
+            content.innerHTML = `
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <div>加载中...</div>
+                </div>
+            `;
+            modal.classList.add('active');
+
+            try {
+                const response = await fetch(`/api/admin/api-keys/${id}/stats`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const stats = result.data;
+                    content.innerHTML = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">总调用次数</div>
+                                <div class="stat-value">${stats.total_calls}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">成功调用</div>
+                                <div class="stat-value">${stats.success_calls}</div>
+                                <div class="stat-trend">
+                                    成功率: ${stats.total_calls > 0 ? Math.round(stats.success_calls / stats.total_calls * 100) : 0}%
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">今日调用</div>
+                                <div class="stat-value">${stats.today_calls}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">最后调用</div>
+                                <div class="stat-value" style="font-size: 14px;">
+                                    ${stats.last_call ? new Date(stats.last_call).toLocaleString('zh-CN') : '从未调用'}
+                                </div>
+                            </div>
+                        </div>
+                        ${stats.trend && stats.trend.length > 0 ? `
+                            <div>
+                                <h4 style="margin-bottom: 12px; font-size: 14px;">最近7天调用趋势</h4>
+                                <div style="display: flex; gap: 8px; height: 80px; align-items: flex-end;">
+                                    ${stats.trend.map(t => {
+                                        const maxCount = Math.max(...stats.trend.map(d => d.count));
+                                        const height = maxCount > 0 ? (t.count / maxCount * 100) : 0;
+                                        return `
+                                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                                                <div style="width: 100%; background: var(--primary); border-radius: 4px 4px 0 0; height: ${height}%; min-height: 4px;"></div>
+                                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${t.date.slice(5)}</div>
+                                                <div style="font-size: 11px; color: var(--text-muted);">${t.count}</div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : '<p style="text-align: center; color: var(--text-muted);">暂无调用数据</p>'}
+                    `;
+                } else {
+                    throw new Error(result.message || '加载失败');
+                }
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <div class="empty-title">加载失败</div>
+                        <div class="empty-description">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Utilities
+        function maskApiKey(key) {
+            if (!key) return '-';
+            return key.substring(0, 7) + '...' + key.substring(key.length - 4);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'toastSlideIn 0.2s ease reverse';
+                setTimeout(() => toast.remove(), 200);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
