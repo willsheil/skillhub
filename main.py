@@ -63,7 +63,9 @@ from database import (
     enable_user, delete_user, reset_user_api_key, get_user_skills_count,
     get_default_skill_version, get_all_default_skill_versions,
     get_skill_approval_status, delete_skill_version, batch_unlist_skills,
-    batch_delete_skills
+    batch_delete_skills,
+    get_api_keys_list, create_api_key, delete_api_key, toggle_api_key_status,
+    get_api_key_stats
 )
 
 # Configure logging - get application logger with proper configuration
@@ -3663,21 +3665,12 @@ async def api_get_api_keys(
 
 @app.post("/api/admin/api-keys")
 async def api_create_api_key(
-    request: Request,
     name: str = Form(None, max_length=100),
     rate_limit: int = Form(100, ge=1, le=1000),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """创建新的 API Key（管理员）- 不绑定用户，用于外部 API 调用"""
     try:
-        # 获取当前管理员 ID
-        current_user = get_current_user(request)
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized"
-            )
-
         # 使用固定值 0 表示这是管理员创建的全局 API Key
         admin_user_id = 0
 
