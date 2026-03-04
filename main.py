@@ -56,12 +56,11 @@ from database import (
     get_skills_count_by_status, get_today_downloads_count,
     get_top_skills_by_downloads, get_top_users_by_downloads,
     get_skill_source_type, create_notification, update_skill_active_status,
-    get_skill_active_status, get_my_skills, set_default_skill_version,
-    get_skill_versions, get_user_notifications, get_unread_notifications_count,
+    get_skill_active_status, get_my_skills,
+    get_user_notifications, get_unread_notifications_count,
     mark_notification_read, mark_all_notifications_read, cleanup_old_notifications,
     get_users_list, create_user, update_user_role, disable_user,
     enable_user, delete_user, reset_user_api_key, get_user_skills_count,
-    get_default_skill_version, get_all_default_skill_versions,
     get_skill_approval_status, delete_skill_version, batch_unlist_skills,
     batch_delete_skills,
     get_api_keys_list, create_api_key, delete_api_key, toggle_api_key_status,
@@ -1108,6 +1107,9 @@ def save_skill_zip(temp_zip: Path, metadata: dict) -> Path:
 def approve_skill_file(skill_id: int) -> bool:
     """Approve a skill by moving it from pending to plugins directory.
 
+    In single-version mode, if an approved version of the same skill_name exists,
+    it will be removed before the new version is moved.
+
     Args:
         skill_id: The ID of the skill to approve
 
@@ -1125,8 +1127,26 @@ def approve_skill_file(skill_id: int) -> bool:
     # File paths
     pending_path = PENDING_DIR / skill["filename"]
     plugins_path = PLUGINS_DIR / skill["filename"]
+    skill_name = skill["skill_name"]
 
     try:
+        # In single-version mode, check for existing approved version of this skill
+        from database import get_skill_by_name
+        existing_skill = get_skill_by_name(skill_name)
+
+        # If there's an existing approved version, delete its file and record
+        if existing_skill and existing_skill["status"] == "approved" and existing_skill["id"] != skill_id:
+            old_file_path = PLUGINS_DIR / existing_skill["filename"]
+            if old_file_path.exists():
+                logger.info(f"Removing old version file: {old_file_path}")
+                old_file_path.unlink()
+            # Delete the old database record
+            from database import get_connection
+            with get_connection() as conn:
+                conn.execute("DELETE FROM skills WHERE id = %s", (existing_skill["id"],))
+                conn.commit()
+            logger.info(f"Deleted old skill record: {existing_skill['id']}")
+
         # Check if file is in pending directory
         if pending_path.exists():
             # Move file from pending to plugins
@@ -1833,113 +1853,6 @@ async def api_publish_skill(
         )
 
 
-@app.post("/api/my-skills/{skill_id}/set-default")
-async def api_set_default_skill(
-    skill_id: int,
-    request: Request,
-    _: bool = Depends(require_auth)
-):
-    """Set a skill version as the default for its skill name.
-
-    User must own the skill. All other versions of the same skill
-    will have is_default_version set to 0.
-    """
-    try:
-        user_id = request.session.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated"
-            )
-
-        # Get skill record
-        skill = get_skill_by_id(skill_id)
-        if not skill:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Skill {skill_id} not found"
-            )
-
-        # Verify ownership
-        if skill["uploader_id"] != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't own this skill"
-            )
-
-        # Set as default version
-        success = set_default_skill_version(
-            user_id=user_id,
-            skill_name=skill["skill_name"],
-            skill_id=skill_id
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to set default version"
-            )
-
-        return {
-            "success": True,
-            "message": f"Skill {skill['skill_name']}@{skill['version']} is now the default version",
-            "skill_id": skill_id
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to set default version: {str(e)}"
-        )
-
-
-@app.get("/api/my-skills/versions/{skill_name}")
-async def api_get_skill_versions(
-    skill_name: str,
-    request: Request,
-    _: bool = Depends(require_auth)
-):
-    """Get all versions of a skill owned by the current user.
-
-    Returns versions sorted newest first. User must own at least
-    one version of the skill.
-    """
-    try:
-        user_id = request.session.get("user_id")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not authenticated"
-            )
-
-        # Get skill versions (function already verifies ownership by filtering on uploader_id)
-        versions = get_skill_versions(user_id, skill_name)
-
-        # Check if user owns any version of this skill
-        if not versions:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No versions found for skill '{skill_name}' or you don't own this skill"
-            )
-
-        return {
-            "success": True,
-            "data": versions,
-            "skill_name": skill_name,
-            "count": len(versions)
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch skill versions: {str(e)}"
-        )
-
-
 @app.delete("/api/my-skills/{skill_id}")
 async def api_delete_skill(
     skill_id: int,
@@ -2104,23 +2017,27 @@ async def upload_plugin(
         target_filename = f"{skill_name}-{version}.zip"
         target_path = PENDING_DIR / target_filename
 
-        # Check if skill with same name and version already exists
-        from database import check_skill_exists
-        if check_skill_exists(skill_name, version):
-            error_msg = f"技能 {skill_name}@{version} 已存在，请使用不同的版本号"
-
-            # Return HTML error for admin_upload page
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": None,
-                    "error": error_msg
-                })
-            else:
+        # Check if skill with same name already exists
+        from database import get_skill_by_name
+        existing_skill = get_skill_by_name(skill_name)
+        if existing_skill:
+            if existing_skill["uploader_id"] != user_id:
+                error_msg = f"技能 {skill_name} 已被其他用户创建，您无权更新"
                 return JSONResponse(
-                    status_code=status.HTTP_409_CONFLICT,
+                    status_code=status.HTTP_403_FORBIDDEN,
                     content={"success": False, "error": error_msg}
                 )
+            # Skill exists and belongs to user, return special response for frontend to confirm
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={
+                    "success": False,
+                    "error": "SKILL_EXISTS",
+                    "message": f"技能 {skill_name} 已存在，是否覆盖更新？",
+                    "skill_name": skill_name,
+                    "existing_version": existing_skill["version"]
+                }
+            )
 
         # Copy file to pending location
         shutil.copy(temp_zip, target_path)
@@ -2325,12 +2242,15 @@ async def complete_upload_with_metadata(
         target_path = PENDING_DIR / target_filename
 
         # 检查是否已存在
-        from database import check_skill_exists
-        if check_skill_exists(skill_name, version):
-            return JSONResponse(
-                status_code=status.HTTP_409_CONFLICT,
-                content={"success": False, "error": f"技能 {skill_name}@{version} 已存在，请使用不同的版本号"}
-            )
+        from database import get_skill_by_name
+        existing_skill = get_skill_by_name(skill_name)
+        if existing_skill:
+            if existing_skill["uploader_id"] != user_id:
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={"success": False, "error": f"技能 {skill_name} 已被其他用户创建，您无权更新"}
+                )
+            # 对于已存在的技能，这是更新操作，继续执行
 
         # 复制文件到 pending 位置
         shutil.copy(temp_zip, target_path)
@@ -2426,18 +2346,21 @@ async def upload_batch(
                 })
                 continue
 
-            # Check if skill with same name and version already exists
-            from database import check_skill_exists
+            # Check if skill with same name already exists
+            from database import get_skill_by_name
             skill_name = metadata["name"]
             skill_version = metadata.get("version", "1.0.0")
             target_filename = f"{skill_name}-{skill_version}.zip"
 
-            if check_skill_exists(skill_name, skill_version):
-                results["failed"].append({
-                    "file": file.filename,
-                    "error": f"Skill {skill_name}@{skill_version} already exists"
-                })
-                continue
+            existing_skill = get_skill_by_name(skill_name)
+            if existing_skill:
+                if existing_skill["uploader_id"] != user_id:
+                    results["failed"].append({
+                        "file": file.filename,
+                        "error": f"Skill {skill_name} is owned by another user"
+                    })
+                    continue
+                # Skill exists and belongs to user - this is an update, continue
 
             # Save the skill ZIP to pending directory for review
             target_path = PENDING_DIR / target_filename
@@ -3153,20 +3076,21 @@ async def skill_detail_page(request: Request, skill_name: str):
     if not user_id:
         return RedirectResponse(url="/login", status_code=302)
 
-    # First, try to get the default version from database
-    default_version = get_default_skill_version(skill_name)
+    # Get the skill from database (single-version mode)
+    from database import get_skill_by_name
+    skill = get_skill_by_name(skill_name)
 
     skill_zip = None
 
-    if default_version:
-        # Use the default version's filename
-        skill_zip = PLUGINS_DIR / default_version["filename"]
+    if skill and skill["status"] == "approved" and skill["is_active"]:
+        # Use the skill's filename
+        skill_zip = PLUGINS_DIR / skill["filename"]
         if not skill_zip.exists():
-            # Default version file not found, fall back to searching
+            # Skill file not found, fall back to searching
             skill_zip = None
 
     if not skill_zip:
-        # No default version or file not found, try exact match
+        # No skill found or file not found, try exact match
         skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
         if not skill_zip.exists():
             # Try to find a ZIP that starts with skill_name-

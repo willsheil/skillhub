@@ -263,6 +263,7 @@ def init_db():
     migrate_add_source_type_to_skills()
     migrate_add_user_management_features()
     migrate_add_skill_description_and_metadata()
+    migrate_to_single_version()
 
 
 def migrate_gitea_push_tasks():
@@ -623,12 +624,11 @@ def update_last_login(user_id: int) -> None:
         conn.commit()
 
 
-def check_skill_exists(skill_name: str, version: str) -> bool:
-    """Check if a skill with the same name and version already exists.
+def check_skill_exists(skill_name: str) -> bool:
+    """Check if a skill with the given name already exists.
 
     Args:
         skill_name: The name of the skill
-        version: The version of the skill
 
     Returns:
         True if skill exists, False otherwise
@@ -637,12 +637,55 @@ def check_skill_exists(skill_name: str, version: str) -> bool:
         row = conn.execute(
             """
             SELECT COUNT(*) as count FROM skills
-            WHERE skill_name = %s AND version = %s
+            WHERE skill_name = %s
             """,
-            (skill_name, version)
+            (skill_name,)
         ).fetchone()
 
         return row["count"] > 0 if row else False
+
+
+def get_skill_by_name(skill_name: str) -> Optional[Dict[str, Any]]:
+    """Get a skill by its name.
+
+    Args:
+        skill_name: The name of the skill
+
+    Returns:
+        Dictionary with skill record or None if not found
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                id, skill_name, version, filename, uploader_id, status,
+                source_type, uploaded_at, reviewed_at, reviewer_id,
+                review_comment, is_active, description, metadata
+            FROM skills
+            WHERE skill_name = %s
+            LIMIT 1
+            """,
+            (skill_name,)
+        ).fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "skill_name": row["skill_name"],
+                "version": row["version"],
+                "filename": row["filename"],
+                "uploader_id": row["uploader_id"],
+                "status": row["status"],
+                "source_type": row["source_type"],
+                "uploaded_at": row["uploaded_at"],
+                "reviewed_at": row["reviewed_at"],
+                "reviewer_id": row["reviewer_id"],
+                "review_comment": row["review_comment"],
+                "is_active": row["is_active"],
+                "description": row["description"],
+                "metadata": row["metadata"]
+            }
+        return None
 
 
 def create_skill_record(
@@ -1466,6 +1509,61 @@ def migrate_add_skill_description_and_metadata():
         logger.info("Migration: skill_description_and_metadata migration completed")
 
 
+def migrate_to_single_version():
+    """Migrate database to single version model for skills.
+
+    Changes:
+    1. Clean up duplicate skill_name records (keep default version or earliest)
+    2. Add UNIQUE KEY idx_skill_name (skill_name)
+    3. Drop is_default_version column
+
+    This migration implements the single-version model where each skill_name
+    is unique and owned by a single user.
+    """
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+
+        # Step 1: Check if unique index already exists
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM information_schema.statistics
+            WHERE table_schema = DATABASE() AND table_name = 'skills' AND index_name = 'idx_skill_name'
+        """)
+        if cursor.fetchone()["count"] > 0:
+            logger.info("Migration: idx_skill_name already exists, skipping migration")
+            return
+
+        # Step 2: Clean up duplicate skill_name records
+        # Keep the record with is_default_version=1, or the earliest uploaded_at
+        cursor.execute("""
+            DELETE t1 FROM skills t1
+            INNER JOIN skills t2
+            WHERE t1.skill_name = t2.skill_name
+              AND t1.id > t2.id
+        """)
+        deleted_count = cursor.rowcount
+        conn.commit()
+        logger.info(f"Migration: Deleted {deleted_count} duplicate skill records")
+
+        # Step 3: Add unique index on skill_name
+        create_index_if_not_exists(
+            cursor,
+            "skills",
+            "idx_skill_name",
+            "CREATE UNIQUE INDEX idx_skill_name ON skills(skill_name)"
+        )
+        logger.info("Migration: Added unique index idx_skill_name on skills table")
+
+        # Step 4: Drop is_default_version column
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+        if "is_default_version" in columns:
+            conn.execute("ALTER TABLE skills DROP COLUMN is_default_version")
+            conn.commit()
+            logger.info("Migration: Dropped is_default_version column from skills table")
+
+        logger.info("Migration: to_single_version migration completed")
+
+
 def create_notification(
     user_id: int,
     type: str,
@@ -1791,7 +1889,7 @@ def get_my_skills(
             SELECT
                 id, skill_name, version, filename, uploader_id, status,
                 source_type, uploaded_at, reviewed_at, reviewer_id,
-                review_comment, is_active, is_default_version
+                review_comment, is_active
             {base_query}
             ORDER BY uploaded_at DESC
             LIMIT %s OFFSET %s
@@ -1813,8 +1911,7 @@ def get_my_skills(
                 "reviewed_at": row["reviewed_at"],
                 "reviewer_id": row["reviewer_id"],
                 "review_comment": row["review_comment"],
-                "is_active": row["is_active"],
-                "is_default_version": row["is_default_version"]
+                "is_active": row["is_active"]
             })
 
         return {
@@ -1825,193 +1922,8 @@ def get_my_skills(
         }
 
 
-def set_default_skill_version(user_id: int, skill_name: str, skill_id: int) -> bool:
-    """Set a specific skill version as the default for a skill name.
-
-    Unsets is_default_version for all other versions of the same skill
-    owned by the user, then sets the specified version as default.
-
-    Args:
-        user_id: The user's ID (for ownership verification)
-        skill_name: The name of the skill
-        skill_id: The ID of the skill to set as default
-
-    Returns:
-        True if updated successfully, False if skill not found or not owned by user
-    """
-    with get_connection() as conn:
-        # First verify the skill belongs to the user
-        verify_row = conn.execute(
-            """
-            SELECT id FROM skills
-            WHERE id = %s AND uploader_id = %s AND skill_name = %s
-            """,
-            (skill_id, user_id, skill_name)
-        ).fetchone()
-
-        if not verify_row:
-            return False
-
-        # Unset default for all versions of this skill owned by the user
-        conn.execute(
-            """
-            UPDATE skills
-            SET is_default_version = 0
-            WHERE uploader_id = %s AND skill_name = %s
-            """,
-            (user_id, skill_name)
-        )
-
-        # Set the specified version as default
-        cursor = conn.execute(
-            """
-            UPDATE skills
-            SET is_default_version = 1
-            WHERE id = %s AND uploader_id = %s AND skill_name = %s
-            """,
-            (skill_id, user_id, skill_name)
-        )
-        conn.commit()
-
-        return cursor.rowcount > 0
-
-
-def get_skill_versions(user_id: int, skill_name: str) -> List[Dict[str, Any]]:
-    """Get all versions of a skill owned by a user.
-
-    Args:
-        user_id: The user's ID
-        skill_name: The name of the skill
-
-    Returns:
-        List of skill version records sorted newest first
-    """
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT
-                id, skill_name, version, filename, uploader_id, status,
-                source_type, uploaded_at, reviewed_at, reviewer_id,
-                review_comment, is_active, is_default_version
-            FROM skills
-            WHERE uploader_id = %s AND skill_name = %s
-            ORDER BY uploaded_at DESC
-            """,
-            (user_id, skill_name)
-        ).fetchall()
-
-        results = []
-        for row in rows:
-            results.append({
-                "id": row["id"],
-                "skill_name": row["skill_name"],
-                "version": row["version"],
-                "filename": row["filename"],
-                "uploader_id": row["uploader_id"],
-                "status": row["status"],
-                "source_type": row["source_type"],
-                "uploaded_at": row["uploaded_at"],
-                "reviewed_at": row["reviewed_at"],
-                "reviewer_id": row["reviewer_id"],
-                "review_comment": row["review_comment"],
-                "is_active": row["is_active"],
-                "is_default_version": row["is_default_version"]
-            })
-
-        return results
-
-
-def get_default_skill_version(skill_name: str) -> Optional[Dict[str, Any]]:
-    """Get the default version of a skill by name.
-
-    Returns the skill record marked as is_default_version=1 with status='approved'.
-    If no default version is set, returns None.
-
-    Args:
-        skill_name: The name of the skill
-
-    Returns:
-        Dictionary with skill record or None if not found
-    """
-    with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT
-                id, skill_name, version, filename, uploader_id, status,
-                source_type, uploaded_at, reviewed_at, reviewer_id,
-                review_comment, is_active, is_default_version
-            FROM skills
-            WHERE skill_name = %s
-              AND status = 'approved'
-              AND is_default_version = 1
-            LIMIT 1
-            """,
-            (skill_name,)
-        ).fetchone()
-
-        if row:
-            return {
-                "id": row["id"],
-                "skill_name": row["skill_name"],
-                "version": row["version"],
-                "filename": row["filename"],
-                "uploader_id": row["uploader_id"],
-                "status": row["status"],
-                "source_type": row["source_type"],
-                "uploaded_at": row["uploaded_at"],
-                "reviewed_at": row["reviewed_at"],
-                "reviewer_id": row["reviewer_id"],
-                "review_comment": row["review_comment"],
-                "is_active": row["is_active"],
-                "is_default_version": row["is_default_version"]
-            }
-        return None
-
-
-def get_all_default_skill_versions() -> Dict[str, Dict[str, Any]]:
-    """Get all default skill versions as a dictionary keyed by skill name.
-
-    Returns a dictionary where keys are skill names and values are the
-    skill records marked as is_default_version=1 with status='approved'.
-
-    Returns:
-        Dictionary mapping skill_name to skill record
-    """
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT
-                id, skill_name, version, filename, uploader_id, status,
-                source_type, uploaded_at, reviewed_at, reviewer_id,
-                review_comment, is_active, is_default_version
-            FROM skills
-            WHERE status = 'approved'
-              AND is_default_version = 1
-            """
-        ).fetchall()
-
-        result = {}
-        for row in rows:
-            result[row["skill_name"]] = {
-                "id": row["id"],
-                "skill_name": row["skill_name"],
-                "version": row["version"],
-                "filename": row["filename"],
-                "uploader_id": row["uploader_id"],
-                "status": row["status"],
-                "source_type": row["source_type"],
-                "uploaded_at": row["uploaded_at"],
-                "reviewed_at": row["reviewed_at"],
-                "reviewer_id": row["reviewer_id"],
-                "review_comment": row["review_comment"],
-                "is_active": row["is_active"],
-                "is_default_version": row["is_default_version"]
-            }
-        return result
-
-
 def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) -> bool:
-    """Delete a specific skill version.
+    """Delete a skill.
 
     Only the owner of the skill can delete it, unless user is admin.
     The physical ZIP file will also be removed from the plugins directory.
@@ -2033,7 +1945,7 @@ def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) ->
         if is_admin:
             verify_row = conn.execute(
                 """
-                SELECT id, filename, skill_name, is_default_version, uploader_id
+                SELECT id, filename, skill_name, uploader_id
                 FROM skills
                 WHERE id = %s
                 """,
@@ -2042,7 +1954,7 @@ def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) ->
         else:
             verify_row = conn.execute(
                 """
-                SELECT id, filename, skill_name, is_default_version
+                SELECT id, filename, skill_name
                 FROM skills
                 WHERE id = %s AND uploader_id = %s
                 """,
@@ -2054,62 +1966,7 @@ def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) ->
 
         filename = verify_row["filename"]
         skill_name = verify_row["skill_name"]
-        is_default = verify_row["is_default_version"]
         uploader_id = verify_row.get("uploader_id", user_id)
-
-        # If this is the default version, check if there are other versions
-        if is_default:
-            # For admin, check all other versions regardless of uploader
-            # For non-admin, only check versions from same uploader
-            if is_admin:
-                other_versions = conn.execute(
-                    """
-                        SELECT COUNT(*) as count FROM skills
-                        WHERE skill_name = %s AND id != %s
-                        """,
-                    (skill_name, skill_id)
-                ).fetchone()
-            else:
-                other_versions = conn.execute(
-                    """
-                        SELECT COUNT(*) as count FROM skills
-                        WHERE skill_name = %s AND uploader_id = %s AND id != %s
-                        """,
-                    (skill_name, uploader_id, skill_id)
-                ).fetchone()
-
-            # If there are other versions, we need to set a new default
-            if other_versions["count"] > 0:
-                # For admin, set latest version as default regardless of uploader
-                # For non-admin, only set versions from same uploader as default
-                if is_admin:
-                    conn.execute(
-                        """
-                            UPDATE skills
-                            SET is_default_version = 1
-                            WHERE id = (
-                                SELECT id FROM skills
-                                WHERE skill_name = %s AND id != %s
-                                ORDER BY uploaded_at DESC
-                                LIMIT 1
-                            )
-                            """,
-                        (skill_name, skill_id)
-                    )
-                else:
-                    conn.execute(
-                        """
-                            UPDATE skills
-                            SET is_default_version = 1
-                            WHERE id = (
-                                SELECT id FROM skills
-                                WHERE skill_name = %s AND uploader_id = %s AND id != %s
-                                ORDER BY uploaded_at DESC
-                                LIMIT 1
-                            )
-                            """,
-                        (skill_name, uploader_id, skill_id)
-                    )
 
         # Delete related notifications first (due to foreign key constraint)
         conn.execute(

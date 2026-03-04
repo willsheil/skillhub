@@ -10,7 +10,6 @@ let currentStatus = 'all';
 let currentPage = 1;
 let pageSize = 12;
 let searchQuery = '';
-let expandedGroups = new Set();
 let statusCounts = { all: 0, active: 0, unlisted: 0, pending: 0, rejected: 0 };
 let confirmCallback = null;
 let searchDebounceTimer = null;
@@ -176,47 +175,19 @@ function filterAndRenderSkills() {
         return skill.skill_name.toLowerCase().includes(query);
     });
 
-    // Group by skill name
-    const groupedSkills = groupSkillsByName(filteredSkills);
+    // Sort by upload date (newest first)
+    filteredSkills.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
 
     // Render
-    renderSkills(groupedSkills);
+    renderSkills(filteredSkills);
     updatePagination();
 }
 
-// Group skills by name
-function groupSkillsByName(skills) {
-    const groups = {};
-
-    skills.forEach(skill => {
-        const name = skill.skill_name;
-        if (!groups[name]) {
-            groups[name] = {
-                name: name,
-                versions: []
-            };
-        }
-        groups[name].versions.push(skill);
-    });
-
-    // Sort versions within each group (newest first)
-    Object.values(groups).forEach(group => {
-        group.versions.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
-    });
-
-    return Object.values(groups).sort((a, b) => {
-        // Sort by latest upload date
-        const aLatest = new Date(a.versions[0].uploaded_at);
-        const bLatest = new Date(b.versions[0].uploaded_at);
-        return bLatest - aLatest;
-    });
-}
-
 // Render skills
-function renderSkills(groupedSkills) {
+function renderSkills(skills) {
     const container = document.getElementById('skillsList');
 
-    if (groupedSkills.length === 0) {
+    if (skills.length === 0) {
         const emptyMessage = searchQuery
             ? '没有找到匹配的技能'
             : getStatusEmptyMessage();
@@ -232,7 +203,7 @@ function renderSkills(groupedSkills) {
         return;
     }
 
-    container.innerHTML = groupedSkills.map(group => renderSkillGroup(group)).join('');
+    container.innerHTML = skills.map(skill => renderSkillCard(skill)).join('');
 
     // Add event listeners
     attachSkillEventListeners();
@@ -250,28 +221,26 @@ function getStatusEmptyMessage() {
     return messages[currentStatus] || messages.all;
 }
 
-// Render a skill group
-function renderSkillGroup(group) {
-    const latestVersion = group.versions[0];
-    const icon = getSkillIcon(group.name);
-    const isExpanded = expandedGroups.has(group.name);
-    const isSelected = selectedSkillIds.has(latestVersion.id);
+// Render a skill card
+function renderSkillCard(skill) {
+    const icon = getSkillIcon(skill.skill_name);
+    const isSelected = selectedSkillIds.has(skill.id);
 
     // Determine status badge
     let statusBadge = '';
     let activeBadge = '';
     let rejectionReason = '';
 
-    if (latestVersion.status === 'pending') {
+    if (skill.status === 'pending') {
         statusBadge = '<span class="badge badge-status pending">待审核</span>';
-    } else if (latestVersion.status === 'rejected') {
+    } else if (skill.status === 'rejected') {
         statusBadge = '<span class="badge badge-status rejected">已拒绝</span>';
         // Add rejection reason if available
-        if (latestVersion.review_comment) {
-            rejectionReason = `<div class="rejection-reason">拒绝原因: ${escapeHtml(latestVersion.review_comment)}</div>`;
+        if (skill.review_comment) {
+            rejectionReason = `<div class="rejection-reason">拒绝原因: ${escapeHtml(skill.review_comment)}</div>`;
         }
-    } else if (latestVersion.status === 'approved') {
-        if (latestVersion.is_active) {
+    } else if (skill.status === 'approved') {
+        if (skill.is_active) {
             statusBadge = '<span class="badge badge-status">已发布</span>';
             activeBadge = '<span class="badge badge-active">Active</span>';
         } else {
@@ -279,26 +248,22 @@ function renderSkillGroup(group) {
         }
     }
 
-    if (latestVersion.is_default_version) {
-        activeBadge += '<span class="badge badge-default">默认版本</span>';
-    }
-
     // Count downloads (mock data for now)
-    const downloads = latestVersion.download_count || 0;
+    const downloads = skill.download_count || 0;
 
     // Generate action buttons
-    const actionButtons = generateActionButtons(latestVersion, group.name);
+    const actionButtons = generateActionButtons(skill);
 
     return `
-        <div class="skill-group" data-skill-name="${encodeURIComponent(group.name)}" data-skill-id="${latestVersion.id}">
-            <div class="skill-card-header ${isExpanded ? 'expanded' : ''}" data-skill-name="${encodeURIComponent(group.name)}">
+        <div class="skill-group" data-skill-id="${skill.id}">
+            <div class="skill-card-header">
                 <div class="skill-checkbox">
-                    <input type="checkbox" class="skill-select-checkbox" data-skill-id="${latestVersion.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleSkillSelection(${latestVersion.id})">
+                    <input type="checkbox" class="skill-select-checkbox" data-skill-id="${skill.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleSkillSelection(${skill.id})">
                 </div>
                 <div class="skill-icon">${icon}</div>
                 <div class="skill-info">
                     <div class="skill-name-row">
-                        <span class="skill-name">${group.name}</span>
+                        <span class="skill-name">${skill.skill_name}</span>
                         <div class="skill-badges">
                             ${statusBadge}
                             ${activeBadge}
@@ -308,118 +273,47 @@ function renderSkillGroup(group) {
                     <div class="skill-meta">
                         <span class="meta-item">
                             <span class="meta-icon">📦</span>
-                            v${latestVersion.version}
+                            v${skill.version}
                         </span>
                         <span class="meta-item">
                             <span class="meta-icon">📅</span>
-                            ${formatDate(latestVersion.uploaded_at)}
+                            ${formatDate(skill.uploaded_at)}
                         </span>
                         <span class="meta-item">
                             <span class="meta-icon">⬇️</span>
                             ${downloads} 次下载
                         </span>
-                        ${group.versions.length > 1 ? `
-                        <span class="meta-item">
-                            <span class="meta-icon">📚</span>
-                            ${group.versions.length} 个版本
-                        </span>
-                        ` : ''}
                     </div>
                 </div>
                 ${actionButtons}
-                ${group.versions.length > 1 ? `
-                <div class="expand-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </div>
-                ` : ''}
             </div>
-            ${group.versions.length > 1 ? `
-            <div class="version-list ${isExpanded ? 'expanded' : ''}" data-skill-name="${encodeURIComponent(group.name)}">
-                ${group.versions.map(version => renderVersionItem(version, group.name)).join('')}
-            </div>
-            ` : ''}
         </div>
     `;
 }
 
-// Render a version item
-function renderVersionItem(version, skillName) {
-    const badges = [];
-
-    if (version.is_default_version) {
-        badges.push('<span class="version-status default">默认版本</span>');
-    }
-
-    if (version.status === 'approved' && version.is_active) {
-        badges.push('<span class="version-status active">已发布</span>');
-    } else if (version.status === 'pending') {
-        badges.push('<span class="version-status" style="background: #fef3c7; color: #d97706;">待审核</span>');
-    } else if (version.status === 'rejected') {
-        badges.push('<span class="version-status" style="background: #fee2e2; color: #dc2626;">已拒绝</span>');
-    } else if (version.status === 'approved' && !version.is_active) {
-        badges.push('<span class="version-status" style="background: #f3f4f6; color: #64748b;">未上架</span>');
-    }
-
-    // Actions for non-default versions
-    let actions = '';
-    if (!version.is_default_version && version.status === 'approved') {
-        actions = `
-            <button class="btn-action" onclick="event.stopPropagation(); setDefaultVersion(${version.id}, '${encodeURIComponent(skillName)}')" title="设为默认版本">
-                设为默认
-            </button>
-        `;
-    }
-
-    // Add rejection reason for rejected versions
-    let rejectionReason = '';
-    if (version.status === 'rejected' && version.review_comment) {
-        rejectionReason = `<div class="version-rejection-reason" style="grid-column: 1 / -1; padding: 6px 8px; background: #fef2f2; border-left: 2px solid #dc2626; border-radius: 3px; font-size: 12px; color: #991b1b; margin-top: 4px;">拒绝原因: ${escapeHtml(version.review_comment)}</div>`;
-    }
-
-    return `
-        <div class="version-item" data-version-id="${version.id}" style="display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center;">
-            <span class="version-number">v${version.version}</span>
-            <div style="display: flex; gap: 8px;">${badges.join('')}</div>
-            <span class="version-date">${formatDate(version.uploaded_at)}</span>
-            ${actions ? `<div class="version-actions">${actions}</div>` : '<div></div>'}
-            ${rejectionReason}
-        </div>
-    `;
-}
-
-// Generate action buttons for the latest version
-function generateActionButtons(skill, skillName) {
+// Generate action buttons for a skill
+function generateActionButtons(skill) {
     let buttons = '';
+    const skillName = encodeURIComponent(skill.skill_name);
 
-    // Re-upload button
+    // Re-upload button (update)
     buttons += `
-        <a href="/upload?skill_name=${encodeURIComponent(skillName)}" class="btn-action" onclick="event.stopPropagation();">
-            上传新版本
+        <a href="/upload?skill_name=${skillName}" class="btn-action" onclick="event.stopPropagation();">
+            更新技能
         </a>
     `;
 
     if (skill.status === 'approved') {
         if (skill.is_active) {
             buttons += `
-                <button class="btn-action danger" onclick="event.stopPropagation(); unlistSkill(${skill.id}, '${encodeURIComponent(skillName)}', '${skill.version}')">
+                <button class="btn-action danger" onclick="event.stopPropagation(); unlistSkill(${skill.id}, '${skillName}', '${skill.version}')">
                     下架
                 </button>
             `;
         } else {
             buttons += `
-                <button class="btn-action primary" onclick="event.stopPropagation(); publishSkill(${skill.id}, '${encodeURIComponent(skillName)}', '${skill.version}')">
+                <button class="btn-action primary" onclick="event.stopPropagation(); publishSkill(${skill.id}, '${skillName}', '${skill.version}')">
                     发布
-                </button>
-            `;
-        }
-
-        // Set default button (only if not already default)
-        if (!skill.is_default_version) {
-            buttons += `
-                <button class="btn-action" onclick="event.stopPropagation(); setDefaultVersion(${skill.id}, '${encodeURIComponent(skillName)}')">
-                    设为默认
                 </button>
             `;
         }
@@ -427,7 +321,7 @@ function generateActionButtons(skill, skillName) {
         buttons += `<span style="font-size: 13px; color: #a1a1aa;">等待审核...</span>`;
     } else if (skill.status === 'rejected') {
         buttons += `
-            <a href="/upload?skill_name=${encodeURIComponent(skillName)}" class="btn-action" onclick="event.stopPropagation();">
+            <a href="/upload?skill_name=${skillName}" class="btn-action" onclick="event.stopPropagation();">
                 重新上传
             </a>
         `;
@@ -436,7 +330,7 @@ function generateActionButtons(skill, skillName) {
     // Delete button (admin only)
     if (window.currentUserRole === 'admin') {
         buttons += `
-            <button class="btn-action danger" onclick="event.stopPropagation(); deleteSkill(${skill.id}, '${encodeURIComponent(skillName)}', '${skill.version}')" style="margin-left: 4px;">
+            <button class="btn-action danger" onclick="event.stopPropagation(); deleteSkill(${skill.id}, '${skillName}', '${skill.version}')" style="margin-left: 4px;">
                 删除
             </button>
         `;
@@ -447,34 +341,7 @@ function generateActionButtons(skill, skillName) {
 
 // Attach event listeners
 function attachSkillEventListeners() {
-    // Skill card header click (toggle expand)
-    document.querySelectorAll('.skill-card-header').forEach(header => {
-        header.addEventListener('click', (e) => {
-            // Don't toggle if clicking on buttons, links, or checkboxes
-            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('.skill-checkbox')) return;
-
-            const skillName = decodeURIComponent(header.dataset.skillName);
-            toggleSkillGroup(skillName);
-        });
-    });
-}
-
-// Toggle skill group expansion
-function toggleSkillGroup(skillName) {
-    if (expandedGroups.has(skillName)) {
-        expandedGroups.delete(skillName);
-    } else {
-        expandedGroups.add(skillName);
-    }
-
-    // Update UI
-    const header = document.querySelector(`.skill-card-header[data-skill-name="${encodeURIComponent(skillName)}"]`);
-    const versionList = document.querySelector(`.version-list[data-skill-name="${encodeURIComponent(skillName)}"]`);
-
-    if (header && versionList) {
-        header.classList.toggle('expanded', expandedGroups.has(skillName));
-        versionList.classList.toggle('expanded', expandedGroups.has(skillName));
-    }
+    // No expand/collapse functionality needed in single-version mode
 }
 
 // Unlist a skill
@@ -526,33 +393,6 @@ async function publishSkill(skillId, skillName, version) {
             } catch (error) {
                 console.error('Error publishing skill:', error);
                 showToast(error.message || '发布失败', 'error');
-            }
-        }
-    );
-}
-
-// Set default version
-async function setDefaultVersion(skillId, skillName) {
-    showConfirmDialog(
-        '设置默认版本',
-        `确定要将此版本设为 ${decodeURIComponent(skillName)} 的默认版本吗？用户下载时将默认获取此版本。`,
-        async () => {
-            try {
-                const response = await fetch(`/api/my-skills/${skillId}/set-default`, {
-                    method: 'POST'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || '设置失败');
-                }
-
-                showToast('默认版本已更新');
-                await loadSkills(); // Reload to refresh data
-
-            } catch (error) {
-                console.error('Error setting default version:', error);
-                showToast(error.message || '设置失败', 'error');
             }
         }
     );

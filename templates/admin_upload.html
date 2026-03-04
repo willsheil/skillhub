@@ -938,6 +938,9 @@
                     showAlert(`成功上传 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
                     clearSingleFile();
                     loadUploadHistory();
+                } else if (result.error === 'SKILL_EXISTS') {
+                    // 显示覆盖确认对话框
+                    showOverwriteConfirmModal(result);
                 } else if (result.error === 'MISSING_FIELDS') {
                     // 显示补充信息对话框
                     showMissingFieldsModal(result.data);
@@ -1230,6 +1233,74 @@
                 alert('上传失败: ' + error.message);
             } finally {
                 buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+
+        // Show overwrite confirm modal
+        function showOverwriteConfirmModal(data) {
+            const modal = document.createElement('div');
+            modal.id = 'overwrite-confirm-modal';
+            modal.innerHTML = `
+                <div class="modal-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000;">
+                    <div class="modal-card" style="background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
+                        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 12px;">技能已存在</h3>
+                        <p style="color: #64748b; margin-bottom: 20px;">
+                            ${data.message}<br>
+                            <small style="color: #94a3b8;">当前版本: ${data.existing_version}</small>
+                        </p>
+                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                            <button type="button" class="modal-btn-secondary" onclick="closeOverwriteModal()">取消</button>
+                            <button type="button" class="modal-btn-primary" onclick="confirmOverwrite('${data.skill_name}')">确认覆盖</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Close overwrite modal
+        function closeOverwriteModal() {
+            const modal = document.getElementById('overwrite-confirm-modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Confirm overwrite and re-submit
+        async function confirmOverwrite(skillName) {
+            closeOverwriteModal();
+
+            const form = document.getElementById('single-form');
+            const formData = new FormData(form);
+            formData.append('confirm_overwrite', 'true');
+
+            const submitBtn = document.getElementById('single-submit');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>⏳</span><span>上传中...</span>';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert(`成功更新 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    clearSingleFile();
+                    loadUploadHistory();
+                } else if (result.error === 'MISSING_FIELDS') {
+                    showMissingFieldsModal(result.data);
+                } else {
+                    showAlert(result.error || '上传失败', 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAlert('上传失败: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span>⬆️</span><span>上传 Skill</span>';
             }
         }
 
