@@ -934,7 +934,7 @@ async def admin_api_keys_page(request: Request):
     })
 
 
-def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
+def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[bool, dict]:
     """Validate a skill ZIP file according to Agent Skills specification.
 
     The ZIP should have structure:
@@ -958,9 +958,12 @@ def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
 
     Args:
         zip_path: Path to the skill ZIP file
+        allow_missing: If True, return missing fields info instead of rejecting
 
     Returns:
         (is_valid, metadata or error_info)
+        When allow_missing=True and fields are missing, returns:
+        (False, {"error": "MISSING_FIELDS", "missing_fields": [...], "metadata": {...}})
     """
     import zipfile
 
@@ -1011,15 +1014,45 @@ def validate_skill_zip(zip_path: Path) -> tuple[bool, dict]:
             if not isinstance(skill_metadata, dict):
                 return False, {"error": "Metadata must be a key-value mapping"}
 
-            # Validate version is required in metadata
+            # 检查缺失字段
+            missing_fields = []
             version = skill_metadata.get("version")
+            if not version:
+                missing_fields.append("metadata.version")
+
+            author = skill_metadata.get("author")
+            if not author:
+                missing_fields.append("metadata.author")
+
+            # 如果有缺失字段且允许缺失模式，返回缺失信息
+            if missing_fields and allow_missing:
+                # 构建现有字段信息
+                existing_metadata = {
+                    "name": metadata["name"],
+                    "description": metadata["description"],
+                    "license": metadata.get("license"),
+                    "compatibility": metadata.get("compatibility"),
+                    "metadata": skill_metadata,
+                    "allowed_tools": metadata.get("allowed-tools")
+                }
+                # 添加已有的 version 和 author
+                if version:
+                    existing_metadata["version"] = version
+                if author:
+                    existing_metadata["author"] = author
+
+                return False, {
+                    "error": "MISSING_FIELDS",
+                    "missing_fields": missing_fields,
+                    "metadata": existing_metadata
+                }
+
+            # 严格模式：验证所有必填字段
             if not version:
                 return False, {"error": "Missing required field 'metadata.version' in SKILL.md"}
             if not isinstance(version, str) or len(version) == 0:
                 return False, {"error": "Metadata.version must be a non-empty string"}
 
-            # Validate author is required in metadata
-            author = skill_metadata.get("author")
             if not author:
                 return False, {"error": "Missing required field 'metadata.author' in SKILL.md"}
             if not isinstance(author, str) or len(author) == 0:
@@ -1999,11 +2032,35 @@ async def upload_plugin(
         with open(temp_zip, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        # Validate the ZIP file
-        is_valid, result = validate_skill_zip(temp_zip)
+        # Validate the ZIP file (allow missing fields for补充)
+        is_valid, result = validate_skill_zip(temp_zip, allow_missing=True)
 
         if not is_valid:
             error_msg = result.get('error', 'Unknown error')
+
+            # 处理缺失字段的情况
+            if error_msg == "MISSING_FIELDS":
+                # 生成临时文件 ID 并保存文件
+                import secrets
+                temp_file_id = secrets.token_urlsafe(16)
+                temp_storage_dir = Path(tempfile.gettempdir()) / "skillhub_uploads"
+                temp_storage_dir.mkdir(exist_ok=True)
+                temp_storage_path = temp_storage_dir / f"{temp_file_id}.zip"
+                shutil.copy(temp_zip, temp_storage_path)
+
+                # 返回缺失字段信息
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={
+                        "success": False,
+                        "error": "MISSING_FIELDS",
+                        "data": {
+                            "missing_fields": result.get("missing_fields", []),
+                            "metadata": result.get("metadata", {}),
+                            "temp_file_id": temp_file_id
+                        }
+                    }
+                )
 
             # Map validation errors to user-friendly messages
             error_messages = {
@@ -2121,6 +2178,200 @@ async def upload_plugin(
     finally:
         # Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def update_skill_metadata_in_zip(zip_path: Path, version: str, author: str) -> Path:
+    """更新 ZIP 文件中的 SKILL.md，添加缺失的 metadata.version 和 metadata.author
+
+    Args:
+        zip_path: 原始 ZIP 文件路径
+        version: 版本号
+        author: 作者ID
+
+    Returns:
+        更新后的 ZIP 文件路径
+    """
+    import zipfile
+    import tempfile
+
+    try:
+        # 读取原始 ZIP
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            namelist = zf.namelist()
+
+            # 找到 SKILL.md
+            skill_md_paths = [name for name in namelist
+                             if name.endswith('SKILL.md') or name == 'SKILL.md']
+
+            if not skill_md_paths:
+                raise ValueError("SKILL.md not found in ZIP")
+
+            skill_md_path = skill_md_paths[0]
+            original_content = zf.read(skill_md_path).decode('utf-8')
+
+        # 解析并更新 YAML frontmatter
+        metadata, content = parse_skill_md(original_content)
+
+        if metadata is None:
+            raise ValueError("Invalid YAML frontmatter in SKILL.md")
+
+        # 确保 metadata 字典存在
+        if 'metadata' not in metadata or not isinstance(metadata['metadata'], dict):
+            metadata['metadata'] = {}
+
+        # 更新 version 和 author
+        metadata['metadata']['version'] = version
+        metadata['metadata']['author'] = author
+
+        # 重建 SKILL.md 内容
+        import yaml
+        yaml_frontmatter = yaml.dump(metadata, default_flow_style=False, allow_unicode=True)
+        updated_content = f"---\n{yaml_frontmatter}---\n\n{content}"
+
+        # 创建新的 ZIP 文件
+        output_path = zip_path.parent / f"updated_{zip_path.name}"
+
+        with zipfile.ZipFile(zip_path, 'r') as zf_in:
+            with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf_out:
+                for item in zf_in.infolist():
+                    if item.filename == skill_md_path:
+                        # 写入更新后的 SKILL.md
+                        zf_out.writestr(item, updated_content.encode('utf-8'))
+                    else:
+                        # 复制其他文件
+                        zf_out.writestr(item, zf_in.read(item.filename))
+
+        # 替换原文件
+        shutil.move(output_path, zip_path)
+
+        return zip_path
+
+    except Exception as e:
+        raise ValueError(f"Failed to update ZIP metadata: {str(e)}")
+
+
+@app.post("/api/upload/complete")
+async def complete_upload_with_metadata(
+    request: Request,
+    temp_file_id: str = Form(...),
+    version: str = Form(...),
+    author: str = Form(...),
+    source_type: str = Form(default="opensource"),
+    _: bool = Depends(require_auth)
+):
+    """补充缺失的 metadata 信息后完成上传
+
+    Args:
+        temp_file_id: 临时文件 ID
+        version: 版本号
+        author: 作者ID
+        source_type: 来源类型
+
+    Returns:
+        上传结果
+    """
+    import tempfile
+    from fastapi.responses import JSONResponse
+
+    # 获取当前用户
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"success": False, "error": "请先登录"}
+        )
+
+    # 验证作者格式
+    import re
+    if not re.match(r'^[a-z]\d{8}$', author):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "error": "作者ID格式错误，必须是小写字母+8位数字（如：w00545471）"}
+        )
+
+    # 验证版本号格式
+    if not version or not isinstance(version, str) or len(version) == 0:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "error": "版本号不能为空"}
+        )
+
+    # 获取临时文件路径
+    temp_storage_dir = Path(tempfile.gettempdir()) / "skillhub_uploads"
+    temp_zip = temp_storage_dir / f"{temp_file_id}.zip"
+
+    if not temp_zip.exists():
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"success": False, "error": "临时文件不存在，请重新上传"}
+        )
+
+    try:
+        # 更新 ZIP 文件中的 metadata
+        update_skill_metadata_in_zip(temp_zip, version, author)
+
+        # 重新验证 ZIP 文件
+        is_valid, result = validate_skill_zip(temp_zip, allow_missing=False)
+
+        if not is_valid:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "error": result.get('error', '验证失败')}
+            )
+
+        # 保存到 pending 目录
+        skill_name = result["name"]
+        target_filename = f"{skill_name}-{version}.zip"
+        target_path = PENDING_DIR / target_filename
+
+        # 检查是否已存在
+        from database import check_skill_exists
+        if check_skill_exists(skill_name, version):
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={"success": False, "error": f"技能 {skill_name}@{version} 已存在，请使用不同的版本号"}
+            )
+
+        # 复制文件到 pending 位置
+        shutil.copy(temp_zip, target_path)
+
+        # 创建数据库记录
+        from database import create_skill_record
+        skill_id = create_skill_record(
+            skill_name=skill_name,
+            version=version,
+            filename=target_filename,
+            uploader_id=user_id,
+            status='pending',
+            source_type=source_type
+        )
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": f"成功上传 {skill_name}@{version}，等待管理员审核",
+                "skill_name": skill_name,
+                "version": version,
+                "skill_id": skill_id
+            }
+        )
+
+    except ValueError as e:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "error": str(e)}
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": f"上传失败: {str(e)}"}
+        )
+    finally:
+        # 清理临时文件
+        if temp_zip.exists():
+            temp_zip.unlink()
 
 
 @app.post("/admin/upload-batch")
