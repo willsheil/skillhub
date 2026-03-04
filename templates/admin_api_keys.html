@@ -825,17 +825,6 @@
             <div class="modal-body">
                 <form id="createForm">
                     <div class="form-group">
-                        <label class="form-label">
-                            选择用户
-                            <span class="required">*</span>
-                        </label>
-                        <select class="form-select" id="userId" required>
-                            <option value="">请选择用户</option>
-                        </select>
-                        <div class="form-hint">API Key 将关联到所选用户</div>
-                    </div>
-
-                    <div class="form-group">
                         <label class="form-label">名称</label>
                         <input type="text" class="form-input" id="keyName" placeholder="例如：生产环境API" maxlength="100">
                         <div class="form-hint">可选，用于标识此 API Key 的用途</div>
@@ -954,15 +943,8 @@
         }
 
         async function loadUsers() {
-            try {
-                const response = await fetch('/api/admin/users?per_page=1000');
-                const result = await response.json();
-                if (result.success) {
-                    users = result.data.items;
-                }
-            } catch (error) {
-                console.error('Failed to load users:', error);
-            }
+            // 不再需要加载用户列表，API Key 不绑定用户
+            users = [];
         }
 
         async function loadApiKeys() {
@@ -1098,13 +1080,8 @@
 
         function openCreateModal() {
             const modal = document.getElementById('createModal');
-            const select = document.getElementById('userId');
             const display = document.getElementById('apiKeyDisplay');
             const footer = document.getElementById('createModalFooter');
-
-            // Populate users select
-            select.innerHTML = '<option value="">请选择用户</option>' +
-                users.map(u => `<option value="${u.id}">${u.employee_id} (${u.role === 'admin' ? '管理员' : '用户'})</option>`).join('');
 
             // Reset form
             document.getElementById('keyName').value = '';
@@ -1116,14 +1093,8 @@
         }
 
         async function createApiKey() {
-            const userId = document.getElementById('userId').value;
             const name = document.getElementById('keyName').value;
             const rateLimit = parseInt(document.getElementById('rateLimit').value);
-
-            if (!userId) {
-                showToast('请选择用户', 'error');
-                return;
-            }
 
             const createBtn = document.getElementById('createBtn');
             createBtn.disabled = true;
@@ -1131,7 +1102,6 @@
 
             try {
                 const formData = new FormData();
-                formData.append('user_id', userId);
                 formData.append('name', name || '');
                 formData.append('rate_limit', rateLimit);
 

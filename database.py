@@ -2466,7 +2466,7 @@ def get_api_keys_list(page: int = 1, per_page: int = 20, search: str = None,
             params = []
 
             if search:
-                conditions.append("(eak.name LIKE %s OR u.employee_id LIKE %s)")
+                conditions.append("(eak.name LIKE %s OR COALESCE(u.employee_id, '管理员') LIKE %s)")
                 params.extend([f"%{search}%", f"%{search}%"])
 
             if status_filter == "active":
@@ -2489,7 +2489,7 @@ def get_api_keys_list(page: int = 1, per_page: int = 20, search: str = None,
             # 获取数据
             offset = (page - 1) * per_page
             data_query = f"""
-                SELECT eak.*, u.employee_id
+                SELECT eak.*, COALESCE(u.employee_id, '管理员') as employee_id
                 FROM external_api_keys eak
                 LEFT JOIN users u ON eak.user_id = u.id
                 {where_clause}

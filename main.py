@@ -3664,23 +3664,25 @@ async def api_get_api_keys(
 @app.post("/api/admin/api-keys")
 async def api_create_api_key(
     request: Request,
-    user_id: int = Form(...),
     name: str = Form(None, max_length=100),
     rate_limit: int = Form(100, ge=1, le=1000),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
-    """创建新的 API Key（管理员）"""
+    """创建新的 API Key（管理员）- 不绑定用户，用于外部 API 调用"""
     try:
-        # 验证用户存在
-        user = get_user_by_id(user_id)
-        if not user:
+        # 获取当前管理员 ID
+        current_user = get_current_user(request)
+        if not current_user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized"
             )
 
+        # 使用固定值 0 表示这是管理员创建的全局 API Key
+        admin_user_id = 0
+
         # 创建 API Key
-        api_key_info = create_api_key(user_id, name, rate_limit)
+        api_key_info = create_api_key(admin_user_id, name, rate_limit)
         if not api_key_info:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -3689,10 +3691,7 @@ async def api_create_api_key(
 
         return {
             "success": True,
-            "data": {
-                **api_key_info,
-                "employee_id": user["employee_id"]
-            },
+            "data": api_key_info,
             "message": "API Key created successfully. Save the key now as it won't be shown again."
         }
     except HTTPException:
