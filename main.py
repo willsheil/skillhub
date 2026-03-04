@@ -475,6 +475,7 @@ def scan_plugins() -> List[dict]:
 
         # Build result list with metadata from ZIP files
         for row in rows:
+            skill_name = row["skill_name"]
             # Extract metadata from ZIP file
             metadata = extract_metadata(row["filename"])
             if not metadata:
