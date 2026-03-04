@@ -1534,6 +1534,16 @@ def migrate_to_single_version():
 
         # Step 2: Clean up duplicate skill_name records
         # Keep the record with is_default_version=1, or the earliest uploaded_at
+        # First, delete notifications that reference the duplicate skills
+        cursor.execute("""
+            DELETE n FROM notifications n
+            INNER JOIN skills s1 ON n.related_skill_id = s1.id
+            INNER JOIN skills s2 ON s1.skill_name = s2.skill_name
+            WHERE s1.id > s2.id
+        """)
+        conn.commit()
+
+        # Then delete the duplicate skill records
         cursor.execute("""
             DELETE t1 FROM skills t1
             INNER JOIN skills t2
