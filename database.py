@@ -2324,16 +2324,14 @@ def init_external_api_tables():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS external_api_keys (
                 id INT PRIMARY KEY AUTO_INCREMENT,
-                user_id INT NOT NULL,
+                user_id INT NULL,
                 api_key VARCHAR(64) UNIQUE NOT NULL,
                 name VARCHAR(100),
                 is_active TINYINT(1) DEFAULT 1,
                 rate_limit INT DEFAULT 100,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_used_at TIMESTAMP NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                INDEX idx_api_key (api_key),
-                INDEX idx_user_id (user_id)
+                INDEX idx_api_key (api_key)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
 
@@ -2354,6 +2352,10 @@ def init_external_api_tables():
                 INDEX idx_endpoint (endpoint)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+
+        # 迁移：修改 user_id 为可空（如果表已存在且为 NOT NULL）
+        migrate_api_keys_user_id_nullable(conn)
+
         conn.commit()
 
 
@@ -2603,3 +2605,41 @@ def get_api_key_stats(api_key_id: int) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"获取 API Key 统计失败: {e}")
         return None
+
+
+def migrate_api_keys_user_id_nullable(conn):
+    """迁移：将 external_api_keys 表的 user_id 改为可空"""
+    try:
+        # 检查外键约束是否存在
+        fk_check = conn.execute("""
+            SELECT CONSTRAINT_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'external_api_keys'
+            AND CONSTRAINT_NAME = 'external_api_keys_ibfk_1'
+        """).fetchone()
+
+        if fk_check:
+            logger.info("Migration: Dropping foreign key constraint on external_api_keys.user_id")
+            conn.execute("ALTER TABLE external_api_keys DROP FOREIGN KEY external_api_keys_ibfk_1")
+
+        # 检查 user_id 是否为 NOT NULL
+        column_info = conn.execute("""
+            SELECT IS_NULLABLE
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'external_api_keys'
+            AND COLUMN_NAME = 'user_id'
+        """).fetchone()
+
+        if column_info and column_info['IS_NULLABLE'] == 'NO':
+            logger.info("Migration: Making external_api_keys.user_id nullable")
+            # 先将现有记录的 user_id 设为一个有效值或 NULL
+            conn.execute("UPDATE external_api_keys SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users)")
+            # 修改列为可空
+            conn.execute("ALTER TABLE external_api_keys MODIFY user_id INT NULL")
+
+        logger.info("Migration: external_api_keys.user_id is now nullable")
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+        # 不抛出异常，允许继续执行
