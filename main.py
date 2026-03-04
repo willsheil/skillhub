@@ -466,28 +466,15 @@ def scan_plugins() -> List[dict]:
             SELECT
                 id, skill_name, version, filename, uploader_id, status,
                 source_type, uploaded_at, reviewed_at, reviewer_id,
-                review_comment, is_active, is_default_version
+                review_comment, is_active
             FROM skills
             WHERE status = 'approved' AND is_active = 1
             ORDER BY skill_name, uploaded_at DESC
             """
         ).fetchall()
 
-        # Group by skill_name to get only one entry per skill (the default version if exists)
-        skills_by_name = {}
-        for row in rows:
-            skill_name = row["skill_name"]
-            is_default = row["is_default_version"]
-
-            # If we haven't added this skill yet, or this is the default version
-            if skill_name not in skills_by_name or is_default:
-                skills_by_name[skill_name] = row
-            # If current is not default and existing is not default, keep the first one
-            elif not skills_by_name[skill_name]["is_default_version"]:
-                continue  # Keep the existing one
-
         # Build result list with metadata from ZIP files
-        for skill_name, row in skills_by_name.items():
+        for row in rows:
             # Extract metadata from ZIP file
             metadata = extract_metadata(row["filename"])
             if not metadata:

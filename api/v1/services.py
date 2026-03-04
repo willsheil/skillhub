@@ -58,7 +58,7 @@ def get_skills_list(
         # 查询数据
         query = f"""
             SELECT id, skill_name, description, metadata, source_type,
-                   version, filename, is_default_version
+                   version, filename
             FROM skills
             WHERE {where_clause}
             ORDER BY created_at DESC
@@ -136,14 +136,13 @@ def get_skill_detail(skill_name: str) -> Optional[Dict[str, Any]]:
         技能详情字典，不存在返回 None
     """
     with get_connection() as conn:
-        # 获取默认版本信息
+        # 获取技能信息（单版本模式）
         row = conn.execute(
             """
             SELECT id, skill_name, description, metadata, source_type,
-                   version, filename, is_default_version
+                   version, filename
             FROM skills
             WHERE skill_name = %s AND status = 'approved' AND is_active = 1
-            ORDER BY is_default_version DESC, version DESC
             LIMIT 1
             """,
             (skill_name,)
@@ -169,38 +168,38 @@ def get_skill_detail(skill_name: str) -> Optional[Dict[str, Any]]:
             "compatibility": metadata.get("compatibility")
         }
 
-        # 获取所有版本详情
-        versions = _get_skill_version_details(skill_name)
-
         return {
             "name": row['skill_name'],
             "description": row['description'] or "",
             "metadata": metadata,
             "source_type": row['source_type'],
-            "versions": versions
+            "version": row['version'],
+            "filename": row['filename']
         }
 
 def _get_skill_version_details(skill_name: str) -> List[Dict[str, Any]]:
-    """获取技能的所有版本详情"""
+    """获取技能的所有版本详情（单版本模式，返回单个版本）"""
     with get_connection() as conn:
-        rows = conn.execute(
+        row = conn.execute(
             """
-            SELECT version, filename, is_default_version
+            SELECT version, filename
             FROM skills
             WHERE skill_name = %s AND status = 'approved' AND is_active = 1
-            ORDER BY version DESC
+            LIMIT 1
             """,
             (skill_name,)
-        ).fetchall()
+        ).fetchone()
+
+        if not row:
+            return []
 
         return [
             {
                 "version": row['version'],
                 "filename": row['filename'],
-                "is_default": bool(row['is_default_version']),
-                "download_url": f"/api/v1/skills/{skill_name}/download?version={row['version']}"
+                "is_default": True,
+                "download_url": f"/api/v1/skills/{skill_name}/download"
             }
-            for row in rows
         ]
 
 def get_skill_download_path(skill_name: str, version: Optional[str] = None) -> Optional[str]:
@@ -208,32 +207,21 @@ def get_skill_download_path(skill_name: str, version: Optional[str] = None) -> O
 
     Args:
         skill_name: 技能名称
-        version: 版本号，None 表示默认版本
+        version: 版本号（已忽略，单版本模式）
 
     Returns:
         文件路径，不存在返回 None
     """
     with get_connection() as conn:
-        if version:
-            row = conn.execute(
-                """
-                SELECT filename FROM skills
-                WHERE skill_name = %s AND version = %s
+        row = conn.execute(
+            """
+            SELECT filename FROM skills
+            WHERE skill_name = %s
                 AND status = 'approved' AND is_active = 1
                 LIMIT 1
-                """,
-                (skill_name, version)
-            ).fetchone()
-        else:
-            row = conn.execute(
-                """
-                SELECT filename FROM skills
-                WHERE skill_name = %s AND is_default_version = 1
-                AND status = 'approved' AND is_active = 1
-                LIMIT 1
-                """,
-                (skill_name,)
-            ).fetchone()
+            """,
+            (skill_name,)
+        ).fetchone()
 
         if row:
             from pathlib import Path

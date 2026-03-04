@@ -2101,7 +2101,7 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
             # Admin can delete any skill, no ownership check needed
             verify_row = conn.execute(
                 """
-                SELECT id, filename, skill_name, is_default_version, uploader_id
+                SELECT id, filename, skill_name, uploader_id
                 FROM skills
                 WHERE id = %s
                 """,
@@ -2111,34 +2111,6 @@ def batch_delete_skills(user_id: int, skill_ids: List[int]) -> Dict[str, Any]:
             if verify_row:
                 filename = verify_row["filename"]
                 skill_name = verify_row["skill_name"]
-                is_default = verify_row["is_default_version"]
-
-                # If this is the default version, check if there are other versions
-                if is_default:
-                    other_versions = conn.execute(
-                        """
-                        SELECT COUNT(*) as count FROM skills
-                        WHERE skill_name = %s AND id != %s
-                        """,
-                        (skill_name, skill_id)
-                    ).fetchone()
-
-                    # If there are other versions, we need to set a new default
-                    if other_versions["count"] > 0:
-                        # Set the latest other version as default
-                        conn.execute(
-                            """
-                            UPDATE skills
-                            SET is_default_version = 1
-                            WHERE id = (
-                                SELECT id FROM skills
-                                WHERE skill_name = %s AND id != %s
-                                ORDER BY uploaded_at DESC
-                                LIMIT 1
-                            )
-                            """,
-                            (skill_name, skill_id)
-                        )
 
                 # Delete related notifications first (due to foreign key constraint)
                 conn.execute(
