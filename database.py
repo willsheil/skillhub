@@ -264,6 +264,7 @@ def init_db():
     migrate_add_user_management_features()
     migrate_add_skill_description_and_metadata()
     migrate_to_single_version()
+    init_external_api_tables()  # 创建外部 API 相关表
 
 
 def migrate_gitea_push_tasks():
