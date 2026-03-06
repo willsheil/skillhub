@@ -265,6 +265,10 @@ def init_db():
     migrate_add_skill_description_and_metadata()
     migrate_to_single_version()
     init_external_api_tables()  # 创建外部 API 相关表
+    # 新增：评分评论、搜索、分类系统
+    migrate_add_rating_comment_system()
+    migrate_add_search_features()
+    migrate_add_category_system()
 
 
 def migrate_gitea_push_tasks():
@@ -2483,3 +2487,720 @@ def migrate_api_keys_user_id_nullable(conn):
     except Exception as e:
         logger.error(f"Migration failed: {e}")
         # 不抛出异常，允许继续执行
+
+
+# ============================================
+# 评分评论系统
+# ============================================
+
+def migrate_add_rating_comment_system():
+    """迁移：添加评分评论系统表和 skills 表相关字段"""
+    with get_connection() as conn:
+        # 创建 skill_ratings 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS skill_ratings (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                skill_id INT NOT NULL,
+                user_id INT NOT NULL,
+                rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE KEY uk_skill_user (skill_id, user_id),
+                INDEX idx_skill_rating (skill_id, rating)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        # 创建 skill_comments 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS skill_comments (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                skill_id INT NOT NULL,
+                user_id INT NOT NULL,
+                content VARCHAR(500) NOT NULL,
+                rating_id INT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                is_deleted TINYINT(1) DEFAULT 0,
+                FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (rating_id) REFERENCES skill_ratings(id) ON DELETE SET NULL,
+                INDEX idx_skill_created (skill_id, created_at DESC),
+                INDEX idx_user_comments (user_id, created_at DESC)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        # 给 skills 表添加评分统计字段
+        cursor = conn._conn.cursor()
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        if "rating_average" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN rating_average DECIMAL(2,1) DEFAULT 0.0")
+            logger.info("Migration: Added rating_average column to skills table")
+
+        if "rating_count" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN rating_count INT DEFAULT 0")
+            logger.info("Migration: Added rating_count column to skills table")
+
+        if "comment_count" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN comment_count INT DEFAULT 0")
+            logger.info("Migration: Added comment_count column to skills table")
+
+        conn.commit()
+        logger.info("Migration: rating_comment_system migration completed")
+
+
+def submit_rating(skill_id: int, user_id: int, rating: int) -> Dict[str, Any]:
+    """提交或更新评分
+
+    Args:
+        skill_id: 技能ID
+        user_id: 用户ID
+        rating: 评分 (1-5)
+
+    Returns:
+        操作结果
+    """
+    if rating < 1 or rating > 5:
+        return {"success": False, "error": "评分必须在 1-5 之间"}
+
+    with get_connection() as conn:
+        # 检查是否已评分
+        existing = conn.execute(
+            "SELECT id FROM skill_ratings WHERE skill_id = %s AND user_id = %s",
+            (skill_id, user_id)
+        ).fetchone()
+
+        if existing:
+            # 更新评分
+            conn.execute(
+                "UPDATE skill_ratings SET rating = %s WHERE skill_id = %s AND user_id = %s",
+                (rating, skill_id, user_id)
+            )
+        else:
+            # 新增评分
+            conn.execute(
+                "INSERT INTO skill_ratings (skill_id, user_id, rating) VALUES (%s, %s, %s)",
+                (skill_id, user_id, rating)
+            )
+
+        # 更新技能的评分统计
+        _update_skill_rating_stats(conn, skill_id)
+        conn.commit()
+
+        return {"success": True, "rating": rating}
+
+
+def get_user_rating(skill_id: int, user_id: int) -> Optional[int]:
+    """获取用户对技能的评分
+
+    Args:
+        skill_id: 技能ID
+        user_id: 用户ID
+
+    Returns:
+        评分值或 None
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT rating FROM skill_ratings WHERE skill_id = %s AND user_id = %s",
+            (skill_id, user_id)
+        ).fetchone()
+        return row["rating"] if row else None
+
+
+def get_skill_ratings(skill_id: int) -> Dict[str, Any]:
+    """获取技能的评分统计
+
+    Args:
+        skill_id: 技能ID
+
+    Returns:
+        评分统计信息
+    """
+    with get_connection() as conn:
+        # 获取评分分布
+        distribution = conn.execute(
+            """
+            SELECT rating, COUNT(*) as count
+            FROM skill_ratings
+            WHERE skill_id = %s
+            GROUP BY rating
+            ORDER BY rating
+            """,
+            (skill_id,)
+        ).fetchall()
+
+        # 获取平均分和总数
+        stats = conn.execute(
+            """
+            SELECT
+                COALESCE(AVG(rating), 0) as average,
+                COUNT(*) as total
+            FROM skill_ratings
+            WHERE skill_id = %s
+            """,
+            (skill_id,)
+        ).fetchone()
+
+        distribution_dict = {i: 0 for i in range(1, 6)}
+        for row in distribution:
+            distribution_dict[row["rating"]] = row["count"]
+
+        return {
+            "average": round(float(stats["average"]), 1) if stats else 0.0,
+            "total": stats["total"] if stats else 0,
+            "distribution": distribution_dict
+        }
+
+
+def _update_skill_rating_stats(conn, skill_id: int):
+    """更新技能的评分统计字段"""
+    stats = conn.execute(
+        """
+        SELECT
+            COALESCE(AVG(rating), 0) as average,
+            COUNT(*) as total
+        FROM skill_ratings
+        WHERE skill_id = %s
+        """,
+        (skill_id,)
+    ).fetchone()
+
+    if stats:
+        conn.execute(
+            "UPDATE skills SET rating_average = %s, rating_count = %s WHERE id = %s",
+            (round(float(stats["average"]), 1), stats["total"], skill_id)
+        )
+
+
+def add_comment(skill_id: int, user_id: int, content: str, rating_id: Optional[int] = None) -> Dict[str, Any]:
+    """添加评论
+
+    Args:
+        skill_id: 技能ID
+        user_id: 用户ID
+        content: 评论内容（限500字）
+        rating_id: 关联的评分ID
+
+    Returns:
+        操作结果
+    """
+    if len(content) > 500:
+        return {"success": False, "error": "评论内容不能超过500字"}
+
+    if len(content.strip()) == 0:
+        return {"success": False, "error": "评论内容不能为空"}
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO skill_comments (skill_id, user_id, content, rating_id)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (skill_id, user_id, content, rating_id)
+        )
+        comment_id = cursor.lastrowid
+
+        # 更新评论计数
+        conn.execute(
+            "UPDATE skills SET comment_count = comment_count + 1 WHERE id = %s",
+            (skill_id,)
+        )
+
+        conn.commit()
+
+        return {
+            "success": True,
+            "comment_id": comment_id,
+            "content": content
+        }
+
+
+def get_skill_comments(skill_id: int, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
+    """获取技能的评论列表
+
+    Args:
+        skill_id: 技能ID
+        page: 页码
+        per_page: 每页数量
+
+    Returns:
+        评论列表和分页信息
+    """
+    with get_connection() as conn:
+        # 获取总数
+        total_row = conn.execute(
+            "SELECT COUNT(*) as total FROM skill_comments WHERE skill_id = %s AND is_deleted = 0",
+            (skill_id,)
+        ).fetchone()
+        total = total_row["total"] if total_row else 0
+
+        # 获取评论列表
+        offset = (page - 1) * per_page
+        comments = conn.execute(
+            """
+            SELECT
+                c.id, c.content, c.created_at, c.updated_at,
+                c.rating_id, u.employee_id,
+                r.rating
+            FROM skill_comments c
+            JOIN users u ON c.user_id = u.id
+            LEFT JOIN skill_ratings r ON c.rating_id = r.id
+            WHERE c.skill_id = %s AND c.is_deleted = 0
+            ORDER BY c.created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (skill_id, per_page, offset)
+        ).fetchall()
+
+        return {
+            "comments": [
+                {
+                    "id": row["id"],
+                    "content": row["content"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                    "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+                    "author": row["employee_id"],
+                    "rating": row["rating"]
+                }
+                for row in comments
+            ],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page if total > 0 else 0
+        }
+
+
+def delete_comment(comment_id: int, user_id: int) -> bool:
+    """删除评论（软删除）
+
+    Args:
+        comment_id: 评论ID
+        user_id: 用户ID（只能删除自己的评论）
+
+    Returns:
+        是否成功
+    """
+    with get_connection() as conn:
+        # 检查评论是否存在且属于该用户
+        comment = conn.execute(
+            "SELECT skill_id FROM skill_comments WHERE id = %s AND user_id = %s AND is_deleted = 0",
+            (comment_id, user_id)
+        ).fetchone()
+
+        if not comment:
+            return False
+
+        # 软删除
+        conn.execute(
+            "UPDATE skill_comments SET is_deleted = 1 WHERE id = %s",
+            (comment_id,)
+        )
+
+        # 更新评论计数
+        conn.execute(
+            "UPDATE skills SET comment_count = GREATEST(0, comment_count - 1) WHERE id = %s",
+            (comment["skill_id"],)
+        )
+
+        conn.commit()
+        return True
+
+
+# ============================================
+# 搜索历史
+# ============================================
+
+def migrate_add_search_features():
+    """迁移：添加搜索历史表"""
+    with get_connection() as conn:
+        # 创建 search_history 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS search_history (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                user_id INT NOT NULL,
+                query VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                INDEX idx_user_created (user_id, created_at DESC)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        conn.commit()
+        logger.info("Migration: search_features migration completed")
+
+
+def add_search_history(user_id: int, query: str) -> None:
+    """添加搜索历史
+
+    Args:
+        user_id: 用户ID
+        query: 搜索关键词
+    """
+    if not query or len(query.strip()) == 0:
+        return
+
+    with get_connection() as conn:
+        # 检查是否已存在相同搜索词
+        existing = conn.execute(
+            """
+            SELECT id FROM search_history
+            WHERE user_id = %s AND query = %s
+            """,
+            (user_id, query.strip())
+        ).fetchone()
+
+        if existing:
+            # 更新时间戳
+            conn.execute(
+                "UPDATE search_history SET created_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (existing["id"],)
+            )
+        else:
+            # 新增记录
+            conn.execute(
+                "INSERT INTO search_history (user_id, query) VALUES (%s, %s)",
+                (user_id, query.strip())
+            )
+
+        conn.commit()
+
+
+def get_search_history(user_id: int, limit: int = 10) -> List[str]:
+    """获取用户搜索历史
+
+    Args:
+        user_id: 用户ID
+        limit: 最大返回数量
+
+    Returns:
+        搜索历史列表
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT query FROM search_history
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (user_id, limit)
+        ).fetchall()
+
+        return [row["query"] for row in rows]
+
+
+def clear_search_history(user_id: int) -> None:
+    """清空用户搜索历史
+
+    Args:
+        user_id: 用户ID
+    """
+    with get_connection() as conn:
+        conn.execute("DELETE FROM search_history WHERE user_id = %s", (user_id,))
+        conn.commit()
+
+
+# ============================================
+# 分类系统
+# ============================================
+
+def migrate_add_category_system():
+    """迁移：添加分类系统表和 skills 表相关字段"""
+    with get_connection() as conn:
+        # 创建 categories 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(50) NOT NULL UNIQUE,
+                slug VARCHAR(50) NOT NULL UNIQUE,
+                icon VARCHAR(50),
+                sort_order INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_slug (slug),
+                INDEX idx_sort (sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+
+        # 初始化分类数据
+        categories_data = [
+            ('前端开发', 'frontend', 'code', 1),
+            ('后端开发', 'backend', 'server', 2),
+            ('DevOps', 'devops', 'git-branch', 3),
+            ('安全', 'security', 'shield', 4),
+            ('数据工程', 'data', 'database', 5),
+            ('通用工具', 'general', 'tool', 6),
+        ]
+
+        for name, slug, icon, sort_order in categories_data:
+            conn.execute(
+                """
+                INSERT IGNORE INTO categories (name, slug, icon, sort_order)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (name, slug, icon, sort_order)
+            )
+
+        # 给 skills 表添加分类和统计字段
+        cursor = conn._conn.cursor()
+        cursor.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        if "category_id" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN category_id INT DEFAULT NULL")
+            logger.info("Migration: Added category_id column to skills table")
+
+        if "view_count" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN view_count INT DEFAULT 0")
+            logger.info("Migration: Added view_count column to skills table")
+
+        if "screenshots" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN screenshots TEXT DEFAULT NULL")
+            logger.info("Migration: Added screenshots column to skills table")
+
+        if "usage_example" not in columns:
+            conn.execute("ALTER TABLE skills ADD COLUMN usage_example TEXT DEFAULT NULL")
+            logger.info("Migration: Added usage_example column to skills table")
+
+        # 添加分类索引
+        cursor = conn._conn.cursor()
+        create_index_if_not_exists(
+            cursor,
+            "skills",
+            "idx_skills_category",
+            "CREATE INDEX idx_skills_category ON skills(category_id)"
+        )
+
+        conn.commit()
+        logger.info("Migration: category_system migration completed")
+
+
+def get_categories() -> List[Dict[str, Any]]:
+    """获取所有分类
+
+    Returns:
+        分类列表
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, name, slug, icon, sort_order
+            FROM categories
+            ORDER BY sort_order
+            """
+        ).fetchall()
+
+        return [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "slug": row["slug"],
+                "icon": row["icon"],
+                "sort_order": row["sort_order"]
+            }
+            for row in rows
+        ]
+
+
+def get_category_by_slug(slug: str) -> Optional[Dict[str, Any]]:
+    """根据 slug 获取分类
+
+    Args:
+        slug: 分类 slug
+
+    Returns:
+        分类信息或 None
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, name, slug, icon, sort_order FROM categories WHERE slug = %s",
+            (slug,)
+        ).fetchone()
+
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "slug": row["slug"],
+                "icon": row["icon"],
+                "sort_order": row["sort_order"]
+            }
+        return None
+
+
+def increment_skill_view_count(skill_id: int) -> None:
+    """增加技能浏览次数
+
+    Args:
+        skill_id: 技能ID
+    """
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE skills SET view_count = view_count + 1 WHERE id = %s",
+            (skill_id,)
+        )
+        conn.commit()
+
+
+def update_skill_category(skill_id: int, category_id: Optional[int]) -> bool:
+    """更新技能分类
+
+    Args:
+        skill_id: 技能ID
+        category_id: 分类ID
+
+    Returns:
+        是否成功
+    """
+    with get_connection() as conn:
+        result = conn.execute(
+            "UPDATE skills SET category_id = %s WHERE id = %s",
+            (category_id, skill_id)
+        )
+        conn.commit()
+        return result.rowcount > 0
+
+
+def search_skills(
+    query: str,
+    category_slug: Optional[str] = None,
+    source_type: Optional[str] = None,
+    sort_by: str = "relevance",
+    page: int = 1,
+    per_page: int = 20
+) -> Dict[str, Any]:
+    """高级搜索技能
+
+    Args:
+        query: 搜索关键词
+        category_slug: 分类 slug
+        source_type: 来源类型
+        sort_by: 排序方式 (relevance, downloads, rating, newest)
+        page: 页码
+        per_page: 每页数量
+
+    Returns:
+        搜索结果和分页信息
+    """
+    with get_connection() as conn:
+        # 构建基础查询
+        base_query = """
+            FROM skills s
+            LEFT JOIN categories c ON s.category_id = c.id
+            JOIN users u ON s.uploader_id = u.id
+            WHERE s.status = 'approved' AND s.is_active = 1
+        """
+        params = []
+
+        # 搜索条件
+        if query and query.strip():
+            base_query += " AND (s.skill_name LIKE %s OR s.description LIKE %s)"
+            search_term = f"%{query.strip()}%"
+            params.extend([search_term, search_term])
+
+        # 分类过滤
+        if category_slug:
+            base_query += " AND c.slug = %s"
+            params.append(category_slug)
+
+        # 来源类型过滤
+        if source_type:
+            base_query += " AND s.source_type = %s"
+            params.append(source_type)
+
+        # 获取总数
+        count_query = f"SELECT COUNT(*) as total {base_query}"
+        total_row = conn.execute(count_query, params).fetchone()
+        total = total_row["total"] if total_row else 0
+
+        # 排序
+        order_clause = ""
+        if sort_by == "relevance" and query:
+            # 简单的相关性排序：名称匹配优先
+            order_clause = "ORDER BY CASE WHEN s.skill_name LIKE %s THEN 0 ELSE 1 END, s.rating_average DESC"
+            params.append(f"%{query.strip()}%")
+        elif sort_by == "downloads":
+            order_clause = "ORDER BY s.view_count DESC"
+        elif sort_by == "rating":
+            order_clause = "ORDER BY s.rating_average DESC, s.rating_count DESC"
+        elif sort_by == "newest":
+            order_clause = "ORDER BY s.uploaded_at DESC"
+        else:
+            order_clause = "ORDER BY s.rating_average DESC"
+
+        # 分页
+        offset = (page - 1) * per_page
+        data_query = f"""
+            SELECT
+                s.id, s.skill_name, s.version, s.description, s.source_type,
+                s.rating_average, s.rating_count, s.comment_count, s.view_count,
+                s.uploaded_at, c.name as category_name, c.slug as category_slug,
+                u.employee_id as author
+            {base_query}
+            {order_clause}
+            LIMIT %s OFFSET %s
+        """
+        params.extend([per_page, offset])
+
+        rows = conn.execute(data_query, params).fetchall()
+
+        return {
+            "skills": [
+                {
+                    "id": row["id"],
+                    "name": row["skill_name"],
+                    "version": row["version"],
+                    "description": row["description"],
+                    "source_type": row["source_type"],
+                    "rating_average": float(row["rating_average"]) if row["rating_average"] else 0.0,
+                    "rating_count": row["rating_count"],
+                    "comment_count": row["comment_count"],
+                    "view_count": row["view_count"],
+                    "uploaded_at": row["uploaded_at"].isoformat() if row["uploaded_at"] else None,
+                    "category": {
+                        "name": row["category_name"],
+                        "slug": row["category_slug"]
+                    } if row["category_name"] else None,
+                    "author": row["author"]
+                }
+                for row in rows
+            ],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page if total > 0 else 0
+        }
+
+
+def get_search_suggestions(query: str, limit: int = 5) -> List[str]:
+    """获取搜索建议
+
+    Args:
+        query: 搜索关键词
+        limit: 最大返回数量
+
+    Returns:
+        建议列表
+    """
+    if not query or len(query.strip()) < 2:
+        return []
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT skill_name, MAX(rating_average) as rating_average, MAX(view_count) as view_count
+            FROM skills
+            WHERE status = 'approved' AND is_active = 1
+              AND skill_name LIKE %s
+            GROUP BY skill_name
+            ORDER BY rating_average DESC, view_count DESC
+            LIMIT %s
+            """,
+            (f"%{query.strip()}%", limit)
+        ).fetchall()
+
+        return [row["skill_name"] for row in rows]

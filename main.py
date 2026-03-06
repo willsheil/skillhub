@@ -21,7 +21,7 @@ from datetime import datetime, date
 
 import yaml
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status, Query
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
@@ -64,7 +64,15 @@ from database import (
     get_skill_approval_status, delete_skill_version, batch_unlist_skills,
     batch_delete_skills,
     get_api_keys_list, create_api_key, delete_api_key, toggle_api_key_status,
-    get_api_key_stats
+    get_api_key_stats,
+    # 新增：评分评论系统
+    submit_rating, get_user_rating, get_skill_ratings,
+    add_comment, get_skill_comments, delete_comment,
+    # 新增：搜索历史
+    add_search_history, get_search_history, clear_search_history,
+    # 新增：分类系统
+    get_categories, get_category_by_slug, increment_skill_view_count,
+    update_skill_category, search_skills, get_search_suggestions
 )
 
 # Configure logging - get application logger with proper configuration
@@ -3986,6 +3994,270 @@ async def api_get_api_key_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get API key stats: {str(e)}"
         )
+
+
+# ==================== 搜索、评分、评论、分类 API ====================
+
+@app.get("/api/search")
+async def api_search(
+    request: Request,
+    q: str = "",
+    category: str = None,
+    source_type: str = None,
+    sort: str = "relevance",
+    page: int = 1,
+    per_page: int = 20
+):
+    """高级搜索技能 API
+
+    Args:
+        q: 搜索关键词
+        category: 分类 slug
+        source_type: 来源类型 (opensource/icsl/huawei)
+        sort: 排序方式 (relevance/downloads/rating/newest)
+        page: 页码
+        per_page: 每页数量
+    """
+    user = get_current_user(request)
+
+    # 记录搜索历史（仅登录用户）
+    if user and q.strip():
+        add_search_history(user["id"], q)
+
+    results = search_skills(
+        query=q,
+        category_slug=category,
+        source_type=source_type,
+        sort_by=sort,
+        page=page,
+        per_page=per_page
+    )
+
+    return JSONResponse(content=results)
+
+
+@app.get("/api/search/suggestions")
+async def api_search_suggestions(q: str = "", limit: int = 5):
+    """获取搜索建议 API
+
+    Args:
+        q: 搜索关键词
+        limit: 最大返回数量
+    """
+    suggestions = get_search_suggestions(q, limit)
+    return JSONResponse(content={"suggestions": suggestions})
+
+
+@app.get("/api/search/history")
+async def api_search_history(request: Request, limit: int = 10):
+    """获取搜索历史 API"""
+    user = require_auth(request)
+    history = get_search_history(user["id"], limit)
+    return JSONResponse(content={"history": history})
+
+
+@app.delete("/api/search/history")
+async def api_clear_search_history(request: Request):
+    """清空搜索历史 API"""
+    user = require_auth(request)
+    clear_search_history(user["id"])
+    return JSONResponse(content={"success": True, "message": "搜索历史已清空"})
+
+
+@app.get("/api/categories")
+async def api_get_categories():
+    """获取所有分类 API"""
+    categories = get_categories()
+
+    # 获取每个分类的技能数量
+    for cat in categories:
+        # 通过 scan_plugins 获取活跃技能，然后统计分类
+        cat["skill_count"] = 0  # 暂时设为 0，后续可以通过数据库统计
+
+    return JSONResponse(content={"categories": categories})
+
+
+@app.get("/api/categories/{slug}/skills")
+async def api_get_category_skills(
+    slug: str,
+    page: int = 1,
+    per_page: int = 20,
+    sort: str = "rating"
+):
+    """获取分类下的技能列表 API
+
+    Args:
+        slug: 分类 slug
+        page: 页码
+        per_page: 每页数量
+        sort: 排序方式
+    """
+    category = get_category_by_slug(slug)
+    if not category:
+        raise HTTPException(status_code=404, detail="分类不存在")
+
+    results = search_skills(
+        query="",
+        category_slug=slug,
+        sort_by=sort,
+        page=page,
+        per_page=per_page
+    )
+
+    return JSONResponse(content={
+        "category": category,
+        **results
+    })
+
+
+@app.post("/api/skills/{skill_id}/rating")
+async def api_submit_rating(request: Request, skill_id: int):
+    """提交评分 API"""
+    user = require_auth(request)
+
+    # 验证技能存在
+    skill = database.get_skill_by_id(skill_id)
+    if not skill:
+        raise HTTPException(status_code=404, detail="技能不存在")
+
+    # 获取请求体
+    body = await request.json()
+    rating = body.get("rating")
+
+    if not rating:
+        raise HTTPException(status_code=400, detail="评分不能为空")
+
+    result = submit_rating(skill_id, user["id"], int(rating))
+
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return JSONResponse(content=result)
+
+
+@app.get("/api/skills/{skill_id}/rating")
+async def api_get_rating(request: Request, skill_id: int):
+    """获取技能评分统计和当前用户评分 API"""
+    user = get_current_user(request)
+
+    # 获取评分统计
+    stats = get_skill_ratings(skill_id)
+
+    # 获取当前用户评分
+    user_rating = None
+    if user:
+        user_rating = get_user_rating(skill_id, user["id"])
+
+    return JSONResponse(content={
+        "average": stats["average"],
+        "total": stats["total"],
+        "distribution": stats["distribution"],
+        "user_rating": user_rating
+    })
+
+
+@app.get("/api/skills/{skill_id}/comments")
+async def api_get_comments(skill_id: int, page: int = 1, per_page: int = 10):
+    """获取技能评论列表 API"""
+    result = get_skill_comments(skill_id, page, per_page)
+    return JSONResponse(content=result)
+
+
+@app.post("/api/skills/{skill_id}/comments")
+async def api_add_comment(request: Request, skill_id: int):
+    """发表评论 API"""
+    user = require_auth(request)
+
+    # 验证技能存在
+    skill = database.get_skill_by_id(skill_id)
+    if not skill:
+        raise HTTPException(status_code=404, detail="技能不存在")
+
+    # 获取请求体
+    body = await request.json()
+    content = body.get("content", "").strip()
+    rating_id = body.get("rating_id")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="评论内容不能为空")
+
+    result = add_comment(skill_id, user["id"], content, rating_id)
+
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+    return JSONResponse(content=result)
+
+
+@app.delete("/api/skills/{skill_id}/comments/{comment_id}")
+async def api_delete_comment(request: Request, skill_id: int, comment_id: int):
+    """删除评论 API"""
+    user = require_auth(request)
+
+    success = delete_comment(comment_id, user["id"])
+
+    if not success:
+        raise HTTPException(status_code=404, detail="评论不存在或无权删除")
+
+    return JSONResponse(content={"success": True, "message": "评论已删除"})
+
+
+@app.post("/api/skills/{skill_id}/view")
+async def api_increment_view(skill_id: int):
+    """增加技能浏览次数 API"""
+    database.increment_skill_view_count(skill_id)
+    return JSONResponse(content={"success": True})
+
+
+@app.get("/api/skills/{skill_id}/related")
+async def api_get_related_skills(skill_id: int, limit: int = 5):
+    """获取相关技能推荐 API
+
+    基于同分类和相似名称推荐
+    """
+    skill = database.get_skill_by_id(skill_id)
+    if not skill:
+        raise HTTPException(status_code=404, detail="技能不存在")
+
+    # 获取所有插件
+    plugins = scan_plugins()
+
+    related = []
+    for plugin in plugins:
+        # 排除自己
+        if plugin.get("name") == skill["skill_name"]:
+            continue
+
+        # 计算相关性分数
+        score = 0
+
+        # 同分类加分
+        # TODO: 当插件有分类信息时启用
+
+        # 名称相似度
+        if skill["skill_name"][:3] in plugin.get("name", ""):
+            score += 1
+
+        # 根据评分调整
+        score += float(plugin.get("metadata", {}).get("rating_average", 0)) / 5
+
+        related.append({
+            "name": plugin.get("name"),
+            "description": plugin.get("description", ""),
+            "rating_average": float(plugin.get("metadata", {}).get("rating_average", 0)),
+            "view_count": plugin.get("metadata", {}).get("view_count", 0),
+            "score": score
+        })
+
+    # 排序并取前 limit 个
+    related.sort(key=lambda x: x["score"], reverse=True)
+    related = related[:limit]
+
+    # 移除 score 字段
+    for r in related:
+        del r["score"]
+
+    return JSONResponse(content={"related": related})
 
 
 # ==================== UI Routes ====================

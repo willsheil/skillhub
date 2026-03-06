@@ -7,7 +7,7 @@ def test_external_api_keys_table_exists():
     with get_connection() as conn:
         result = conn.execute("""
             SELECT COUNT(*) as count FROM information_schema.tables
-            WHERE table_name = 'external_api_keys'
+            WHERE table_name = 'external_api_keys' AND table_schema = DATABASE()
         """).fetchone()
         assert result['count'] == 1
 
@@ -17,6 +17,6 @@ def test_api_call_logs_table_exists():
     with get_connection() as conn:
         result = conn.execute("""
             SELECT COUNT(*) as count FROM information_schema.tables
-            WHERE table_name = 'api_call_logs'
+            WHERE table_name = 'api_call_logs' AND table_schema = DATABASE()
         """).fetchone()
         assert result['count'] == 1

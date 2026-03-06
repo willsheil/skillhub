@@ -1272,6 +1272,62 @@
                 </div>
             `;
         }
+
+        // 初始化搜索建议
+        function initSearchSuggestions() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && typeof SearchSuggestions !== 'undefined') {
+                new SearchSuggestions(searchInput, {
+                    onSelect: function(query) {
+                        handleSearch();
+                    }
+                });
+            }
+        }
+
+        // 加载分类（从 API）
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                const data = await response.json();
+
+                if (data.categories && data.categories.length > 0) {
+                    const container = document.getElementById('categoryPills');
+                    if (container) {
+                        // 保留原有的 source_type 分类
+                        let html = `
+                            <button class="category-pill active" data-category="all">全部</button>
+                            <button class="category-pill" data-category="opensource">开源</button>
+                            <button class="category-pill" data-category="icsl">ICSL自研</button>
+                            <button class="category-pill" data-category="huawei">华为自研</button>
+                        `;
+
+                        // 添加新的功能分类
+                        html += '<span style="margin: 0 8px; color: #e5e7eb;">|</span>';
+                        data.categories.forEach(cat => {
+                            html += `<button class="category-pill" data-category-slug="${cat.slug}">${cat.icon || ''} ${cat.name}</button>`;
+                        });
+
+                        container.innerHTML = html;
+
+                        // 重新绑定分类点击事件
+                        setupCategoryPills();
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load categories:', error);
+            }
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initSearchSuggestions();
+            // 暂时注释掉分类加载，因为当前功能分类数据尚未填充
+            // loadCategories();
+        });
     </script>
+
+    <!-- 引入搜索组件 -->
+    <script src="/static/js/search.js"></script>
 </body>
 </html>
