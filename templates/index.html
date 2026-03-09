@@ -886,8 +886,8 @@
                             <div class="card-title" title="${skill.metadata?.name || skill.name}">${skill.metadata?.name || skill.name}</div>
                             <div class="card-author">by ${author}</div>
                             <div class="card-rating">
-                                <span class="stars">${generateStars()}</span>
-                                <span class="rating-count">(${Math.floor(Math.random() * 100) + 10})</span>
+                                <span class="stars">${generateStars(skill.rating || 0)}</span>
+                                <span class="rating-count">(${skill.rating_count || 0})</span>
                             </div>
                         </div>
                     </div>

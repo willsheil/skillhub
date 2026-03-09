@@ -26,8 +26,8 @@ def test_create_push_task():
     # Create a test user first
     with get_connection() as conn:
         cursor = conn.execute("""
-            INSERT INTO users (employee_id, api_key, role)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (employee_id, api_key, role, status, skills_count)
+            VALUES (%s, %s, %s, 1, 0)
         """, ("test-gitea-user", "test-key", "user"))
         user_id = cursor.lastrowid
         conn.commit()
@@ -42,7 +42,7 @@ def test_create_push_task():
         skill_id = cursor.lastrowid
         conn.commit()
 
-    # Create push task
+    # Create push task - this will call get_skill_by_id which uses its own connection
     task_id = create_push_task(skill_id)
 
     assert task_id is not None

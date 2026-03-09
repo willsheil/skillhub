@@ -225,7 +225,7 @@ def init_db():
                 version VARCHAR(50) NOT NULL,
                 filename VARCHAR(255) NOT NULL,
                 uploader_id INT NOT NULL,
-                status VARCHAR(20),
+                status VARCHAR(20) DEFAULT 'pending',
                 source_type VARCHAR(20) DEFAULT 'opensource',
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 reviewed_at TIMESTAMP NULL,
@@ -1132,10 +1132,10 @@ def create_user(employee_id: str, api_key: str, role: str = "user") -> int:
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO users (employee_id, api_key, role)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (employee_id, api_key, role, status)
+            VALUES (%s, %s, %s, %s)
             """,
-            (employee_id, api_key, role)
+            (employee_id, api_key, role, 1)  # status=1 means active
         )
         conn.commit()
         return cursor.lastrowid
@@ -1801,6 +1801,44 @@ def update_skill_active_status(skill_id: int, is_active: bool) -> bool:
             WHERE id = %s
             """,
             (1 if is_active else 0, skill_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def set_skill_default_version(skill_id: int, skill_name: str) -> bool:
+    """Set a skill version as the default version.
+
+    This will:
+    1. Set is_default_version = 0 for all versions of the same skill_name
+    2. Set is_default_version = 1 for the specified skill_id
+
+    Args:
+        skill_id: The skill version ID to set as default
+        skill_name: The skill name (to clear other versions' default status)
+
+    Returns:
+        True if updated successfully, False otherwise
+    """
+    with get_connection() as conn:
+        # First, clear default status for all versions of this skill
+        conn.execute(
+            """
+            UPDATE skills
+            SET is_default_version = 0
+            WHERE skill_name = %s
+            """,
+            (skill_name,)
+        )
+
+        # Then, set the specified version as default
+        cursor = conn.execute(
+            """
+            UPDATE skills
+            SET is_default_version = 1
+            WHERE id = %s
+            """,
+            (skill_id,)
         )
         conn.commit()
         return cursor.rowcount > 0

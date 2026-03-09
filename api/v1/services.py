@@ -75,7 +75,7 @@ def get_skills_list(
         import json
         try:
             metadata = json.loads(row['metadata']) if row['metadata'] else {}
-        except:
+        except (json.JSONDecodeError, TypeError):
             metadata = {}
 
         # 确保必需字段存在，提供默认值
@@ -155,7 +155,7 @@ def get_skill_detail(skill_name: str) -> Optional[Dict[str, Any]]:
         import json
         try:
             metadata = json.loads(row['metadata']) if row['metadata'] else {}
-        except:
+        except (json.JSONDecodeError, TypeError):
             metadata = {}
 
         # 确保必需字段存在，提供默认值

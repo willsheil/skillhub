@@ -51,7 +51,7 @@ PENDING_DIR.mkdir(parents=True, exist_ok=True)
 from database import (
     init_db, record_download, get_download_stats, get_stats_with_author,
     get_user_by_credentials, get_user_by_id, update_last_login,
-    create_skill_record, get_pending_skills, get_skill_by_id,
+    create_skill_record, get_pending_skills, get_skill_by_id, get_skill_by_name,
     update_skill_status, get_user_uploads, get_total_users_count,
     get_skills_count_by_status, get_today_downloads_count,
     get_top_skills_by_downloads, get_top_users_by_downloads,
@@ -64,7 +64,7 @@ from database import (
     get_skill_approval_status, delete_skill_version, batch_unlist_skills,
     batch_delete_skills,
     get_api_keys_list, create_api_key, delete_api_key, toggle_api_key_status,
-    get_api_key_stats,
+    get_api_key_stats, get_connection,
     # 新增：评分评论系统
     submit_rating, get_user_rating, get_skill_ratings,
     add_comment, get_skill_comments, delete_comment,
@@ -177,6 +177,9 @@ def require_auth(request: Request):
     """Check if user is authenticated.
 
     Raises HTTP 401 if user is not logged in.
+
+    Returns:
+        User dictionary if authenticated
     """
     user_id = request.session.get("user_id")
     if not user_id:
@@ -184,7 +187,7 @@ def require_auth(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
         )
-    return True
+    return get_user_by_id(user_id)
 
 
 def require_admin(request: Request):
@@ -466,7 +469,7 @@ def scan_plugins() -> List[dict]:
     result = []
 
     # Get all approved and active skills directly from database
-    from database import get_connection
+    from database import get_connection, get_skill_ratings
 
     with get_connection() as conn:
         rows = conn.execute(
@@ -484,6 +487,8 @@ def scan_plugins() -> List[dict]:
         # Build result list with metadata from ZIP files
         for row in rows:
             skill_name = row["skill_name"]
+            skill_id = row["id"]
+
             # Extract metadata from ZIP file
             metadata = extract_metadata(row["filename"])
             if not metadata:
@@ -498,6 +503,9 @@ def scan_plugins() -> List[dict]:
                     "allowed_tools": None
                 }
 
+            # Get rating data from database
+            rating_data = get_skill_ratings(skill_id)
+
             result.append({
                 "name": skill_name,
                 "metadata": metadata,
@@ -508,7 +516,9 @@ def scan_plugins() -> List[dict]:
                 "versions": [{
                     "version": row["version"],
                     "filename": row["filename"]
-                }]
+                }],
+                "rating": rating_data.get("average", 0.0),
+                "rating_count": rating_data.get("total", 0)
             })
 
     return result
@@ -992,10 +1002,10 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[boo
             if not is_name_valid:
                 return False, {"error": f"Invalid skill name: {name_error}"}
 
-            # Validate description length (max 1024 chars)
+            # Validate description (required, no max length limit)
             description = metadata["description"]
-            if not isinstance(description, str) or len(description) == 0 or len(description) > 1024:
-                return False, {"error": "Description must be 1-1024 characters"}
+            if not isinstance(description, str) or len(description) == 0:
+                return False, {"error": "Description cannot be empty"}
 
             # Validate optional fields if present
             # compatibility: max 500 chars
@@ -1127,7 +1137,6 @@ def approve_skill_file(skill_id: int) -> bool:
 
     try:
         # In single-version mode, check for existing approved version of this skill
-        from database import get_skill_by_name
         existing_skill = get_skill_by_name(skill_name)
 
         # If there's an existing approved version, delete its file and record
@@ -1798,6 +1807,101 @@ async def api_unlist_skill(
         )
 
 
+@app.post("/api/my-skills/{skill_id}/set-default")
+async def api_set_default_version(
+    skill_id: int,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Set a skill version as the default version.
+
+    User must own the skill to set it as default.
+    """
+    from database import set_skill_default_version
+
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        # Get skill record
+        skill = get_skill_by_id(skill_id)
+        if not skill:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Skill {skill_id} not found"
+            )
+
+        # Verify ownership
+        if skill["uploader_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't own this skill"
+            )
+
+        # Set as default version
+        success = set_skill_default_version(skill_id, skill["skill_name"])
+
+        return {
+            "success": success,
+            "message": f"Skill {skill['skill_name']}@{skill['version']} has been set as default version",
+            "skill_id": skill_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set default version: {str(e)}"
+        )
+
+
+@app.get("/api/my-skills/versions/{skill_name}")
+async def api_get_skill_versions(
+    skill_name: str,
+    request: Request,
+    _: bool = Depends(require_auth)
+):
+    """Get all versions of a skill by name.
+
+    Returns version history for a specific skill name that belongs to the current user.
+    """
+    try:
+        user_id = request.session.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated"
+            )
+
+        with get_connection() as conn:
+            versions = conn.execute(
+                """
+                SELECT version, filename, created_at, is_active, is_default_version
+                FROM skills
+                WHERE skill_name = %s AND uploader_id = %s
+                ORDER BY created_at DESC
+                """,
+                (skill_name, user_id)
+            ).fetchall()
+
+        return {
+            "success": True,
+            "data": [dict(v) for v in versions]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get versions: {str(e)}"
+        )
+
+
 @app.post("/api/my-skills/{skill_id}/publish")
 async def api_publish_skill(
     skill_id: int,
@@ -1995,18 +2099,11 @@ async def upload_plugin(
             # Use user-friendly message if available, otherwise use original
             user_friendly_error = error_messages.get(error_msg, error_msg)
 
-            # Return HTML error for admin_upload page
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": None,
-                    "error": user_friendly_error
-                })
-            else:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={"success": False, "error": user_friendly_error}
-                )
+            # 统一返回 JSON 响应，前端处理错误显示
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "error": user_friendly_error}
+            )
 
         # Save the skill ZIP to pending directory
         skill_name = result["name"]
@@ -2015,7 +2112,6 @@ async def upload_plugin(
         target_path = PENDING_DIR / target_filename
 
         # Check if skill with same name already exists
-        from database import get_skill_by_name
         existing_skill = get_skill_by_name(skill_name)
         if existing_skill:
             if existing_skill["uploader_id"] != user_id:
@@ -2062,52 +2158,8 @@ async def upload_plugin(
             # Copy file to pending location
             shutil.copy(temp_zip, target_path)
 
-            # Return success response
+            # Return success response - 统一返回 JSON
             success_msg = f"成功更新 {result['name']}@{result['version']}，等待管理员审核"
-
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": success_msg,
-                    "error": None
-                })
-            else:
-                return JSONResponse(
-                    content={
-                        "success": True,
-                        "message": success_msg,
-                        "skill_name": result['name'],
-                        "version": result['version'],
-                        "skill_id": skill_id
-                    }
-                )
-
-        # Copy file to pending location
-        shutil.copy(temp_zip, target_path)
-
-        # Create database record with status='pending'
-        from database import create_skill_record
-        skill_id = create_skill_record(
-            skill_name=skill_name,
-            version=version,
-            filename=target_filename,
-            uploader_id=user_id,
-            status='pending',
-            source_type=source_type
-        )
-
-        # Return success response
-        success_msg = f"成功上传 {result['name']}@{result['version']}，等待管理员审核"
-
-        # Return HTML success for admin_upload page
-        if "admin" in request.headers.get("referer", ""):
-            return templates.TemplateResponse("admin_upload.html", {
-                "request": request,
-                "success": success_msg,
-                "error": None
-            })
-        else:
-            # Return JSON for AJAX requests
             return JSONResponse(
                 content={
                     "success": True,
@@ -2118,22 +2170,41 @@ async def upload_plugin(
                 }
             )
 
+        # Copy file to pending location
+        shutil.copy(temp_zip, target_path)
+
+        # Create database record with status='pending'
+        skill_id = create_skill_record(
+            skill_name=skill_name,
+            version=version,
+            filename=target_filename,
+            uploader_id=user_id,
+            status='pending',
+            source_type=source_type
+        )
+
+        # Return success response - 统一返回 JSON
+        success_msg = f"成功上传 {result['name']}@{result['version']}，等待管理员审核"
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": success_msg,
+                "skill_name": result['name'],
+                "version": result['version'],
+                "skill_id": skill_id
+            }
+        )
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         error_msg = f"上传失败: {str(e)}"
 
-        if "admin" in request.headers.get("referer", ""):
-            return templates.TemplateResponse("admin_upload.html", {
-                "request": request,
-                "success": None,
-                "error": error_msg
-            })
-        else:
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"success": False, "error": error_msg}
-            )
+        # 统一返回 JSON 响应
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": error_msg}
+        )
 
     finally:
         # Cleanup
@@ -2285,7 +2356,6 @@ async def complete_upload_with_metadata(
         target_path = PENDING_DIR / target_filename
 
         # 检查是否已存在
-        from database import get_skill_by_name
         existing_skill = get_skill_by_name(skill_name)
         if existing_skill:
             if existing_skill["uploader_id"] != user_id:
@@ -2299,7 +2369,6 @@ async def complete_upload_with_metadata(
         shutil.copy(temp_zip, target_path)
 
         # 创建数据库记录
-        from database import create_skill_record
         skill_id = create_skill_record(
             skill_name=skill_name,
             version=version,
@@ -2390,7 +2459,6 @@ async def upload_batch(
                 continue
 
             # Check if skill with same name already exists
-            from database import get_skill_by_name
             skill_name = metadata["name"]
             skill_version = metadata.get("version", "1.0.0")
             target_filename = f"{skill_name}-{skill_version}.zip"
@@ -3120,7 +3188,6 @@ async def skill_detail_page(request: Request, skill_name: str):
         return RedirectResponse(url="/login", status_code=302)
 
     # Get the skill from database (single-version mode)
-    from database import get_skill_by_name
     skill = get_skill_by_name(skill_name)
 
     skill_zip = None
@@ -3150,7 +3217,6 @@ async def skill_detail_page(request: Request, skill_name: str):
     real_skill_name = metadata.get("name", skill_name) if metadata else skill_name
 
     # Get download count from database
-    from database import get_download_stats
     stats = get_download_stats()
     download_count = 0
     for ranking in stats["rankings"]:
@@ -3176,9 +3242,13 @@ async def skill_detail_page(request: Request, skill_name: str):
     # Get current user
     user = get_current_user(request)
 
+    # Get skill_id from database record
+    skill_id = skill["id"] if skill else None
+
     return templates.TemplateResponse("skill_detail.html", {
         "request": request,
         "skill_name": real_skill_name,
+        "skill_id": skill_id,
         "author": author,
         "download_count": download_count,
         "version": version,
@@ -4116,7 +4186,7 @@ async def api_submit_rating(request: Request, skill_id: int):
     user = require_auth(request)
 
     # 验证技能存在
-    skill = database.get_skill_by_id(skill_id)
+    skill = get_skill_by_id(skill_id)
     if not skill:
         raise HTTPException(status_code=404, detail="技能不存在")
 
@@ -4169,7 +4239,7 @@ async def api_add_comment(request: Request, skill_id: int):
     user = require_auth(request)
 
     # 验证技能存在
-    skill = database.get_skill_by_id(skill_id)
+    skill = get_skill_by_id(skill_id)
     if not skill:
         raise HTTPException(status_code=404, detail="技能不存在")
 
@@ -4205,7 +4275,7 @@ async def api_delete_comment(request: Request, skill_id: int, comment_id: int):
 @app.post("/api/skills/{skill_id}/view")
 async def api_increment_view(skill_id: int):
     """增加技能浏览次数 API"""
-    database.increment_skill_view_count(skill_id)
+    increment_skill_view_count(skill_id)
     return JSONResponse(content={"success": True})
 
 
@@ -4215,7 +4285,7 @@ async def api_get_related_skills(skill_id: int, limit: int = 5):
 
     基于同分类和相似名称推荐
     """
-    skill = database.get_skill_by_id(skill_id)
+    skill = get_skill_by_id(skill_id)
     if not skill:
         raise HTTPException(status_code=404, detail="技能不存在")
 

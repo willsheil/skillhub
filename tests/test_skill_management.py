@@ -11,24 +11,62 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from main import app, get_current_user, require_auth
+from starlette.requests import Request
+from main import app, get_current_user, require_auth, require_admin
 from database import get_connection, init_db
 import tempfile
 import zipfile
 import io
 
 # 覆盖认证依赖
-def override_get_current_user(request):
+def override_get_current_user(request: Request):
     return {"id": 1, "employee_id": "test-mgmt-user", "role": "user"}
 
-def override_require_auth(request):
-    # 设置测试用户 session
-    request.session["user_id"] = 1
+def override_require_auth(request: Request):
+    # 设置测试用户 session - 使用动态的测试用户ID
+    global _test_user_id
+    if _test_user_id:
+        user_id = _test_user_id
+    else:
+        user_id = 1  # fallback
+    request.session["user_id"] = user_id
+    request.session["role"] = "user"
+    # Return user dict similar to get_user_by_id
+    return {
+        "id": user_id,
+        "employee_id": "test-mgmt-user",
+        "role": "user",
+        "status": 1,
+        "skills_count": 0
+    }
+
+def override_require_admin(request: Request):
+    # 设置测试用户 session - 使用动态的测试用户ID，role设为admin
+    global _test_user_id
+    if _test_user_id:
+        user_id = _test_user_id
+    else:
+        user_id = 1  # fallback
+    request.session["user_id"] = user_id
+    request.session["role"] = "admin"
+    # Return True as required by require_admin
     return True
 
+# Set dependency overrides - will be re-set in fixture for isolation
 app.dependency_overrides[get_current_user] = override_get_current_user
 app.dependency_overrides[require_auth] = override_require_auth
+app.dependency_overrides[require_admin] = override_require_admin
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_dependency_overrides():
+    """Reset dependency overrides before each test for isolation."""
+    # Re-apply overrides to ensure this module's overrides are active
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[require_auth] = override_require_auth
+    app.dependency_overrides[require_admin] = override_require_admin
+    yield
 
 
 def create_test_skill_zip(skill_name: str = "test-skill", version: str = "1.0.0",
@@ -60,6 +98,8 @@ Test skill for management tests.
 @pytest.fixture(autouse=True)
 def setup_database():
     """Setup test database before each test."""
+    global _test_user_id
+    _test_user_id = None  # Reset before each test for isolation
     init_db()
     # Clean up any existing test data
     with get_connection() as conn:
@@ -74,18 +114,29 @@ def setup_database():
         conn.commit()
 
 
+# 存储测试创建的用户ID，用于认证覆盖
+_test_user_id = None
+
+
+def get_test_user_id():
+    """Get the current test user ID for auth override."""
+    return _test_user_id
+
+
 def create_test_user(employee_id: str = "test-mgmt-user", role: str = "user") -> int:
     """Create a test user and return user ID."""
+    global _test_user_id
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO users (employee_id, api_key, role)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (employee_id, api_key, role, status, skills_count)
+            VALUES (%s, %s, %s, 1, 0)
             """,
             (employee_id, f"key_{employee_id}", role)
         )
         user_id = cursor.lastrowid
         conn.commit()
+        _test_user_id = user_id  # 保存用户ID供认证覆盖使用
         return user_id
 
 
@@ -306,7 +357,8 @@ def test_only_approved_and_active_on_homepage():
 
 def test_delete_single_skill():
     """Test deleting a single skill."""
-    user_id = create_test_user()
+    # Create admin user since DELETE endpoint requires require_admin
+    user_id = create_test_user(role="admin")
     skill_name = "test-mgmt-delete"
 
     skill_id = create_test_skill(skill_name, user_id)
