@@ -1227,14 +1227,18 @@ def get_users_list(
         ).fetchone()
         total = total_row["total"] if total_row else 0
 
-        # Get paginated results
+        # Get paginated results with dynamic skills count using LEFT JOIN
         offset = (page - 1) * per_page
         rows = conn.execute(
             f"""
-            SELECT id, employee_id, role, status, skills_count, created_at, last_login
-            FROM users
+            SELECT u.id, u.employee_id, u.role, u.status,
+                   COALESCE(COUNT(s.id), 0) as skills_count,
+                   u.created_at, u.last_login
+            FROM users u
+            LEFT JOIN skills s ON s.uploader_id = u.id
             {where_clause}
-            ORDER BY created_at DESC
+            GROUP BY u.id
+            ORDER BY u.created_at DESC
             LIMIT %s OFFSET %s
             """,
             params + [per_page, offset]

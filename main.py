@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
 
 import yaml
+import markdown
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status, Query
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -649,6 +650,29 @@ async def install_guide(request: Request):
     """Installation guide page."""
     return templates.TemplateResponse("install_guide.html", {
         "request": request
+    })
+
+
+@app.get("/skill-specification", response_class=HTMLResponse)
+async def skill_specification(request: Request):
+    """Skill technical specification page - renders markdown content."""
+    spec_file = Path(__file__).parent / "docs" / "skill_specification_v1.md"
+
+    if spec_file.exists():
+        with open(spec_file, "r", encoding="utf-8") as f:
+            md_content = f.read()
+        # Convert markdown to HTML with extensions
+        html_content = markdown.markdown(
+            md_content,
+            extensions=["tables", "fenced_code", "toc", "nl2br"]
+        )
+    else:
+        html_content = "<h1>规范文档未找到</h1><p>请联系管理员添加规范文档。</p>"
+
+    return templates.TemplateResponse("skill_specification.html", {
+        "request": request,
+        "content": html_content,
+        "version": "v1.0"
     })
 
 
@@ -3551,9 +3575,9 @@ async def api_get_gitea_tasks(
 @app.get("/api/admin/users")
 async def api_get_users(
     page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
-    role: Optional[str] = Query(None, regex="^(admin|user)$"),
-    status_filter: Optional[str] = Query(None, regex="^(active|disabled)$"),
+    per_page: int = Query(20, ge=1, le=200),
+    role: Optional[str] = Query(None, pattern="^(admin|user)$"),
+    status_filter: Optional[str] = Query(None, pattern="^(active|disabled)$"),
     search: Optional[str] = Query(None, max_length=50),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3592,7 +3616,7 @@ async def api_get_users(
 async def api_create_user(
     request: Request,
     employee_id: str = Form(..., max_length=50),
-    role: str = Form(..., regex="^(admin|user)$"),
+    role: str = Form(..., pattern="^(admin|user)$"),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Create a new user.
@@ -3654,7 +3678,7 @@ async def api_create_user(
 async def api_update_user_role(
     user_id: int,
     request: Request,
-    role: str = Form(..., regex="^(admin|user)$"),
+    role: str = Form(..., pattern="^(admin|user)$"),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Update a user's role.
@@ -3944,7 +3968,7 @@ async def api_get_api_keys(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None, max_length=50),
-    status_filter: Optional[str] = Query(None, regex="^(active|inactive)$"),
+    status_filter: Optional[str] = Query(None, pattern="^(active|inactive)$"),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """获取 API Keys 列表（管理员）"""
