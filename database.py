@@ -132,6 +132,31 @@ def migrate_add_source_type_to_skills():
             logger.info("Migration: source_type column already exists in skills table")
 
 
+def migrate_add_review_fields_to_skills():
+    """Migrate skills table to add review-related columns if they don't exist.
+
+    Adds: uploaded_at, reviewed_at, reviewer_id, review_comment
+    """
+    with get_connection() as conn:
+        cursor = conn.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        fields_to_add = [
+            ("uploaded_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ("reviewed_at", "TIMESTAMP NULL"),
+            ("reviewer_id", "INT NULL"),
+            ("review_comment", "VARCHAR(255) NULL"),
+        ]
+
+        for field_name, field_type in fields_to_add:
+            if field_name not in columns:
+                conn.execute(f"ALTER TABLE skills ADD COLUMN {field_name} {field_type}")
+                conn.commit()
+                logger.info(f"Migration: Added {field_name} column to skills table")
+            else:
+                logger.info(f"Migration: {field_name} column already exists in skills table")
+
+
 def migrate_table_engines():
     """Migrate existing tables to InnoDB engine for foreign key support."""
     with get_connection() as conn:
@@ -261,6 +286,7 @@ def init_db():
     migrate_add_user_id_to_downloads()
     migrate_gitea_push_tasks()
     migrate_add_source_type_to_skills()
+    migrate_add_review_fields_to_skills()  # Add uploaded_at, reviewed_at, reviewer_id, review_comment
     migrate_add_user_management_features()
     migrate_add_skill_description_and_metadata()
     migrate_to_single_version()
@@ -2919,11 +2945,15 @@ def get_search_history(user_id: int, limit: int = 10) -> List[str]:
         搜索历史列表
     """
     with get_connection() as conn:
+        # 使用 GROUP BY 来获取唯一的 query 并按最新时间排序
+        # 修复 MySQL 中 "DISTINCT 与 ORDER BY 列不在 SELECT 列表中" 的不兼容问题
         rows = conn.execute(
             """
-            SELECT DISTINCT query FROM search_history
+            SELECT query, MAX(created_at) as latest_created
+            FROM search_history
             WHERE user_id = %s
-            ORDER BY created_at DESC
+            GROUP BY query
+            ORDER BY latest_created DESC
             LIMIT %s
             """,
             (user_id, limit)

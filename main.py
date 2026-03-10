@@ -187,7 +187,15 @@ def require_auth(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
         )
-    return get_user_by_id(user_id)
+    user = get_user_by_id(user_id)
+    if not user:
+        # User session exists but user not found in database
+        request.session.clear()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    return user
 
 
 def require_admin(request: Request):
@@ -673,7 +681,7 @@ async def marketplace_json(request: Request):
             "description": meta.get("description", "No description"),
             "author": meta.get("author", {"name": "Unknown"}),
             "download_url": f"http://{request.headers.get('host', 'localhost:28000')}/plugins/{latest['filename']}",
-            "size_kb": round(latest["size"] / 1024, 1)
+            "size_kb": round(latest.get("size", 0) / 1024, 1) if latest.get("size") else 0
         })
 
     return marketplace
@@ -733,7 +741,10 @@ async def download_plugin(filename: str, request: Request):
 
 
 @app.get("/api/skills")
-async def api_skills(page: int = 1, per_page: int = 1000):
+async def api_skills(
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(1000, ge=1, le=10000, description="Items per page")
+):
     """API endpoint for skill list (for AJAX requests) with pagination support."""
     all_plugins = scan_plugins()
 
@@ -745,12 +756,15 @@ async def api_skills(page: int = 1, per_page: int = 1000):
     # Return paginated results
     paginated_plugins = all_plugins[start_idx:end_idx]
 
+    # Safe calculation of total_pages to avoid division by zero
+    total_pages = (total + per_page - 1) // per_page if per_page > 0 else 0
+
     return {
         "data": paginated_plugins,
         "total": total,
         "page": page,
         "per_page": per_page,
-        "total_pages": (total + per_page - 1) // per_page
+        "total_pages": total_pages
     }
 
 
@@ -1397,9 +1411,9 @@ async def api_user_downloads(
             offset=offset
         )
 
-        # Calculate pagination metadata
+        # Calculate pagination metadata (safe calculation)
         total = result["total"]
-        total_pages = (total + per_page - 1) // per_page
+        total_pages = (total + per_page - 1) // per_page if per_page > 0 else 0
 
         return {
             "success": True,
@@ -1636,9 +1650,9 @@ async def api_my_skills(
             offset=offset
         )
 
-        # Calculate pagination metadata
+        # Calculate pagination metadata (safe calculation)
         total = result["total"]
-        total_pages = (total + per_page - 1) // per_page
+        total_pages = (total + per_page - 1) // per_page if per_page > 0 else 0
 
         return {
             "success": True,
@@ -1811,7 +1825,7 @@ async def api_unlist_skill(
 async def api_set_default_version(
     skill_id: int,
     request: Request,
-    _: bool = Depends(require_auth)
+    user: dict = Depends(require_auth)
 ):
     """Set a skill version as the default version.
 
@@ -1820,7 +1834,8 @@ async def api_set_default_version(
     from database import set_skill_default_version
 
     try:
-        user_id = request.session.get("user_id")
+        # 使用 require_auth 返回的用户字典获取用户 ID
+        user_id = user["id"]
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -4122,6 +4137,8 @@ async def api_search_suggestions(q: str = "", limit: int = 5):
 async def api_search_history(request: Request, limit: int = 10):
     """获取搜索历史 API"""
     user = require_auth(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     history = get_search_history(user["id"], limit)
     return JSONResponse(content={"history": history})
 
