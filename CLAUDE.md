@@ -8,101 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. **决策确认**: 遇到不确定的代码设计问题时，必须先询问 Boss，不得直接行动
 3. **代码兼容性**: 不能写兼容性代码，除非 Boss 主动要求
 4. **语言规则**: 用中文回答
-5. **系统信息**: Windows系统，不要使用linux命令
-
----
-
-## Python 项目开发规范
-
-### 代码风格规范
-
-1. **遵循 PEP 8**：严格遵守 Python 官方代码风格指南
-2. **命名规范**：
-   - 变量/函数：snake_case（小写字母+下划线）
-   - 类名：PascalCase（首字母大写）
-   - 常量：UPPER_SNAKE_CASE（全大写+下划线）
-   - 私有成员：前缀单下划线 `_private`
-   - 避免使用单字母变量名（除循环计数器 i, j, k）
-3. **导入顺序**：
-   - 顺序：标准库 → 第三方库 → 本地模块
-   - 每组之间空一行
-   - 避免通配符导入 `from module import *`
-4. **代码复杂度**：
-   - 单个函数不超过 50 行
-   - 圈复杂度不超过 10
-   - 嵌套层级不超过 4 层
-
-### 类型注解规范
-
-1. **必须使用类型提示**：所有函数参数和返回值应有类型注解
-2. **使用 typing 模块**：
-   - 优先使用 `list[str]` 而非 `List[str]`（Python 3.9+）
-   - 使用 `Optional[T]` 表示可空类型
-   - 使用 `Union[T1, T2]` 表示联合类型
-3. **避免使用 `Any`**：除非必要，否则不使用 `typing.Any`
-
-### 错误处理规范
-
-1. **明确异常类型**：捕获具体的异常类型，避免裸 `except:`
-2. **异常处理结构**：
-   ```python
-   try:
-       result = risky_operation()
-   except SpecificError as e:
-       logger.error(f"操作失败: {e}")
-       raise  # 或处理并返回
-   finally:
-       cleanup()
-   ```
-3. **资源管理**：使用上下文管理器 `with` 管理资源
-4. **禁止静默失败**：不使用空的 except 块
-
-### 测试规范
-
-1. **使用 pytest**：作为测试框架
-2. **测试文件命名**：`test_*.py`
-3. **测试函数命名**：`test_<功能>_<场景>`
-4. **测试结构**：AAA 模式（Arrange-Act-Assert）
-5. **测试覆盖**：
-   - 单元测试覆盖率 ≥ 80%
-   - 关键业务逻辑覆盖率 ≥ 90%
-6. **测试隔离**：每个测试独立，不依赖执行顺序
-
-### 文档规范
-
-1. **docstring 格式**：使用 Google 风格
-   ```python
-   def calculate_total(items: list[Item]) -> float:
-       """计算项目总价。
-
-       Args:
-           items: 项目列表，每个项目包含价格和数量。
-
-       Returns:
-           所有项目的总价。
-
-       Raises:
-           ValueError: 如果项目列表为空。
-       """
-   ```
-2. **注释规范**：
-   - 解释"为什么"而非"是什么"
-   - 复杂逻辑必须添加注释
-   - 保持注释与代码同步
-
-### 安全规范
-
-1. **SQL 注入防护**：使用参数化查询，不拼接 SQL
-2. **敏感信息**：使用环境变量，不硬编码
-3. **输入验证**：在系统边界验证用户输入
-
-### 日志规范
-
-1. **使用 logging 模块**：不使用 print
-2. **日志级别**：DEBUG < INFO < WARNING < ERROR < CRITICAL
-3. **日志格式**：包含时间、级别、模块、消息
-
----
+5. **开发验证流程**: 每次开发完成后必须执行以下验证流程：
+   - 启动后端服务: `py main.py`（端口 28000）
+   - 打开浏览器访问: `http://localhost:28000/login`
+   - 登录账号: `admin001` / 密码: `admin_key_001`
+   - 验证修改功能是否正常工作
 
 ## Project Overview
 

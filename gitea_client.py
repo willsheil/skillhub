@@ -478,46 +478,69 @@ class GiteaClient:
                         skill_name: str, version: str) -> str:
         """Extract skill ZIP to target folder in repository.
 
-        Validates ZIP integrity before extraction.
+        Simplified structure: extracts to {skill_name}/ directly (no version folder).
+        ZIP is expected to contain a {skill_name}/ folder with SKILL.md inside.
 
         Args:
             repo_path: Path to local git repository
             skill_zip: Path to skill ZIP file
             skill_name: Name of the skill
-            version: Version string
+            version: Version string (used for logging only)
 
         Returns:
-            Folder name created (format: {skill_name}-{version})
+            Folder name created (format: {skill_name})
 
         Raises:
             GiteaError: If ZIP validation or extraction fails
         """
         import shutil
         import zipfile
+        import tempfile
 
         # Validate ZIP file before extraction
         self._validate_zip(skill_zip)
 
-        folder_name = f"{skill_name}-{version}"
+        # Use skill_name only (no version) for cleaner structure
+        folder_name = skill_name
         target_path = repo_path / folder_name
 
         # Remove old version if exists
         if target_path.exists():
-            logger.info(f"Removing old version: {folder_name}")
+            logger.info(f"Removing old skill folder: {folder_name}")
             shutil.rmtree(target_path)
 
-        # Extract ZIP to target location
-        logger.info(f"Extracting skill to: {folder_name}")
-        with zipfile.ZipFile(skill_zip, 'r') as zf:
-            zf.extractall(target_path)
+        # Extract to temp directory first to handle nested structure
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Extract ZIP to temp location
+            logger.info(f"Extracting skill {skill_name}-{version} to: {folder_name}")
+            with zipfile.ZipFile(skill_zip, 'r') as zf:
+                zf.extractall(temp_path)
+
+            # Find the skill folder inside (ZIP contains {skill_name}/SKILL.md)
+            extracted_items = list(temp_path.iterdir())
+            if len(extracted_items) == 1 and extracted_items[0].is_dir():
+                # Move the inner folder to target
+                inner_folder = extracted_items[0]
+                shutil.move(str(inner_folder), str(target_path))
+            else:
+                # ZIP structure is flat, move as-is
+                target_path.mkdir(parents=True, exist_ok=True)
+                for item in extracted_items:
+                    shutil.move(str(item), str(target_path / item.name))
 
         # Verify extraction
         if not target_path.exists():
             raise GiteaError(f"Failed to extract skill ZIP to {target_path}")
 
-        # Verify content was extracted
-        if not list(target_path.iterdir()):
-            raise GiteaError(f"ZIP extracted but target is empty: {target_path}")
+        # Verify SKILL.md exists
+        skill_md = target_path / "SKILL.md"
+        if not skill_md.exists():
+            # Check for case-insensitive match
+            skill_md_files = list(target_path.glob("*.md"))
+            if not skill_md_files:
+                raise GiteaError(f"SKILL.md not found in extracted skill: {target_path}")
 
         logger.info(f"Successfully extracted skill to: {folder_name}")
         return folder_name

@@ -434,17 +434,262 @@
             <a href="/" class="btn">← 返回列表</a>
         </div>
 
-        <!-- 安装命令 -->
-        <div id="installCommand"></div>
+        <!-- Installation Section - Agent & Human -->
+        <div class="install-section" style="background: #f6f8fa; border: 1px solid #d1d5da; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+            <h3 style="font-size: 18px; font-weight: 600; color: #24292e; margin-bottom: 16px;">安装方式</h3>
 
-        <!-- 评分区域 -->
-        <div class="section-title">⭐ 评分</div>
-        <div id="ratingComponent"></div>
+            <!-- Install Type Tabs -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <button id="agentTabBtn" onclick="switchInstallTab('agent')" style="flex: 1; padding: 12px 16px; border: 2px solid #0366d6; background: #0366d6; color: white; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;">
+                    🤖 我是 Agent
+                </button>
+                <button id="humanTabBtn" onclick="switchInstallTab('human')" style="flex: 1; padding: 12px 16px; border: 2px solid #d1d5da; background: white; color: #24292e; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;">
+                    👤 我是 Human
+                </button>
+            </div>
+
+            <!-- Agent Install Content -->
+            <div id="agentInstallContent">
+                <p style="color: #586069; font-size: 14px; margin-bottom: 12px;">将此提示发送给你的 Agent 以安装该技能：</p>
+                <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="color: #8b949e; font-size: 12px;">📄 Agent prompt</span>
+                        <button onclick="copyAgentPrompt()" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
+                    </div>
+                    <code id="agentPrompt" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从我的私有 Git 仓库安装技能：
+仓库地址：{{ gitea_repo_url }}
+技能目录：{{ skill_dir }}
+请克隆仓库，找到该技能并安装到 .claude/skills</code>
+                </div>
+                <p style="color: #586069; font-size: 12px; margin-top: 12px;">
+                    💡 提示：将上面的 Prompt 发送给 Claude Code 或其他 AI Agent，它会自动完成安装。
+                </p>
+            </div>
+
+            <!-- Human Install Content -->
+            <div id="humanInstallContent" style="display: none;">
+                <p style="color: #586069; font-size: 14px; margin-bottom: 12px;">手动安装步骤：</p>
+
+                <div style="background: white; border: 1px solid #d1d5da; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                    <h4 style="font-size: 14px; font-weight: 600; color: #24292e; margin-bottom: 12px;">方式一：下载 ZIP 包</h4>
+
+                    <!-- Client Tabs -->
+                    <div style="display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #e1e4e8; padding-bottom: 8px;">
+                        <button onclick="switchClientTab('claude-code')" id="tab-claude-code" style="background: #0366d6; color: white; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px; font-weight: 500;">Claude Code</button>
+                        <button onclick="switchClientTab('codex')" id="tab-codex" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">Codex</button>
+                        <button onclick="switchClientTab('cursor')" id="tab-cursor" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">Cursor</button>
+                        <button onclick="switchClientTab('vscode')" id="tab-vscode" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">VS Code</button>
+                        <button onclick="switchClientTab('cline')" id="tab-cline" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">Cline</button>
+                    </div>
+
+                    <!-- Claude Code Content -->
+                    <div id="client-claude-code" class="client-content">
+                        <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">在 Claude Code 上安装</p>
+                        <ol style="color: #586069; font-size: 13px; margin-left: 20px; margin-bottom: 12px;">
+                            <li>下载 Skill 包</li>
+                            <li>将其解压到全局 Skills 目录</li>
+                            <li>重新加载 Claude Code 窗口以应用</li>
+                        </ol>
+                        <p style="color: #586069; font-size: 12px; margin-bottom: 8px;"><strong>目录结构：</strong></p>
+                        <pre style="background: #f6f8fa; padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0;">~/.claude/skills/{{ skill_name }}
+├── SKILL.md
+└── ... (来自此包的其他资源文件)</pre>
+                    </div>
+
+                    <!-- Codex Content -->
+                    <div id="client-codex" class="client-content" style="display: none;">
+                        <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">在 Codex 上安装</p>
+                        <ol style="color: #586069; font-size: 13px; margin-left: 20px; margin-bottom: 12px;">
+                            <li>下载 Skill 包</li>
+                            <li>将其解压到全局 Skills 目录</li>
+                            <li>重启 Codex 即可使用</li>
+                        </ol>
+                        <p style="color: #586069; font-size: 12px; margin-bottom: 8px;"><strong>目录结构：</strong></p>
+                        <pre style="background: #f6f8fa; padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0;">~/.codex/skills/{{ skill_name }}
+├── SKILL.md
+└── ... (来自此包的其他资源文件)</pre>
+                    </div>
+
+                    <!-- Cursor Content -->
+                    <div id="client-cursor" class="client-content" style="display: none;">
+                        <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">在 Cursor 上安装</p>
+                        <ol style="color: #586069; font-size: 13px; margin-left: 20px; margin-bottom: 12px;">
+                            <li>下载 Skill 包</li>
+                            <li>将其解压到工作区级别的 Skills 目录</li>
+                            <li>重新加载 Cursor 窗口以应用</li>
+                        </ol>
+                        <p style="color: #586069; font-size: 12px; margin-bottom: 8px;"><strong>目录结构：</strong></p>
+                        <pre style="background: #f6f8fa; padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0;">./.cursor/skills/{{ skill_name }}
+├── SKILL.md
+└── ... (来自此包的其他资源文件)</pre>
+                    </div>
+
+                    <!-- VS Code Content -->
+                    <div id="client-vscode" class="client-content" style="display: none;">
+                        <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">在 VS Code 上安装</p>
+                        <ol style="color: #586069; font-size: 13px; margin-left: 20px; margin-bottom: 12px;">
+                            <li>下载 Skill 包</li>
+                            <li>将其解压到工作区级别的 Skills 目录</li>
+                            <li>重新加载 VS Code 窗口以应用</li>
+                        </ol>
+                        <p style="color: #586069; font-size: 12px; margin-bottom: 8px;"><strong>目录结构：</strong></p>
+                        <pre style="background: #f6f8fa; padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0;">./.vscode/skills/{{ skill_name }}
+├── SKILL.md
+└── ... (来自此包的其他资源文件)</pre>
+                    </div>
+
+                    <!-- Cline Content -->
+                    <div id="client-cline" class="client-content" style="display: none;">
+                        <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">在 Cline 上安装</p>
+                        <ol style="color: #586069; font-size: 13px; margin-left: 20px; margin-bottom: 12px;">
+                            <li>下载 Skill 包</li>
+                            <li>将其解压到工作区级别的 Skills 目录</li>
+                            <li>重新加载 VS Code 窗口以应用</li>
+                        </ol>
+                        <p style="color: #586069; font-size: 12px; margin-bottom: 8px;"><strong>目录结构：</strong></p>
+                        <pre style="background: #f6f8fa; padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin: 0;">./.cline/skills/{{ skill_name }}
+├── SKILL.md
+└── ... (来自此包的其他资源文件)</pre>
+                    </div>
+
+                    {% if download_url %}
+                    <a href="{{ download_url }}" style="display: inline-block; margin-top: 12px; background: #2ea44f; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px;">⬇ 下载 ZIP 包</a>
+                    {% endif %}
+                </div>
+
+                <div style="background: white; border: 1px solid #d1d5da; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                    <h4 style="font-size: 14px; font-weight: 600; color: #24292e; margin-bottom: 8px;">方式二：npx skills 安装</h4>
+                    <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">使用 npx skills 命令安装：</p>
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <code id="npxCommand" style="flex: 1; background: #24292e; color: #f0f6fc; padding: 12px 16px; border-radius: 6px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px;">npx -y skills add {{ request_url }} --skill {{ skill_name }}</code>
+                        <button onclick="copyNpxCommand()" style="background: #0366d6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">复制</button>
+                    </div>
+                    <p style="color: #586069; font-size: 12px; margin-top: 8px;">
+                        💡 需要先安装 <a href="https://www.npmjs.com/package/@anthropic/skills" target="_blank" style="color: #0366d6;">@anthropic/skills</a> CLI 工具
+                    </p>
+                </div>
+
+                <div style="background: white; border: 1px solid #d1d5da; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                    <h4 style="font-size: 14px; font-weight: 600; color: #24292e; margin-bottom: 8px;">方式三：Marketplace 命令</h4>
+                    <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">使用 marketplace 命令安装：</p>
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                        <code id="marketplaceCommand" style="flex: 1; background: #24292e; color: #f0f6fc; padding: 12px 16px; border-radius: 6px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px;">plugin marketplace add {{ skill_name }}</code>
+                        <button onclick="copyMarketplaceCommand()" style="background: #0366d6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">复制</button>
+                    </div>
+                    <p style="color: #586069; font-size: 12px; margin-top: 8px;">
+                        💡 需要先安装 <a href="/install-guide" style="color: #0366d6;">Claude Code Plugin Manager</a>
+                    </p>
+                </div>
+
+                <div style="margin-top: 16px; padding: 12px; background: #fff8c5; border: 1px solid #d4a72c; border-radius: 6px;">
+                    <p style="color: #7d5e00; font-size: 13px; margin: 0;">
+                        <strong>支持的客户端：</strong>
+                        <code style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">claude-code</code>
+                        <code style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">cursor</code>
+                        <code style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">wind</code>
+                        <code style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">cline</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function switchInstallTab(tab) {
+            const agentBtn = document.getElementById('agentTabBtn');
+            const humanBtn = document.getElementById('humanTabBtn');
+            const agentContent = document.getElementById('agentInstallContent');
+            const humanContent = document.getElementById('humanInstallContent');
+
+            if (tab === 'agent') {
+                agentBtn.style.background = '#0366d6';
+                agentBtn.style.borderColor = '#0366d6';
+                agentBtn.style.color = 'white';
+                humanBtn.style.background = 'white';
+                humanBtn.style.borderColor = '#d1d5da';
+                humanBtn.style.color = '#24292e';
+                agentContent.style.display = 'block';
+                humanContent.style.display = 'none';
+            } else {
+                humanBtn.style.background = '#0366d6';
+                humanBtn.style.borderColor = '#0366d6';
+                humanBtn.style.color = 'white';
+                agentBtn.style.background = 'white';
+                agentBtn.style.borderColor = '#d1d5da';
+                agentBtn.style.color = '#24292e';
+                humanContent.style.display = 'block';
+                agentContent.style.display = 'none';
+            }
+        }
+
+        function switchClientTab(client) {
+            const clients = ['claude-code', 'codex', 'cursor', 'vscode', 'cline'];
+            const contents = document.querySelectorAll('.client-content');
+
+            // Hide all client contents
+            contents.forEach(el => el.style.display = 'none');
+
+            // Reset all tab styles
+            clients.forEach(c => {
+                const tab = document.getElementById('tab-' + c);
+                if (tab) {
+                    tab.style.background = 'transparent';
+                    tab.style.color = '#586069';
+                }
+            });
+
+            // Show selected client content
+            const selectedContent = document.getElementById('client-' + client);
+            if (selectedContent) {
+                selectedContent.style.display = 'block';
+            }
+
+            // Highlight selected tab
+            const selectedTab = document.getElementById('tab-' + client);
+            if (selectedTab) {
+                selectedTab.style.background = '#0366d6';
+                selectedTab.style.color = 'white';
+            }
+        }
+
+        function copyAgentPrompt() {
+            const prompt = document.getElementById('agentPrompt').textContent;
+            navigator.clipboard.writeText(prompt).then(() => {
+                showToast('Agent Prompt 已复制到剪贴板！');
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
+        function copyNpxCommand() {
+            const command = document.getElementById('npxCommand').textContent;
+            navigator.clipboard.writeText(command).then(() => {
+                showToast('npx 命令已复制到剪贴板！');
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
+        function copyMarketplaceCommand() {
+            const command = document.getElementById('marketplaceCommand').textContent;
+            navigator.clipboard.writeText(command).then(() => {
+                showToast('Marketplace 命令已复制到剪贴板！');
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #24292e; color: white; padding: 12px 24px; border-radius: 6px; z-index: 1000; font-size: 14px;';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        }
+        </script>
 
         <!-- Tab Navigation -->
         <div class="tab-nav">
             <a href="#readme" class="tab-item active">📄 README</a>
-            <a href="#comments" class="tab-item">💬 评论</a>
         </div>
 
         <!-- Content Section -->
@@ -456,15 +701,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- 评论区 -->
-        <div id="comments" class="content-section">
-            <div id="commentComponent"></div>
-        </div>
-
-        <!-- 相关技能推荐 -->
-        <div class="section-title" style="margin-top: 40px;">🔗 相关技能</div>
-        <div id="relatedSkills" class="related-skills"></div>
     </div>
 
     <!-- Footer -->
@@ -557,125 +793,7 @@
         }
 
         // Load content on page ready
-        document.addEventListener('DOMContentLoaded', function() {
-            loadSkillMD();
-            initRatingAndComments();
-            loadRelatedSkills();
-        });
-
-        // 初始化评分和评论组件
-        function initRatingAndComments() {
-            const skillName = {{ skill_name | tojson }};
-            const skillId = {{ skill_id | tojson }};
-
-            // 初始化安装命令
-            if (typeof InstallCommand !== 'undefined') {
-                new InstallCommand('installCommand', skillName);
-            }
-
-            // 初始化评分组件
-            if (typeof RatingComponent !== 'undefined') {
-                window.ratingComponent = new RatingComponent('ratingComponent', skillId, {
-                    onRate: function(rating) {
-                        console.log('User rated:', rating);
-                    }
-                });
-            }
-
-            // 初始化评论组件
-            if (typeof CommentComponent !== 'undefined') {
-                window.commentComponent = new CommentComponent('commentComponent', skillId);
-            }
-
-            // 增加浏览次数
-            fetch(`/api/skills/${skillId}/view`, { method: 'POST' }).catch(() => {});
-        }
-
-        // 加载相关技能
-        async function loadRelatedSkills() {
-            const skillId = {{ skill_id | tojson }};
-            const container = document.getElementById('relatedSkills');
-
-            try {
-                const response = await fetch(`/api/skills/${skillId}/related`);
-                const data = await response.json();
-
-                if (data.related && data.related.length > 0) {
-                    let html = '<div class="related-grid">';
-                    data.related.forEach(skill => {
-                        html += `
-                            <a href="/skill/${encodeURIComponent(skill.name)}" class="related-card">
-                                <div class="related-name">${escapeHtml(skill.name)}</div>
-                                <div class="related-desc">${escapeHtml(skill.description || '暂无描述')}</div>
-                                <div class="related-stats">
-                                    <span>⭐ ${skill.rating_average || 0}</span>
-                                    <span>👁 ${skill.view_count || 0}</span>
-                                </div>
-                            </a>
-                        `;
-                    });
-                    html += '</div>';
-                    container.innerHTML = html;
-
-                    // 添加样式
-                    const style = document.createElement('style');
-                    style.textContent = `
-                        .related-grid {
-                            display: grid;
-                            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                            gap: 16px;
-                        }
-                        .related-card {
-                            display: block;
-                            padding: 16px;
-                            background: #f8fafc;
-                            border-radius: 8px;
-                            text-decoration: none;
-                            border: 1px solid #e5e7eb;
-                            transition: all 0.2s;
-                        }
-                        .related-card:hover {
-                            border-color: #10B981;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                        }
-                        .related-name {
-                            font-weight: 600;
-                            color: #171717;
-                            margin-bottom: 8px;
-                        }
-                        .related-desc {
-                            font-size: 13px;
-                            color: #64748b;
-                            margin-bottom: 8px;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            white-space: nowrap;
-                        }
-                        .related-stats {
-                            font-size: 12px;
-                            color: #94a3b8;
-                            display: flex;
-                            gap: 12px;
-                        }
-                    `;
-                    document.head.appendChild(style);
-                } else {
-                    container.innerHTML = '<p style="color: #64748b; padding: 20px; text-align: center;">暂无相关技能</p>';
-                }
-            } catch (error) {
-                console.error('Failed to load related skills:', error);
-                container.innerHTML = '';
-            }
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+        document.addEventListener('DOMContentLoaded', loadSkillMD);
     </script>
-
-    <!-- 引入评分评论组件 -->
-    <script src="/static/js/rating.js"></script>
 </body>
 </html>
