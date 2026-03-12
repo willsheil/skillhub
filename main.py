@@ -1053,8 +1053,13 @@ async def admin_api_keys_page(request: Request):
     })
 
 
-def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[bool, dict]:
+def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_author: str = None) -> tuple[bool, dict]:
     """Validate a skill ZIP file according to Agent Skills specification.
+
+    Args:
+        zip_path: Path to the ZIP file
+        allow_missing: If True, return missing fields info instead of rejecting
+        default_author: Default author to use if not specified in SKILL.md
 
     The ZIP should have structure:
         skill-name/
@@ -1111,10 +1116,10 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[boo
             if "description" not in metadata:
                 return False, {"error": "Missing required field 'description' in SKILL.md YAML frontmatter"}
 
-            # Validate name format
-            is_name_valid, name_error = validate_skill_name(metadata["name"])
-            if not is_name_valid:
-                return False, {"error": f"Invalid skill name: {name_error}"}
+            # Validate name format - DISABLED: 取消name格式校验
+            # is_name_valid, name_error = validate_skill_name(metadata["name"])
+            # if not is_name_valid:
+            #     return False, {"error": f"Invalid skill name: {name_error}"}
 
             # Validate description length (max 1024 chars)
             description = metadata["description"]
@@ -1128,65 +1133,22 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[boo
                 if not isinstance(compat, str) or len(compat) == 0 or len(compat) > 500:
                     return False, {"error": "Compatibility must be 1-500 characters if provided"}
 
-            # Extract and validate metadata fields (version and author are required)
+            # Extract metadata fields (version and author are optional, will use defaults if missing)
             skill_metadata = metadata.get("metadata", {})
             if not isinstance(skill_metadata, dict):
                 return False, {"error": "Metadata must be a key-value mapping"}
 
-            # 检查缺失字段
-            missing_fields = []
-            version = skill_metadata.get("version")
-            if not version:
-                missing_fields.append("metadata.version")
-
-            author = skill_metadata.get("author")
-            if not author:
-                missing_fields.append("metadata.author")
-
-            # 如果有缺失字段且允许缺失模式，返回缺失信息
-            if missing_fields and allow_missing:
-                # 构建现有字段信息
-                existing_metadata = {
-                    "name": metadata["name"],
-                    "description": metadata["description"],
-                    "license": metadata.get("license"),
-                    "compatibility": metadata.get("compatibility"),
-                    "metadata": skill_metadata,
-                    "allowed_tools": metadata.get("allowed-tools")
-                }
-                # 添加已有的 version 和 author
-                if version:
-                    existing_metadata["version"] = version
-                if author:
-                    existing_metadata["author"] = author
-
-                return False, {
-                    "error": "MISSING_FIELDS",
-                    "missing_fields": missing_fields,
-                    "metadata": existing_metadata
-                }
-
-            # 严格模式：验证所有必填字段
-            if not version:
-                return False, {"error": "Missing required field 'metadata.version' in SKILL.md"}
-            if not isinstance(version, str) or len(version) == 0:
-                return False, {"error": "Metadata.version must be a non-empty string"}
-
-            if not author:
-                return False, {"error": "Missing required field 'metadata.author' in SKILL.md"}
-            if not isinstance(author, str) or len(author) == 0:
-                return False, {"error": "Metadata.author must be a non-empty string"}
-
-            # Validate author format: lowercase letter followed by 8 digits (e.g., w00545471)
-            import re
-            if not re.match(r'^[a-z]\d{8}$', author):
-                return False, {"error": "Invalid author format. Must be a lowercase letter followed by 8 digits (e.g., w00545471)"}
+            # 获取 version 和 author，如果未填写则使用默认值
+            version = skill_metadata.get("version") or "1.0.0"  # 默认版本号
+            # author 如果未填写，使用传入的 default_author（上传用户的id）
+            author = skill_metadata.get("author") or default_author
 
             # Normalize metadata for return (matching API format)
             normalized_metadata = {
                 "name": metadata["name"],
                 "description": metadata["description"],
                 "version": version,
+                "author": author,
                 "license": metadata.get("license"),
                 "compatibility": metadata.get("compatibility"),
                 "metadata": skill_metadata,
@@ -2066,8 +2028,8 @@ async def upload_plugin(
         with open(temp_zip, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        # Validate the ZIP file (allow missing fields for补充)
-        is_valid, result = validate_skill_zip(temp_zip, allow_missing=True)
+        # Validate the ZIP file (allow missing fields, use current user as default author)
+        is_valid, result = validate_skill_zip(temp_zip, allow_missing=True, default_author=user_id)
 
         if not is_valid:
             error_msg = result.get('error', 'Unknown error')
@@ -2395,7 +2357,7 @@ async def complete_upload_with_metadata(
         update_skill_metadata_in_zip(temp_zip, version, author)
 
         # 重新验证 ZIP 文件
-        is_valid, result = validate_skill_zip(temp_zip, allow_missing=False)
+        is_valid, result = validate_skill_zip(temp_zip, allow_missing=False, default_author=user_id)
 
         if not is_valid:
             return JSONResponse(
@@ -2504,7 +2466,7 @@ async def upload_batch(
                 shutil.copyfileobj(file.file, f)
 
             # Validate the ZIP file
-            is_valid, metadata = validate_skill_zip(temp_zip)
+            is_valid, metadata = validate_skill_zip(temp_zip, default_author=user_id)
 
             if not is_valid:
                 results["failed"].append({

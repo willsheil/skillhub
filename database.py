@@ -743,8 +743,8 @@ def create_skill_record(
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO skills (skill_name, version, filename, uploader_id, status, source_type)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO skills (skill_name, version, filename, uploader_id, status, source_type, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, 1)
             """,
             (skill_name, version, filename, uploader_id, status, source_type)
         )
