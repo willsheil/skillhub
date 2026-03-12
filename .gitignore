@@ -7,6 +7,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.coverage
+
+# OpenSpec work directory
+openspec/
 
 # IDE
 .vscode/
