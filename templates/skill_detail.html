@@ -746,7 +746,6 @@
         }
 
         function copyAgentPrompt(agent) {
-            const prompt = document.getElementById('agentPrompt-' + agent);
             const downloadUrl = document.querySelector('.agent-download-url');
 
             // 构建完整的 prompt 文本
@@ -754,13 +753,6 @@
 
             navigator.clipboard.writeText(fullPrompt).then(() => {
                 showToast(agent.charAt(0).toUpperCase() + agent.slice(1) + ' Prompt 已复制到剪贴板！');
-            }).catch(err => {
-                console.error('复制失败:', err);
-            });
-        }
-            const prompt = document.getElementById('agentPrompt').textContent;
-            navigator.clipboard.writeText(prompt).then(() => {
-                showToast('Agent Prompt 已复制到剪贴板！');
             }).catch(err => {
                 console.error('复制失败:', err);
             });

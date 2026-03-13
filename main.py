@@ -686,12 +686,13 @@ async def index(request: Request):
     })
 
 
-@app.get("/install-guide", response_class=HTMLResponse)
-async def install_guide(request: Request):
-    """Installation guide page."""
-    return templates.TemplateResponse("install_guide.html", {
-        "request": request
-    })
+# 隐藏安装指南页面
+# @app.get("/install-guide", response_class=HTMLResponse)
+# async def install_guide(request: Request):
+#     """Installation guide page."""
+#     return templates.TemplateResponse("install_guide.html", {
+#         "request": request
+#     })
 
 
 # Markdown extensions for rendering docs
