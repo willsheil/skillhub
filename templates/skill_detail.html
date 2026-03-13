@@ -451,17 +451,83 @@
             <!-- Agent Install Content -->
             <div id="agentInstallContent">
                 <p style="color: #586069; font-size: 14px; margin-bottom: 12px;">将此提示发送给你的 Agent 以安装该技能：</p>
-                <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="color: #8b949e; font-size: 12px;">📄 Agent prompt</span>
-                        <button onclick="copyAgentPrompt()" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
-                    </div>
-                    <code id="agentPrompt" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
-下载地址：<span id="agentDownloadUrl"></span>
-请下载 ZIP 包并解压到 .claude/skills/{{ skill_name }}</code>
+
+                <!-- Agent Client Tabs -->
+                <div style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #e1e4e8; padding-bottom: 8px;">
+                    <button onclick="switchAgentTab('claude-code')" id="agent-tab-claude-code" style="background: #0366d6; color: white; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px; font-weight: 500;">Claude Code</button>
+                    <button onclick="switchAgentTab('codex')" id="agent-tab-codex" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">Codex</button>
+                    <button onclick="switchAgentTab('cursor')" id="agent-tab-cursor" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">Cursor</button>
+                    <button onclick="switchAgentTab('vscode')" id="agent-tab-vscode" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">VS Code</button>
+                    <button onclick="switchAgentTab('cline')" id="agent-tab-cline" style="background: transparent; color: #586069; border: none; padding: 6px 12px; border-radius: 6px 6px 6px 0; cursor: pointer; font-size: 12px;">Cline</button>
                 </div>
+
+                <!-- Claude Code Agent Prompt -->
+                <div id="agent-content-claude-code" class="agent-content">
+                    <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="color: #8b949e; font-size: 12px;">📄 Claude Code prompt</span>
+                            <button onclick="copyAgentPrompt('claude-code')" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
+                        </div>
+                        <code id="agentPrompt-claude-code" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
+下载地址：<span class="agent-download-url"></span>
+请下载 ZIP 包并解压到 .claude/skills/{{ skill_name }}</code>
+                    </div>
+                </div>
+
+                <!-- Codex Agent Prompt -->
+                <div id="agent-content-codex" class="agent-content" style="display: none;">
+                    <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="color: #8b949e; font-size: 12px;">📄 Codex prompt</span>
+                            <button onclick="copyAgentPrompt('codex')" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
+                        </div>
+                        <code id="agentPrompt-codex" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
+下载地址：<span class="agent-download-url"></span>
+请下载 ZIP 包并解压到 .codex/skills/{{ skill_name }}</code>
+                    </div>
+                </div>
+
+                <!-- Cursor Agent Prompt -->
+                <div id="agent-content-cursor" class="agent-content" style="display: none;">
+                    <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="color: #8b949e; font-size: 12px;">📄 Cursor prompt</span>
+                            <button onclick="copyAgentPrompt('cursor')" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
+                        </div>
+                        <code id="agentPrompt-cursor" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
+下载地址：<span class="agent-download-url"></span>
+请下载 ZIP 包并解压到 .cursor/skills/{{ skill_name }}</code>
+                    </div>
+                </div>
+
+                <!-- VS Code Agent Prompt -->
+                <div id="agent-content-vscode" class="agent-content" style="display: none;">
+                    <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="color: #8b949e; font-size: 12px;">📄 VS Code prompt</span>
+                            <button onclick="copyAgentPrompt('vscode')" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
+                        </div>
+                        <code id="agentPrompt-vscode" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
+下载地址：<span class="agent-download-url"></span>
+请下载 ZIP 包并解压到 .vscode/skills/{{ skill_name }}</code>
+                    </div>
+                </div>
+
+                <!-- Cline Agent Prompt -->
+                <div id="agent-content-cline" class="agent-content" style="display: none;">
+                    <div style="background: #24292e; border-radius: 8px; padding: 16px; position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="color: #8b949e; font-size: 12px;">📄 Cline prompt</span>
+                            <button onclick="copyAgentPrompt('cline')" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
+                        </div>
+                        <code id="agentPrompt-cline" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
+下载地址：<span class="agent-download-url"></span>
+请下载 ZIP 包并解压到 .cline/skills/{{ skill_name }}</code>
+                    </div>
+                </div>
+
                 <p style="color: #586069; font-size: 12px; margin-top: 12px;">
-                    💡 提示：将上面的 Prompt 发送给 Claude Code 或其他 AI Agent，它会自动完成安装。
+                    💡 提示：将上面的 Prompt 发送给对应的 AI Agent，它会自动完成安装。
                 </p>
             </div>
 
@@ -610,6 +676,36 @@
             }
         }
 
+        function switchAgentTab(agent) {
+            const agents = ['claude-code', 'codex', 'cursor', 'vscode', 'cline'];
+
+            // Hide all agent contents
+            const contents = document.querySelectorAll('.agent-content');
+            contents.forEach(el => el.style.display = 'none');
+
+            // Reset all agent tab styles
+            agents.forEach(a => {
+                const tab = document.getElementById('agent-tab-' + a);
+                if (tab) {
+                    tab.style.background = 'transparent';
+                    tab.style.color = '#586069';
+                }
+            });
+
+            // Show selected agent content
+            const selectedContent = document.getElementById('agent-content-' + agent);
+            if (selectedContent) {
+                selectedContent.style.display = 'block';
+            }
+
+            // Highlight selected agent tab
+            const selectedTab = document.getElementById('agent-tab-' + agent);
+            if (selectedTab) {
+                selectedTab.style.background = '#0366d6';
+                selectedTab.style.color = 'white';
+            }
+        }
+
         function switchClientTab(client) {
             const clients = ['claude-code', 'codex', 'cursor', 'vscode', 'cline'];
             const contents = document.querySelectorAll('.client-content');
@@ -622,7 +718,7 @@
                 const tab = document.getElementById('tab-' + c);
                 if (tab) {
                     tab.style.background = 'transparent';
-                    tab.style.color = '#586069';
+                tab.style.color = '#586069';
                 }
             });
 
@@ -641,6 +737,27 @@
         }
 
         function copyAgentPrompt() {
+            const prompt = document.getElementById('agentPrompt').textContent;
+            navigator.clipboard.writeText(prompt).then(() => {
+                showToast('Agent Prompt 已复制到剪贴板！');
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
+        function copyAgentPrompt(agent) {
+            const prompt = document.getElementById('agentPrompt-' + agent);
+            const downloadUrl = document.querySelector('.agent-download-url');
+
+            // 构建完整的 prompt 文本
+            const fullPrompt = '从 ZIP 包安装技能：\n下载地址：' + downloadUrl.textContent + '\n请下载 ZIP 包并解压到 .' + agent + '/skills/{{ skill_name }}';
+
+            navigator.clipboard.writeText(fullPrompt).then(() => {
+                showToast(agent.charAt(0).toUpperCase() + agent.slice(1) + ' Prompt 已复制到剪贴板！');
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
             const prompt = document.getElementById('agentPrompt').textContent;
             navigator.clipboard.writeText(prompt).then(() => {
                 showToast('Agent Prompt 已复制到剪贴板！');
@@ -704,11 +821,14 @@
                 npxFullUrlEl.textContent = baseUrl + downloadUrl;
             }
 
-            // Update agent prompt download URL
-            const agentDownloadUrlEl = document.getElementById('agentDownloadUrl');
-            if (agentDownloadUrlEl) {
-                agentDownloadUrlEl.textContent = baseUrl + downloadUrl;
-            }
+            // Update agent prompt download URL (for all agent tabs)
+            const agentDownloadUrls = document.querySelectorAll('.agent-download-url');
+            agentDownloadUrls.forEach(el => {
+                el.textContent = baseUrl + downloadUrl;
+            });
+
+            // Initialize Agent tab - select Claude Code by default
+            switchAgentTab('claude-code');
         })();
         </script>
 

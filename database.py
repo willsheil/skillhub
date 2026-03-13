@@ -295,6 +295,10 @@ def init_db():
     migrate_add_rating_comment_system()
     migrate_add_search_features()
     migrate_add_category_system()
+    # 新增：用户档案字段
+    migrate_add_user_profile_fields()
+    # 新增：用户信息字段
+    migrate_add_user_profile_fields()
 
 
 def migrate_gitea_push_tasks():
@@ -392,6 +396,32 @@ def migrate_gitea_reserved_status():
         # MySQL doesn't support modifying ENUM directly, need to recreate
         logger.info("Migration: Status enum expansion requires manual recreation or use migrate_gitea_push_tasks()")
         logger.info("  For new installations, the full schema includes: pending, reserved, pushing, success, failed, retry_pending")
+
+
+def migrate_add_user_profile_fields():
+    """Migrate users table to add profile fields if they don't exist.
+
+    Adds: name, minDepartment, team, group
+    """
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+        cursor.execute("DESCRIBE users")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        fields_to_add = [
+            ("name", "VARCHAR(100) NULL"),
+            ("minDepartment", "VARCHAR(100) NULL"),
+            ("team", "VARCHAR(100) NULL"),
+            ("group", "VARCHAR(100) NULL"),
+        ]
+
+        for field_name, field_type in fields_to_add:
+            if field_name not in columns:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {field_name} {field_type}")
+                conn.commit()
+                logger.info(f"Migration: Added {field_name} column to users table")
+            else:
+                logger.info(f"Migration: {field_name} column already exists in users table")
 
 
 @contextmanager
@@ -1162,10 +1192,10 @@ def get_upload_stats() -> Dict[str, Any]:
         # Top 10 uploaders
         top_uploaders_rows = conn.execute(
             """
-            SELECT u.employee_id, COUNT(s.id) as upload_count
+            SELECT u.employee_id, u.name, u.minDepartment, u.team, u.`group`, COUNT(s.id) as upload_count
             FROM users u
             INNER JOIN skills s ON u.id = s.uploader_id
-            GROUP BY u.id, u.employee_id
+            GROUP BY u.id, u.employee_id, u.name, u.minDepartment, u.team, u.`group`
             ORDER BY upload_count DESC
             LIMIT 10
             """
@@ -1175,6 +1205,10 @@ def get_upload_stats() -> Dict[str, Any]:
         for row in top_uploaders_rows:
             top_uploaders.append({
                 "username": row["employee_id"],
+                "name": row["name"] or row["employee_id"],
+                "minDepartment": row["minDepartment"],
+                "team": row["team"],
+                "group": row["group"],
                 "upload_count": row["upload_count"]
             })
 

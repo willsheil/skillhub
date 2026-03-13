@@ -293,15 +293,19 @@ Cookie: session=xxx
     "top_uploaders": [
       {
         "username": "w00000001",
+        "name": "张三",
+        "minDepartment": "网络安全部",
+        "team": "安全研发团队",
+        "group": "AI安全组",
         "upload_count": 45
       },
       {
         "username": "w00000002",
+        "name": "李四",
+        "minDepartment": "云计算部",
+        "team": "平台研发团队",
+        "group": "基础架构组",
         "upload_count": 32
-      },
-      {
-        "username": "w00000003",
-        "upload_count": 28
       }
     ]
   }
@@ -316,7 +320,11 @@ Cookie: session=xxx
 | this_month | int | 本月上传技能数量 |
 | last_month | int | 上月上传技能数量 |
 | top_uploaders | array | 上传排行榜前10名 |
-| top_uploaders[].username | string | 上传者用户名 |
+| top_uploaders[].username | string | 上传者工号 |
+| top_uploaders[].name | string | 上传者姓名（如无则显示工号) |
+| top_uploaders[].minDepartment | string | 所属部门 |
+| top_uploaders[].team | string | 所属团队 |
+| top_uploaders[].group | string | 所属小组 |
 | top_uploaders[].upload_count | int | 上传技能数量 |
 
 ---
