@@ -58,7 +58,7 @@ from database import (
     create_skill_record, get_pending_skills, get_skill_by_id,
     update_skill_status, get_user_uploads, get_total_users_count,
     get_skills_count_by_status, get_today_downloads_count,
-    get_top_skills_by_downloads, get_top_users_by_downloads,
+    get_top_skills_by_downloads, get_top_users_by_downloads, get_upload_stats,
     get_skill_source_type, create_notification, update_skill_active_status,
     get_skill_active_status, get_my_skills,
     get_user_notifications, get_unread_notifications_count,
@@ -3141,6 +3141,26 @@ async def api_stats_top(
         raise HTTPException(400, f"Invalid date format: {e}")
     except Exception as e:
         raise HTTPException(500, f"Failed to get stats: {e}")
+
+
+@app.get("/api/stats/uploads")
+async def api_stats_uploads():
+    """Get upload statistics for dashboard (public, no auth required).
+
+    Returns:
+        - total_skills: Total number of uploaded skills
+        - this_month: Number of skills uploaded this month
+        - last_month: Number of skills uploaded last month
+        - top_uploaders: List of top 10 uploaders with username and count
+    """
+    try:
+        stats = get_upload_stats()
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get upload stats: {e}")
 
 
 @app.get("/api/stats/export")

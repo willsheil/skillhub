@@ -1120,6 +1120,72 @@ def get_top_users_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
         return results
 
 
+def get_upload_stats() -> Dict[str, Any]:
+    """Get upload statistics for dashboard.
+
+    Returns:
+        Dict containing:
+        - total_skills: Total number of uploaded skills
+        - this_month: Number of skills uploaded this month
+        - last_month: Number of skills uploaded last month
+        - top_uploaders: List of top 10 uploaders with username and count
+    """
+    with get_connection() as conn:
+        # Total skills count
+        total_row = conn.execute(
+            "SELECT COUNT(*) as count FROM skills"
+        ).fetchone()
+        total_skills = total_row["count"] if total_row else 0
+
+        # This month's uploads
+        this_month_row = conn.execute(
+            """
+            SELECT COUNT(*) as count
+            FROM skills
+            WHERE YEAR(uploaded_at) = YEAR(CURDATE())
+            AND MONTH(uploaded_at) = MONTH(CURDATE())
+            """
+        ).fetchone()
+        this_month = this_month_row["count"] if this_month_row else 0
+
+        # Last month's uploads
+        last_month_row = conn.execute(
+            """
+            SELECT COUNT(*) as count
+            FROM skills
+            WHERE YEAR(uploaded_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)
+            AND MONTH(uploaded_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)
+            """
+        ).fetchone()
+        last_month = last_month_row["count"] if last_month_row else 0
+
+        # Top 10 uploaders
+        top_uploaders_rows = conn.execute(
+            """
+            SELECT u.employee_id, COUNT(s.id) as upload_count
+            FROM users u
+            INNER JOIN skills s ON u.id = s.uploader_id
+            GROUP BY u.id, u.employee_id
+            ORDER BY upload_count DESC
+            LIMIT 10
+            """
+        ).fetchall()
+
+        top_uploaders = []
+        for row in top_uploaders_rows:
+            top_uploaders.append({
+                "username": row["employee_id"],
+                "upload_count": row["upload_count"]
+            })
+
+        return {
+            "total_skills": total_skills,
+            "this_month": this_month,
+            "last_month": last_month,
+            "top_uploaders": top_uploaders
+        }
+
+
 def get_skill_source_type(skill_name: str) -> Optional[str]:
     """Get the source type for a skill by name.
 
