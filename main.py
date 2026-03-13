@@ -514,6 +514,26 @@ def scan_plugins() -> List[dict]:
                     "allowed_tools": None
                 }
 
+            # Get uploader employee_id from database
+            uploader_id = row.get("uploader_id")
+            uploader_employee_id = None
+            if uploader_id:
+                try:
+                    uploader_row = conn.execute(
+                        "SELECT employee_id FROM users WHERE id = %s",
+                        (uploader_id,)
+                    ).fetchone()
+                    if uploader_row:
+                        uploader_employee_id = uploader_row["employee_id"]
+                except Exception:
+                    pass
+
+            # Use uploader employee_id as author if no author in metadata
+            if uploader_employee_id:
+                inner_meta = metadata.get("metadata", {})
+                if not inner_meta.get("author"):
+                    metadata["metadata"] = {**inner_meta, "author": uploader_employee_id}
+
             # Get file size
             file_size = 0
             plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
@@ -529,6 +549,7 @@ def scan_plugins() -> List[dict]:
                 "uploaded_at": row["uploaded_at"].isoformat() if row["uploaded_at"] else None,
                 "updated_at": row["uploaded_at"].strftime("%Y-%m-%d") if row["uploaded_at"] else None,
                 "download_count": 0,  # TODO: Add download count if tracking
+                "uploader_employee_id": uploader_employee_id,  # Add uploader info
                 "versions": [{
                     "version": row["version"],
                     "filename": row["filename"],

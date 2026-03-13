@@ -839,9 +839,17 @@
 
         // Get author name
         function getAuthorName(skill) {
-            // Author is now at skill.metadata.author (directly from YAML frontmatter)
+            // Priority: uploader_employee_id from database > metadata.author from SKILL.md
+            // This ensures author is always the real uploader
+
+            if (skill.uploader_employee_id) {
+                return skill.uploader_employee_id;
+            }
+
+            // Fallback to metadata from SKILL.md
             const meta = skill.metadata || {};
-            const author = meta.author;
+            const innerMeta = meta.metadata || {};
+            const author = innerMeta.author || meta.author;
 
             if (author) {
                 if (typeof author === 'object' && author !== null) {
