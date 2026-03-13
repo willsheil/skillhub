@@ -919,7 +919,7 @@
                         <div class="card-actions">
                             ${latestVersion ? `
                                 <span class="version-badge">v${skill.latest_version}</span>
-                                <a href="/plugins/${latestVersion.filename}" class="btn-download" download>下载</a>
+                                <a href="/plugins/${latestVersion.filename}?t=${Date.now()}" class="btn-download">下载</a>
                             ` : '<span style="color: #ef4444; font-size: 13px;">无可用版本</span>'}
                         </div>
                     </div>
