@@ -9,6 +9,10 @@ import sys
 from pathlib import Path
 import logging
 import os
+from dotenv import load_dotenv
+
+# 加载 .env 文件
+load_dotenv()
 
 # 导入日志配置
 from logging_config import setup_logging, audit_log

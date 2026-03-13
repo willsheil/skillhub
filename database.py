@@ -1158,10 +1158,10 @@ def create_user(employee_id: str, api_key: str, role: str = "user") -> int:
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO users (employee_id, api_key, role, status)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO users (employee_id, api_key, role, status, skills_count)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (employee_id, api_key, role, 1)  # status=1 means active
+            (employee_id, api_key, role, 1, 0)  # status=1 means active, skills_count=0
         )
         conn.commit()
         return cursor.lastrowid
