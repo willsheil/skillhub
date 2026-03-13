@@ -463,6 +463,21 @@ class GiteaClient:
         if branch is None:
             branch = self._get_default_branch(path)
 
+        # Check if remote has any refs first
+        stdout_refs, _, _ = self._run_git_command(
+            path,
+            ["ls-remote", "--heads", "origin", branch]
+        )
+
+        # If remote has no refs (empty repo), skip pull and push directly
+        if not stdout_refs.strip():
+            logger.info(f"Remote has no branch '{branch}', will push directly (empty repo)")
+            # Initialize local repo if needed
+            if not (path / ".git").exists():
+                self._run_git_command(path, ["init"])
+                self._ensure_git_config(path)
+            return
+
         stdout, stderr, returncode = self._run_git_command(
             path,
             ["pull", "origin", branch]
@@ -609,10 +624,21 @@ class GiteaClient:
         Raises:
             GiteaError: If git add fails
         """
+        # First check what files exist
+        list_out, _, _ = self._run_git_command(path, ["ls-files"])
+        logger.info(f"Git tracked files: {list_out[:200] if list_out else 'none'}")
+
+        # List all files in repo
+        all_files = list(path.rglob("*"))
+        logger.info(f"Total files in repo: {len(all_files)}")
+        logger.info(f"Sample files: {[str(f.relative_to(path))[:50] for f in all_files[:5]]}")
+
         stdout, stderr, returncode = self._run_git_command(
             path,
             ["add", "-A"]
         )
+
+        logger.info(f"Git add stdout: {stdout}, stderr: {stderr[:200] if stderr else ''}")
 
         if returncode != 0:
             raise GiteaError(f"Git add failed: {stderr}")
@@ -633,10 +659,27 @@ class GiteaClient:
         """
         import re
 
+        # Check if there are files to commit
+        status_out, _, _ = self._run_git_command(path, ["status", "--porcelain"])
+        logger.info(f"Git status before commit: {status_out}")
+
+        if not status_out.strip():
+            # Nothing to commit - check if remote has changes
+            logger.warning("No files to commit, checking if we need to initialize repo")
+
         stdout, stderr, returncode = self._run_git_command(
             path,
             ["commit", "-m", message]
         )
+
+        logger.info(f"Git commit stdout: {stdout}, stderr: {stderr}, returncode: {returncode}")
+
+        # Handle "nothing to commit" case - this is OK for retry scenarios
+        if returncode != 0 and "nothing to commit" in stdout.lower():
+            logger.info("No new changes to commit (possibly already committed), continuing with push")
+            # Get commit hash from HEAD
+            stdout, _, _ = self._run_git_command(path, ["log", "-1", "--format=%H"])
+            return stdout.strip()
 
         if returncode != 0:
             raise GitConflictError(f"Git commit failed: {stderr}")

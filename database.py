@@ -1536,8 +1536,9 @@ def migrate_add_skill_description_and_metadata():
             logger.info("Migration: Added metadata column to skills table")
 
         # Add created_at column if not exists (for ordering)
+        # Note: Cannot use DEFAULT CURRENT_TIMESTAMP as uploaded_at already uses it
         if "created_at" not in columns:
-            conn.execute("ALTER TABLE skills ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            conn.execute("ALTER TABLE skills ADD COLUMN created_at TIMESTAMP NULL")
             conn.commit()
             logger.info("Migration: Added created_at column to skills table")
 
@@ -1589,12 +1590,12 @@ def migrate_to_single_version():
         conn.commit()
         logger.info(f"Migration: Deleted {deleted_count} duplicate skill records")
 
-        # Step 3: Add unique index on skill_name
+        # Step 3: Add unique index on skill_name (use prefix index due to 767 byte limit)
         create_index_if_not_exists(
             cursor,
             "skills",
             "idx_skill_name",
-            "CREATE UNIQUE INDEX idx_skill_name ON skills(skill_name)"
+            "CREATE UNIQUE INDEX idx_skill_name ON skills(skill_name(191))"
         )
         logger.info("Migration: Added unique index idx_skill_name on skills table")
 
@@ -2056,6 +2057,15 @@ def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) ->
             """
             DELETE FROM notifications
             WHERE related_skill_id = %s
+            """,
+            (skill_id,)
+        )
+
+        # Delete related Gitea push tasks (due to foreign key constraint)
+        conn.execute(
+            """
+            DELETE FROM gitea_push_tasks
+            WHERE skill_id = %s
             """,
             (skill_id,)
         )
@@ -2564,40 +2574,71 @@ def migrate_api_keys_user_id_nullable(conn):
 def migrate_add_rating_comment_system():
     """迁移：添加评分评论系统表和 skills 表相关字段"""
     with get_connection() as conn:
-        # 创建 skill_ratings 表
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS skill_ratings (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                skill_id INT NOT NULL,
-                user_id INT NOT NULL,
-                rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                UNIQUE KEY uk_skill_user (skill_id, user_id),
-                INDEX idx_skill_rating (skill_id, rating)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """)
+        cursor = conn._conn.cursor()
 
-        # 创建 skill_comments 表
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS skill_comments (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                skill_id INT NOT NULL,
-                user_id INT NOT NULL,
-                content VARCHAR(500) NOT NULL,
-                rating_id INT DEFAULT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                is_deleted TINYINT(1) DEFAULT 0,
-                FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (rating_id) REFERENCES skill_ratings(id) ON DELETE SET NULL,
-                INDEX idx_skill_created (skill_id, created_at DESC),
-                INDEX idx_user_comments (user_id, created_at DESC)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        # 检查表是否存在
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM information_schema.tables
+            WHERE table_schema = DATABASE() AND table_name = 'skill_ratings'
         """)
+        ratings_table_exists = cursor.fetchone()["count"] > 0
+
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM information_schema.tables
+            WHERE table_schema = DATABASE() AND table_name = 'skill_comments'
+        """)
+        comments_table_exists = cursor.fetchone()["count"] > 0
+
+        # 创建 skill_ratings 表（如果不存在）
+        if not ratings_table_exists:
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS skill_ratings (
+                        id INT PRIMARY KEY AUTO_INCREMENT,
+                        skill_id INT NOT NULL,
+                        user_id INT NOT NULL,
+                        rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
+                        FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        UNIQUE KEY uk_skill_user (skill_id, user_id),
+                        INDEX idx_skill_rating (skill_id, rating)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+                conn.commit()
+            except Exception as e:
+                if "1293" in str(e):  # 表定义错误，说明表已存在但定义有问题，跳过
+                    logger.warning("Migration: skill_ratings table exists with definition issue, skipping")
+                else:
+                    raise
+
+        # 创建 skill_comments 表（如果不存在）
+        if not comments_table_exists:
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS skill_comments (
+                        id INT PRIMARY KEY AUTO_INCREMENT,
+                        skill_id INT NOT NULL,
+                        user_id INT NOT NULL,
+                        content VARCHAR(500) NOT NULL,
+                        rating_id INT DEFAULT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
+                        is_deleted TINYINT(1) DEFAULT 0,
+                        FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id),
+                        FOREIGN KEY (rating_id) REFERENCES skill_ratings(id) ON DELETE SET NULL,
+                        INDEX idx_skill_created (skill_id, created_at DESC),
+                        INDEX idx_user_comments (user_id, created_at DESC)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+                conn.commit()
+            except Exception as e:
+                if "1293" in str(e):  # 表定义错误，说明表已存在但定义有问题，跳过
+                    logger.warning("Migration: skill_comments table exists with definition issue, skipping")
+                else:
+                    raise
 
         # 给 skills 表添加评分统计字段
         cursor = conn._conn.cursor()

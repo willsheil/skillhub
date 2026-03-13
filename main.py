@@ -19,6 +19,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 import yaml
 import markdown
@@ -83,6 +85,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
 _api_key_reset_times = {}
 
 
+# Global scheduler instance
+scheduler = AsyncIOScheduler()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
@@ -90,20 +95,32 @@ async def lifespan(app: FastAPI):
     init_db()
 
     # Start Gitea push service if configured
-    if os.getenv("GITEA_REPO_URL"):
+    gitea_url = os.getenv("GITEA_REPO_URL")
+    logger.info(f"GITEA_REPO_URL = {gitea_url}")
+    if gitea_url:
         try:
+            logger.info("Starting Gitea push service with APScheduler...")
             from gitea_push_service import GiteaPushService
 
             push_service = GiteaPushService(
                 interval=int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
             )
 
-            # Start service in background
-            asyncio.create_task(push_service.run())
-
-            logger.info("Gitea push service started")
+            # Start APScheduler with interval trigger
+            interval_seconds = int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
+            scheduler.add_job(
+                push_service.process_once,
+                trigger=IntervalTrigger(seconds=interval_seconds),
+                id="gitea_push_task",
+                name="Gitea Push Service",
+                replace_existing=True
+            )
+            scheduler.start()
+            logger.info(f"Gitea push service scheduled every {interval_seconds} seconds")
         except Exception as e:
+            import traceback
             logger.error(f"Failed to start Gitea push service: {e}")
+            logger.error(traceback.format_exc())
     else:
         logger.info("Gitea integration disabled (GITEA_REPO_URL not set)")
 
@@ -111,6 +128,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down...")
+    scheduler.shutdown()
 
 
 app = FastAPI(
@@ -496,6 +514,13 @@ def scan_plugins() -> List[dict]:
                     "allowed_tools": None
                 }
 
+            # Get file size
+            file_size = 0
+            plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
+            file_path = os.path.join(plugins_dir, row["filename"])
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+
             result.append({
                 "name": skill_name,
                 "metadata": metadata,
@@ -507,6 +532,7 @@ def scan_plugins() -> List[dict]:
                 "versions": [{
                     "version": row["version"],
                     "filename": row["filename"],
+                    "size": file_size,
                     "updated_at": row["uploaded_at"].strftime("%Y-%m-%d") if row["uploaded_at"] else None
                 }]
             })
@@ -889,10 +915,16 @@ async def login_page(request: Request, error: str = None):
 
 @app.post("/admin/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    """Process login."""
+    """Process admin login."""
+    # First verify against ADMIN_USERNAME/ADMIN_PASSWORD (static admin)
     if verify_credentials(username, password):
-        request.session["user"] = username
-        return RedirectResponse(url="/admin/upload", status_code=302)
+        # For static admin, query the database to get user info
+        user = get_user_by_credentials(username, "static_admin") or get_user_by_id(1)
+        if user:
+            request.session["user_id"] = user["id"]
+            request.session["employee_id"] = user["employee_id"]
+            request.session["role"] = user["role"]
+            return RedirectResponse(url="/admin/upload", status_code=302)
     return RedirectResponse(url="/admin/login?error=invalid", status_code=302)
 
 
@@ -1105,26 +1137,40 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_auth
             # Read and parse SKILL.md
             skill_md_path = skill_md_paths[0]
             content = zf.read(skill_md_path).decode('utf-8')
-            metadata, _ = parse_skill_md(content)
+            metadata, markdown_body = parse_skill_md(content)
 
+            warnings = []
+
+            # If YAML parsing fails, try to extract info from content
             if metadata is None:
-                return False, {"error": "Invalid YAML frontmatter in SKILL.md"}
+                warnings.append("SKILL.md 的 YAML 格式无法解析，将使用默认值")
+                metadata = {}
 
-            # Validate required fields
-            if "name" not in metadata:
-                return False, {"error": "Missing required field 'name' in SKILL.md YAML frontmatter"}
-            if "description" not in metadata:
-                return False, {"error": "Missing required field 'description' in SKILL.md YAML frontmatter"}
+            # Extract name - try to get from ZIP filename if missing
+            skill_name = metadata.get("name")
+            if not skill_name:
+                # Try to extract from ZIP filename (e.g., skill-name-1.0.0.zip -> skill-name)
+                zip_name = zip_path.stem
+                import re
+                # Remove version suffix like -1.0.0, -1.0, etc.
+                skill_name = re.sub(r'-\d+(\.\d+)*$', '', zip_name)
+                warnings.append(f"未找到 name 字段，将使用文件名: {skill_name}")
+
+            # Extract description - use markdown body or default
+            description = metadata.get("description")
+            if not description:
+                # Use first line of markdown body as description
+                if markdown_body:
+                    first_line = markdown_body.strip().split('\n')[0][:200]
+                    description = first_line if first_line else f"Skill: {skill_name}"
+                else:
+                    description = f"Skill: {skill_name}"
+                warnings.append("未找到 description 字段，将使用默认描述")
 
             # Validate name format - DISABLED: 取消name格式校验
-            # is_name_valid, name_error = validate_skill_name(metadata["name"])
-            # if not is_name_valid:
-            #     return False, {"error": f"Invalid skill name: {name_error}"}
-
             # Validate description length (max 1024 chars)
-            description = metadata["description"]
             if not isinstance(description, str) or len(description) == 0 or len(description) > 1024:
-                return False, {"error": "Description must be 1-1024 characters"}
+                description = description[:1024] if description else f"Skill: {skill_name}"
 
             # Validate optional fields if present
             # compatibility: max 500 chars
@@ -1134,8 +1180,9 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_auth
                     return False, {"error": "Compatibility must be 1-500 characters if provided"}
 
             # Extract metadata fields (version and author are optional, will use defaults if missing)
-            skill_metadata = metadata.get("metadata", {})
-            if not isinstance(skill_metadata, dict):
+            skill_metadata = metadata.get("metadata") or {}
+            # If metadata is None or not a dict (e.g., empty in YAML), use empty dict
+            if skill_metadata and not isinstance(skill_metadata, dict):
                 return False, {"error": "Metadata must be a key-value mapping"}
 
             # 获取 version 和 author，如果未填写则使用默认值
@@ -1145,8 +1192,8 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_auth
 
             # Normalize metadata for return (matching API format)
             normalized_metadata = {
-                "name": metadata["name"],
-                "description": metadata["description"],
+                "name": skill_name,
+                "description": description,
                 "version": version,
                 "author": author,
                 "license": metadata.get("license"),
@@ -1154,6 +1201,10 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_auth
                 "metadata": skill_metadata,
                 "allowed_tools": metadata.get("allowed-tools")
             }
+
+            # Add warnings to metadata if any
+            if warnings:
+                normalized_metadata["_warnings"] = warnings
 
             return True, normalized_metadata
 
@@ -1387,6 +1438,15 @@ async def api_review_skill(
 
         # Perform action
         if action == "approve":
+            # Re-check status before approval to handle race conditions
+            skill = get_skill_by_id(skill_id)
+            if not skill or skill["status"] != "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Skill {skill_id} is no longer pending, may have been processed"
+                )
+
+            # Proceed with approval
             success = approve_skill_file(skill_id)
             if not success:
                 raise HTTPException(
@@ -2081,18 +2141,11 @@ async def upload_plugin(
             # Use user-friendly message if available, otherwise use original
             user_friendly_error = error_messages.get(error_msg, error_msg)
 
-            # Return HTML error for admin_upload page
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": None,
-                    "error": user_friendly_error
-                })
-            else:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={"success": False, "error": user_friendly_error}
-                )
+            # Return JSON error for all cases
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "error": user_friendly_error}
+            )
 
         # Save the skill ZIP to pending directory
         skill_name = result["name"]
@@ -2151,22 +2204,21 @@ async def upload_plugin(
             # Return success response
             success_msg = f"成功更新 {result['name']}@{result['version']}，等待管理员审核"
 
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": success_msg,
-                    "error": None
-                })
-            else:
-                return JSONResponse(
-                    content={
-                        "success": True,
-                        "message": success_msg,
-                        "skill_name": result['name'],
-                        "version": result['version'],
-                        "skill_id": skill_id
-                    }
-                )
+            # Check for warnings
+            upload_warnings = result.get("_warnings", [])
+
+            # Return JSON for all cases
+            response_content = {
+                "success": True,
+                "message": success_msg,
+                "skill_name": result['name'],
+                "version": result['version'],
+                "skill_id": skill_id
+            }
+            if upload_warnings:
+                response_content["warnings"] = upload_warnings
+
+            return JSONResponse(content=response_content)
 
         # Copy file to pending location
         shutil.copy(temp_zip, target_path)
@@ -2185,24 +2237,21 @@ async def upload_plugin(
         # Return success response
         success_msg = f"成功上传 {result['name']}@{result['version']}，等待管理员审核"
 
-        # Return HTML success for admin_upload page
-        if "admin" in request.headers.get("referer", ""):
-            return templates.TemplateResponse("admin_upload.html", {
-                "request": request,
-                "success": success_msg,
-                "error": None
-            })
-        else:
-            # Return JSON for AJAX requests
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "message": success_msg,
-                    "skill_name": result['name'],
-                    "version": result['version'],
-                    "skill_id": skill_id
-                }
-            )
+        # Check for warnings
+        upload_warnings = result.get("_warnings", [])
+
+        # Return JSON for all cases
+        response_content = {
+            "success": True,
+            "message": success_msg,
+            "skill_name": result['name'],
+            "version": result['version'],
+            "skill_id": skill_id
+        }
+        if upload_warnings:
+            response_content["warnings"] = upload_warnings
+
+        return JSONResponse(content=response_content)
 
     except Exception as e:
         import traceback
@@ -2433,6 +2482,9 @@ async def upload_batch(
     """Upload multiple skill ZIP files (batch upload)."""
     import tempfile
 
+    # Get user_id from session at the beginning
+    user_id = request.session.get("user_id")
+
     if not files:
         return templates.TemplateResponse("admin_upload.html", {
             "request": request,
@@ -2496,7 +2548,6 @@ async def upload_batch(
             shutil.copy(temp_zip, target_path)
 
             # Create database record with source_type
-            user_id = request.session.get("user_id")
             create_skill_record(
                 skill_name=skill_name,
                 version=skill_version,
@@ -3614,6 +3665,56 @@ async def api_get_gitea_tasks(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch tasks: {str(e)}"
+        )
+
+
+@app.post("/api/admin/gitea-tasks/{task_id}/retry")
+async def api_retry_gitea_task(
+    task_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Retry a failed Gitea push task.
+
+    Args:
+        task_id: ID of the task to retry
+
+    Returns:
+        Success message
+    """
+    try:
+        from database import get_connection
+
+        with get_connection() as conn:
+            # Check task status
+            row = conn.execute("""
+                SELECT status, skill_id FROM gitea_push_tasks WHERE id = %s
+            """, (task_id,)).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Task not found")
+
+            if row["status"] == "success":
+                raise HTTPException(status_code=400, detail="Task already succeeded")
+
+            # Reset task to pending
+            conn.execute("""
+                UPDATE gitea_push_tasks
+                SET status = 'pending', error_message = NULL, retry_count = retry_count + 1
+                WHERE id = %s
+            """, (task_id,))
+            conn.commit()
+
+            return {
+                "success": True,
+                "message": f"Task {task_id} queued for retry"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retry task: {str(e)}"
         )
 
 

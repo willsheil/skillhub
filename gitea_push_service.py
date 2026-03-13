@@ -111,6 +111,21 @@ class GiteaPushService:
                 logger.error(f"Service error: {e}")
                 await asyncio.sleep(self.interval)
 
+    async def process_once(self):
+        """Process pending tasks once (for scheduled task)."""
+        try:
+            logger.info("Processing pending Gitea push tasks...")
+            tasks = get_pending_tasks(limit=5)
+
+            if tasks:
+                logger.info(f"Found {len(tasks)} pending tasks")
+                for task in tasks:
+                    await self.process_task(task)
+            else:
+                logger.info("No pending tasks to process")
+        except Exception as e:
+            logger.error(f"Error in process_once: {e}")
+
     def stop(self):
         """Stop the service."""
         self.running = False

@@ -938,7 +938,11 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showAlert(`成功上传 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    let msg = result.message || `成功上传 ${result.skill_name}@${result.version}，等待管理员审核`;
+                    if (result.warnings && result.warnings.length > 0) {
+                        msg += '\n⚠️ 警告: ' + result.warnings.join(', ');
+                    }
+                    showAlert(msg, 'success');
                     clearSingleFile();
                     loadUploadHistory();
                 } else if (result.error === 'SKILL_EXISTS') {
@@ -1287,11 +1291,15 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showAlert(`成功更新 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    let msg = result.message || `成功上传 ${result.skill_name}@${result.version}，等待管理员审核`;
+                    if (result.warnings && result.warnings.length > 0) {
+                        msg += '\n⚠️ 警告: ' + result.warnings.join(', ');
+                    }
+                    showAlert(msg, 'success');
                     clearSingleFile();
                     loadUploadHistory();
                 } else {
-                    showAlert(result.error || '上传失败', 'error');
+                    showAlert(result.error || result.message || '上传失败', 'error');
                 }
             } catch (error) {
                 console.error('Upload error:', error);

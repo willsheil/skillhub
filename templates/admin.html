@@ -271,6 +271,40 @@
             color: #991b1b;
         }
 
+        .status-badge.status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.status-pushing {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-badge.status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.status-retry {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .error-message {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #dc2626;
+            font-size: 12px;
+        }
+
         /* Buttons */
         .btn {
             padding: 8px 16px;
@@ -625,6 +659,7 @@
         <!-- Tabs -->
         <div class="tabs">
             <div class="tab active" data-tab="pending">待审核技能</div>
+            <div class="tab" data-tab="gitea">Gitea推送</div>
             <div class="tab" data-tab="skills">技能管理</div>
             <div class="tab" data-tab="stats">统计信息</div>
             <div class="tab" data-tab="users">用户管理</div>
@@ -635,6 +670,16 @@
             <!-- Pending Skills Tab -->
             <div class="tab-pane active" id="pendingPane">
                 <div id="pendingContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gitea Push Tab -->
+            <div class="tab-pane" id="giteaPane">
+                <div id="giteaContent">
                     <div class="loading">
                         <div class="spinner"></div>
                         <div>加载中...</div>
@@ -691,6 +736,8 @@
                 // Load content
                 if (tabName === 'pending') {
                     loadPendingSkills();
+                } else if (tabName === 'gitea') {
+                    loadGiteaTasks();
                 } else if (tabName === 'skills') {
                     loadSkillsManagement();
                 } else if (tabName === 'stats') {
@@ -946,6 +993,121 @@
                 `;
 
             content.innerHTML = html;
+        }
+
+        // Load Gitea push tasks
+        async function loadGiteaTasks() {
+            console.log('loadGiteaTasks called');
+            const content = document.getElementById('giteaContent');
+
+            try {
+                console.log('Fetching API...');
+                const response = await fetch('/api/admin/gitea-tasks?limit=50');
+                console.log('Response:', response.status);
+                const result = await response.json();
+                console.log('Result:', result);
+
+                if (!result.success) {
+                    throw new Error('Failed to load Gitea tasks');
+                }
+
+                const tasks = result.data || [];
+                console.log('Tasks:', tasks.length);
+
+                if (tasks.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📦</div>
+                            <div class="empty-state-text">暂无Gitea推送任务</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Build table
+                let html = `
+                    <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>SKILL名称</th>
+                                <th>版本</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>重试次数</th>
+                                <th>错误信息</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                tasks.forEach(task => {
+                    let statusClass = '';
+                    let statusText = '';
+                    switch(task.status) {
+                        case 'pending': statusClass = 'status-pending'; statusText = '等待推送'; break;
+                        case 'pushing': statusClass = 'status-pushing'; statusText = '推送中'; break;
+                        case 'success': statusClass = 'status-success'; statusText = '推送成功'; break;
+                        case 'failed': statusClass = 'status-failed'; statusText = '推送失败'; break;
+                        case 'retry_pending': statusClass = 'status-retry'; statusText = '等待重试'; break;
+                        default: statusText = task.status;
+                    }
+
+                    const retryBtn = (task.status === 'failed' || task.status === 'retry_pending')
+                        ? `<button class="btn-small" onclick="retryGiteaTask(${task.id})">重试</button>`
+                        : '';
+
+                    html += `
+                        <tr>
+                            <td>${escapeHtml(task.skill_name || '')}</td>
+                            <td>${escapeHtml(task.version || '')}</td>
+                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                            <td>${escapeHtml(task.created_at || '')}</td>
+                            <td>${task.retry_count || 0}</td>
+                            <td class="error-message">${escapeHtml(task.error_message || '-')}</td>
+                            <td>${retryBtn}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                    </div>
+                `;
+
+                content.innerHTML = html;
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">❌</div>
+                        <div class="empty-state-text">加载失败: ${escapeHtml(error.message)}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Retry Gitea task
+        async function retryGiteaTask(taskId) {
+            if (!confirm('确定要重试这个推送任务吗？')) return;
+
+            try {
+                const response = await fetch('/api/admin/gitea-tasks/' + taskId + '/retry', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('任务已加入重试队列');
+                    loadGiteaTasks();
+                } else {
+                    alert('重试失败: ' + (result.detail || result.error));
+                }
+            } catch (error) {
+                alert('错误: ' + error.message);
+            }
         }
 
         // Load skills management

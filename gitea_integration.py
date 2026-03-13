@@ -12,6 +12,9 @@ def create_push_task(skill_id: int) -> int:
 
     Returns:
         ID of the created push task
+
+    Raises:
+        ValueError: If skill not found or task already exists
     """
     from database import get_skill_by_id
 
@@ -20,6 +23,16 @@ def create_push_task(skill_id: int) -> int:
         raise ValueError(f"Skill {skill_id} not found")
 
     with get_connection() as conn:
+        # Check if there's already a pending task for this skill
+        existing = conn.execute("""
+            SELECT id FROM gitea_push_tasks
+            WHERE skill_id = %s AND status IN ('pending', 'pushing', 'retry_pending')
+        """, (skill_id,)).fetchone()
+
+        if existing:
+            logger.info(f"Push task already exists for skill {skill_id}, reusing task {existing['id']}")
+            return existing['id']
+
         cursor = conn.execute("""
             INSERT INTO gitea_push_tasks
             (skill_id, skill_name, version, status)

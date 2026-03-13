@@ -10,11 +10,22 @@
         .status-pushing { background: #d1ecf1; }
         .status-success { background: #d4edda; }
         .status-failed { background: #f8d7da; }
+        .status-retry_pending { background: #fff3cd; }
         .filters { margin: 20px 0; }
         button { padding: 10px 20px; margin-right: 10px; cursor: pointer; }
+        .retry-btn { background: #ffc107; border: none; padding: 5px 15px; cursor: pointer; border-radius: 3px; }
+        .retry-btn:hover { background: #e0a800; }
+        .retry-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .nav { margin-bottom: 20px; }
+        .nav a { margin-right: 15px; }
     </style>
 </head>
 <body>
+    <div class="nav">
+        <a href="/admin">Back to Admin</a>
+        <a href="/admin/gitea-tasks">Gitea Push Tasks</a>
+    </div>
+
     <h1>Gitea Push Tasks</h1>
 
     <div class="filters">
@@ -23,6 +34,7 @@
         <button onclick="filterTasks('pushing')">Pushing</button>
         <button onclick="filterTasks('success')">Success</button>
         <button onclick="filterTasks('failed')">Failed</button>
+        <button onclick="filterTasks('retry_pending')">Retry</button>
     </div>
 
     <div id="tasks" class="task-list">Loading...</div>
@@ -54,13 +66,42 @@
                         <p>Status: ${escapeHtml(task.status)}</p>
                         <p>Created: ${escapeHtml(task.created_at)}</p>
                         ${task.error_message ? `<p>Error: ${escapeHtml(task.error_message)}</p>` : ''}
-                        ${task.commit_hash ? `<p>Commit: <a href="#">${escapeHtml(task.commit_hash.substring(0, 8))}</a></p>` : ''}
+                        ${task.commit_hash ? `<p>Commit: ${escapeHtml(task.commit_hash.substring(0, 8))}</p>` : ''}
                         ${task.retry_count > 0 ? `<p>Retries: ${task.retry_count}</p>` : ''}
+                        ${task.status === 'failed' || task.status === 'retry_pending' ?
+                            `<button class="retry-btn" onclick="retryTask(${task.id})">Retry Push</button>` : ''}
                     </div>
                 `).join('');
             } catch (error) {
                 document.getElementById('tasks').innerHTML = `<p class="error">Error loading tasks: ${escapeHtml(error.message)}</p>`;
                 console.error('Failed to load tasks:', error);
+            }
+        }
+
+        async function retryTask(taskId) {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Retrying...';
+
+            try {
+                const response = await fetch('/api/admin/gitea-tasks/' + taskId + '/retry', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Task queued for retry');
+                    loadTasks();
+                } else {
+                    alert('Failed to retry: ' + (result.detail || result.error));
+                    btn.disabled = false;
+                    btn.textContent = 'Retry Push';
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Retry Push';
             }
         }
 
