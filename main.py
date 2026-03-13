@@ -844,6 +844,8 @@ async def marketplace_json(request: Request):
 async def download_plugin(filename: str, request: Request):
     """Download plugin ZIP file (original uploaded file).
 
+    Public endpoint - no authentication required for downloads.
+
     Args:
         filename: Name of the plugin file
         request: HTTP request
@@ -851,10 +853,8 @@ async def download_plugin(filename: str, request: Request):
     Returns:
         Original ZIP file as uploaded by the user
     """
-    # Require authentication
+    # No authentication required - public download
     user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/admin/login", status_code=302)
 
     file_path = PLUGINS_DIR / filename
 
@@ -3348,14 +3348,22 @@ async def skill_detail_page(request: Request, skill_name: str):
             download_count = ranking["downloads"]
             break
 
-    # Get author from metadata
+    # Get author from metadata or database
     author = "Unknown"
     if metadata and "metadata" in metadata:
-        author_meta = metadata["metadata"].get("author", "Unknown")
+        author_meta = metadata["metadata"].get("author", "")
         if isinstance(author_meta, dict):
-            author = author_meta.get("name", "Unknown")
+            author = author_meta.get("name", "")
         else:
-            author = str(author_meta) if author_meta else "Unknown"
+            author = str(author_meta) if author_meta else ""
+
+    # If author not in metadata, try to get from database uploader
+    if not author or author == "Unknown":
+        skill_record = get_skill_by_name(real_skill_name)
+        if skill_record and skill_record.get("uploader_id"):
+            uploader = get_user_by_id(skill_record["uploader_id"])
+            if uploader:
+                author = uploader.get("employee_id", "Unknown")
 
     # Get version
     version = metadata.get("version", "1.0.0") if metadata else "1.0.0"
