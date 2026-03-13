@@ -457,7 +457,7 @@
                         <button onclick="copyAgentPrompt()" style="background: #2ea44f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制 Prompt</button>
                     </div>
                     <code id="agentPrompt" style="color: #f0f6fc; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; display: block; white-space: pre-wrap; word-break: break-all;">从 ZIP 包安装技能：
-下载地址：{{ request_url }}{{ download_url }}
+下载地址：<span id="agentDownloadUrl"></span>
 请下载 ZIP 包并解压到 .claude/skills/{{ skill_name }}</code>
                 </div>
                 <p style="color: #586069; font-size: 12px; margin-top: 12px;">
@@ -560,7 +560,7 @@
                     <h4 style="font-size: 14px; font-weight: 600; color: #24292e; margin-bottom: 8px;">方式二：npx skills 安装</h4>
                     <p style="color: #586069; font-size: 13px; margin-bottom: 8px;">使用 npx skills 命令安装：</p>
                     <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                        <code id="npxCommand" style="flex: 1; background: #24292e; color: #f0f6fc; padding: 12px 16px; border-radius: 6px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px;">npx -y skills add {{ request_url }} --skill {{ skill_name }} -g</code>
+                        <code id="npxCommand" style="flex: 1; background: #24292e; color: #f0f6fc; padding: 12px 16px; border-radius: 6px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px;">npx -y skills add <span id="npxBaseUrl"></span> --skill {{ skill_name }} -g</code>
                         <button onclick="copyNpxCommand()" style="background: #0366d6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">复制</button>
                     </div>
                 </div>
@@ -692,6 +692,24 @@
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
         }
+
+        // Initialize dynamic URLs based on browser location
+        (function() {
+            const baseUrl = window.location.origin;
+            const downloadUrl = '{{ download_url }}';
+
+            // Update npx command
+            const npxBaseUrlEl = document.getElementById('npxBaseUrl');
+            if (npxBaseUrlEl) {
+                npxBaseUrlEl.textContent = baseUrl;
+            }
+
+            // Update agent prompt download URL
+            const agentDownloadUrlEl = document.getElementById('agentDownloadUrl');
+            if (agentDownloadUrlEl) {
+                agentDownloadUrlEl.textContent = baseUrl + downloadUrl;
+            }
+        })();
         </script>
 
         <!-- Tab Navigation -->
