@@ -2,6 +2,7 @@
 Admin routes - User management, skill review, system administration.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
@@ -10,6 +11,7 @@ from db.repositories import UserRepository, SkillRepository, ApiKeyRepository
 from api.v1.dependencies import get_current_user, require_admin
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class UserCreateRequest(BaseModel):
@@ -73,7 +75,10 @@ async def review_skill(
         reviewer_id=current_user["id"],
         review_comment=data.comment
     )
-
+ 
+    # 添加审计日志
+    logger.info(f"Skill {skill_id} reviewed by admin {current_user['id']}: action={data.action}, comment={data.comment}")
+ 
     # TODO: Create notification for uploader
 
     return {"success": True, "message": f"Skill {data.action}d"}
@@ -85,8 +90,10 @@ async def update_skill_source(
     source_type: str,
     current_user: dict = Depends(require_admin)
 ):
-    """Update skill source type (admin only)."""
+    """Update skill source type (admin only).)."""
     SkillRepository.update_source_type(skill_id, source_type)
+    # 添加审计日志
+    logger.info(f"Skill {skill_id} source type updated by admin {current_user['id']}: source_type={source_type}")
     return {"success": True}
 
 
@@ -117,6 +124,8 @@ async def create_api_key(
 ):
     """Create API key (admin only)."""
     api_key, plain_key = ApiKeyRepository.create(key_name, user_id, rate_limit)
+    # 添加审计日志
+    logger.info(f"API key created by admin {current_user['id']}: key_name={key_name}, user_id={user_id}, rate_limit={rate_limit}")
     return {"success": True, "api_key": plain_key}
 
 
@@ -127,6 +136,8 @@ async def delete_api_key(
 ):
     """Delete API key (admin only)."""
     ApiKeyRepository.delete(key_id)
+    # 添加审计日志
+    logger.info(f"API key {key_id} deleted by admin {current_user['id']}")
     return {"success": True}
 
 
@@ -137,4 +148,6 @@ async def toggle_api_key(
 ):
     """Toggle API key status (admin only)."""
     is_active = ApiKeyRepository.toggle_status(key_id)
+    # 添加审计日志
+    logger.info(f"API key {key_id} toggled by admin {current_user['id']}: is_active={is_active}")
     return {"success": True, "is_active": is_active}
