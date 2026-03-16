@@ -898,13 +898,6 @@ async def user_login_page(request: Request, error: str = None):
     })
 
 
-@app.get("/admin/login", response_class=HTMLResponse)
-async def login_page(request: Request, error: str = None):
-    """Display admin login page (legacy, redirects to user login)."""
-    return RedirectResponse(url="/login", status_code=302)
-
-
-@app.post("/admin/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     """Process admin login."""
     # First verify against ADMIN_USERNAME/ADMIN_PASSWORD (static admin)
