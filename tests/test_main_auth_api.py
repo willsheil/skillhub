@@ -219,15 +219,6 @@ class TestAdminUploadPage:
         cleanup_test_data("aup-")
 
 
-class TestInstallGuide:
-    """安装指南测试。"""
-
-    def test_install_guide_page(self, client):
-        """测试安装指南页面。"""
-        response = client.get("/install-guide")
-        assert response.status_code in [200, 302, 404]
-
-
 class TestAdminLogin:
     """管理员登录测试。"""
 

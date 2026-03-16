@@ -22,7 +22,7 @@ def require_admin_from_request(request):
 
 
 @router.get("/api/admin/api-keys")
-async def get_api_keys(request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
+async def get_api_keys(request: Request, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
     """Get all API keys (admin only)."""
     require_admin_from_request(request)
 
@@ -38,7 +38,7 @@ async def get_api_keys(request, page: int = Query(1, ge=1), page_size: int = Que
 
 
 @router.post("/api/admin/api-keys")
-async def create_api_key(request, key_name: str = None, user_id: int = None, rate_limit: int = 100):
+async def create_api_key(request: Request, key_name: str = None, user_id: int = None, rate_limit: int = 100):
     """Create API key (admin only)."""
     require_admin_from_request(request)
 
@@ -52,7 +52,7 @@ async def create_api_key(request, key_name: str = None, user_id: int = None, rat
 
 
 @router.delete("/api/admin/api-keys/{key_id}")
-async def delete_api_key(request, key_id: int):
+async def delete_api_key(request: Request, key_id: int):
     """Delete API key (admin only)."""
     require_admin_from_request(request)
 
@@ -63,7 +63,7 @@ async def delete_api_key(request, key_id: int):
 
 
 @router.put("/api/admin/api-keys/{key_id}/toggle")
-async def toggle_api_key(request, key_id: int):
+async def toggle_api_key(request: Request, key_id: int):
     """Toggle API key status (admin only)."""
     require_admin_from_request(request)
 
@@ -74,7 +74,7 @@ async def toggle_api_key(request, key_id: int):
 
 
 @router.get("/api/admin/api-keys/{key_id}/stats")
-async def get_api_key_stats(request, key_id: int):
+async def get_api_key_stats(request: Request, key_id: int):
     """Get API key statistics (admin only)."""
     require_admin_from_request(request)
 

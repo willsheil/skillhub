@@ -31,11 +31,6 @@ class TestWebRoutes:
         response = client.get("/admin/login")
         assert response.status_code in [200, 302]
 
-    def test_register_page(self, client):
-        """测试注册页面。"""
-        response = client.get("/register")
-        assert response.status_code in [200, 302, 404]
-
     def test_skills_list_page(self, client):
         """测试技能列表页面。"""
         response = client.get("/skills")

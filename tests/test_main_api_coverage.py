@@ -621,15 +621,6 @@ class TestUnlistSkillEndpoint:
                 conn.commit()
 
 
-class TestInstallGuidePage:
-    """Tests for install guide page."""
-
-    def test_install_guide_page(self):
-        """Test install guide page."""
-        response = client.get("/install-guide")
-        assert response.status_code == 200
-
-
 class TestMarketplaceEndpoint:
     """Tests for marketplace endpoint."""
 

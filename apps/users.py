@@ -1,6 +1,6 @@
 """User management routes."""
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -15,8 +15,8 @@ class UserCreateRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     """User update request."""
-    role: str = None
-    status: str = None
+    role: Optional[str] = None
+    status: Optional[str] = None
 
 
 def get_current_user_from_request(request):
@@ -37,7 +37,7 @@ def require_admin_from_request(request):
 
 @router.get("/api/admin/users")
 async def get_users(
-    request,
+    request: Request,
     role: str = None,
     status: str = None,
     page: int = Query(1, ge=1),
@@ -59,7 +59,7 @@ async def get_users(
 
 
 @router.post("/api/admin/users")
-async def create_user(request, data: UserCreateRequest):
+async def create_user(request: Request, data: UserCreateRequest):
     """Create a new user (admin only)."""
     require_admin_from_request(request)
 
@@ -74,7 +74,7 @@ async def create_user(request, data: UserCreateRequest):
 
 
 @router.put("/api/admin/users/{user_id}")
-async def update_user(request, user_id: int, data: UserUpdateRequest):
+async def update_user(request: Request, user_id: int, data: UserUpdateRequest):
     """Update user (admin only)."""
     require_admin_from_request(request)
 
@@ -89,7 +89,7 @@ async def update_user(request, user_id: int, data: UserUpdateRequest):
 
 
 @router.patch("/api/admin/users/{user_id}/disable")
-async def disable_user(request, user_id: int):
+async def disable_user(request: Request, user_id: int):
     """Disable a user (admin only)."""
     require_admin_from_request(request)
 
@@ -100,7 +100,7 @@ async def disable_user(request, user_id: int):
 
 
 @router.delete("/api/admin/users/{user_id}")
-async def delete_user(request, user_id: int):
+async def delete_user(request: Request, user_id: int):
     """Delete a user (admin only)."""
     require_admin_from_request(request)
 
@@ -111,7 +111,7 @@ async def delete_user(request, user_id: int):
 
 
 @router.patch("/api/admin/users/{user_id}/enable")
-async def enable_user(request, user_id: int):
+async def enable_user(request: Request, user_id: int):
     """Enable a user (admin only)."""
     require_admin_from_request(request)
 
@@ -122,7 +122,7 @@ async def enable_user(request, user_id: int):
 
 
 @router.post("/api/admin/users/{user_id}/reset-key")
-async def reset_user_key(request, user_id: int):
+async def reset_user_key(request: Request, user_id: int):
     """Reset user's API key (admin only)."""
     require_admin_from_request(request)
 

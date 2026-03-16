@@ -27,6 +27,10 @@ class User:
         last_login: Last login timestamp
         created_at: Account creation timestamp
         updated_at: Last update timestamp
+        name: User display name
+        minDepartment: User's department
+        team: User's team
+        group: User's group
     """
     id: Optional[int] = None
     employee_id: str = ""
@@ -37,6 +41,10 @@ class User:
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    name: Optional[str] = None
+    minDepartment: Optional[str] = None
+    team: Optional[str] = None
+    group: Optional[str] = None
 
     def is_admin(self) -> bool:
         """Check if user is admin."""

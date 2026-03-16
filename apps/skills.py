@@ -2,33 +2,44 @@
 Skill management routes - Upload, list, download, manage skills.
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Request
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Request, Query
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 
 from db.repositories import SkillRepository, DownloadRepository
 from api.v1.dependencies import get_current_user
-from core.constants import SkillStatus, SourceType
+from core.constants import SkillStatus
 from core.config import get_settings
 
 router = APIRouter()
 
 
-class SkillUploadResponse(BaseModel):
-    """Skill upload response."""
-    skill_id: int
-    skill_name: str
-    version: str
-    status: str
+@router.get("")
+async def list_skills_paginated(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(1000, ge=1, le=1000)
+):
+    """API endpoint for skill list with pagination support (public endpoint)."""
+    # Import scan_plugins from main to get all plugins
+    from main import scan_plugins
 
+    all_plugins = scan_plugins()
 
-class SkillListQuery(BaseModel):
-    """Skill list query parameters."""
-    source_type: Optional[str] = None
-    keyword: Optional[str] = None
-    page: int = 1
-    page_size: int = 20
+    # Calculate pagination
+    total = len(all_plugins)
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+
+    # Return paginated results
+    paginated_plugins = all_plugins[start_idx:end_idx]
+
+    return {
+        "data": paginated_plugins,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page
+    }
 
 
 @router.post("/upload")

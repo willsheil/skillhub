@@ -489,15 +489,6 @@ class TestCommentEndpoints:
         assert response.status_code in [200, 401, 403, 404, 500]
 
 
-class TestInstallGuide:
-    """Tests for install guide page."""
-
-    def test_install_guide_page(self):
-        """Test install guide page."""
-        response = client.get("/install-guide")
-        assert response.status_code in [200, 302, 404]
-
-
 class TestLogout:
     """Tests for logout endpoint."""
 

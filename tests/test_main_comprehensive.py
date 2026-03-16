@@ -1513,14 +1513,6 @@ class TestSkillDetailWithAuth:
                 conn.commit()
 
 
-class TestInstallGuideEndpoint:
-    """Tests for install guide endpoint."""
-
-    def test_install_guide(self):
-        """Test install guide page."""
-        response = client.get("/install-guide")
-        assert response.status_code in [200, 404]
-
 
 class TestRootEndpoint:
     """Tests for root endpoint."""

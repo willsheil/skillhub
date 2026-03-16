@@ -214,11 +214,6 @@ class TestStaticPages:
         response = client.get("/admin/login", follow_redirects=False)
         assert response.status_code in [200, 302]
 
-    def test_install_guide_page(self):
-        """Test install guide page."""
-        response = client.get("/install-guide")
-        assert response.status_code == 200
-
 
 class TestHealthAndMetrics:
     """Tests for health and metrics endpoints."""

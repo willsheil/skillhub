@@ -2,14 +2,50 @@
 Statistics routes - Download stats, user stats, system stats.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from db.repositories import SkillRepository, DownloadRepository, UserRepository
 from api.v1.dependencies import get_current_user
 
 router = APIRouter()
+
+
+@router.get("/top")
+async def api_stats_top(
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)")
+):
+    """Get download statistics with rankings (public endpoint)."""
+    try:
+        # Parse dates
+        start = date.fromisoformat(start_date) if start_date else None
+        end = date.fromisoformat(end_date) if end_date else None
+
+        # Import here to avoid circular imports
+        from main import scan_plugins
+        from database import get_stats_with_author
+
+        # Get plugins for author mapping
+        plugins = scan_plugins()
+
+        # Get stats with author info
+        stats = get_stats_with_author(plugins, start, end)
+
+        return {
+            "period": {
+                "start_date": start_date or "all-time",
+                "end_date": end_date or "all-time"
+            },
+            "total_downloads": stats["total_downloads"],
+            "rankings": stats["rankings"]
+        }
+
+    except ValueError as e:
+        raise HTTPException(400, f"Invalid date format: {e}")
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get stats: {e}")
 
 
 @router.get("/downloads")

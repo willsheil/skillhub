@@ -982,13 +982,13 @@
                     {% if user.role == 'admin' %}
                     <a href="/admin" class="user-btn user-btn-outline">管理后台</a>
                     <a href="/admin/users" class="user-btn user-btn-outline">用户管理</a>
+                    <a href="/admin/api-keys" class="user-btn user-btn-outline">API Keys</a>
                     {% endif %}
                     <a href="/upload" class="user-btn user-btn-solid">上传</a>
                     <a href="/my-skills" class="user-btn user-btn-outline">我的技能</a>
                     <a href="/logout" class="user-btn user-btn-outline">退出</a>
                 {% else %}
-                    <a href="/login" class="user-btn user-btn-outline">登录</a>
-                    <a href="/register" class="user-btn user-btn-solid">注册</a>
+                    <a href="/login" class="user-btn user-btn-solid">登录</a>
                 {% endif %}
             </div>
         </div>

@@ -15,12 +15,16 @@ from contextlib import contextmanager
 # Get logger for this module
 logger = logging.getLogger("skillhub.database")
 
+# Use centralized configuration from core.config
+from core.config import get_settings
+
+_settings = get_settings()
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', '127.0.0.1'),
-    'port': int(os.getenv('DB_PORT', '3306')),
-    'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', 'root'),
-    'database': os.getenv('DB_DATABASE', 'skills'),
+    'host': _settings.DB_HOST,
+    'port': _settings.DB_PORT,
+    'user': _settings.DB_USER,
+    'password': _settings.DB_PASSWORD,
+    'database': _settings.DB_DATABASE,
     'charset': 'utf8mb4',
     'cursorclass': pymysql.cursors.DictCursor
 }

@@ -8,7 +8,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from db.connection import get_connection
+from database import get_connection
 from db.models import User
 from core.constants import UserRole
 from core.security import hash_api_key, generate_api_key

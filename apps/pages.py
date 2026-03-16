@@ -25,7 +25,8 @@ def get_templates():
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Home page."""
-    return get_templates().TemplateResponse("index.html", {"request": request})
+    user = get_current_user(request)
+    return get_templates().TemplateResponse("index.html", {"request": request, "user": user})
 
 
 @router.get("/skill-specification", response_class=HTMLResponse)
@@ -424,5 +425,19 @@ async def gitea_tasks_page(request: Request):
 
 # Helper function from main.py
 def get_current_user(request: Request):
-    """Get current user from session."""
-    return request.session.get("user_id") or request.session.get("employee_id")
+    """Get current user from session.
+
+    Returns user dictionary if authenticated, None otherwise.
+    """
+    user_id = request.session.get("user_id") or request.session.get("employee_id")
+    if not user_id:
+        return None
+
+    # Import here to avoid circular imports
+    from database import get_connection
+    with get_connection() as conn:
+        result = conn.execute(
+            "SELECT * FROM users WHERE id = %s",
+            (user_id,)
+        ).fetchone()
+        return result
