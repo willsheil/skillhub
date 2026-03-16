@@ -1,6 +1,6 @@
 import pytest
 from fastapi import Header, HTTPException
-from api.v1.dependencies import verify_api_key_header, get_rate_limit
+from api.v1.dependencies import verify_api_key_header, check_rate_limit
 
 def test_verify_valid_api_key():
     """测试验证有效的 API Key"""

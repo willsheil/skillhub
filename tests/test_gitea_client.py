@@ -18,7 +18,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from gitea_client import GiteaClient, GiteaError, AuthenticationError, RepositoryNotFoundError, NetworkError, GitConflictError
+# 修正导入路径
+from services.gitea.gitea_client import GiteaClient, GiteaError, AuthenticationError, RepositoryNotFoundError, NetworkError, GitConflictError
 
 
 def test_gitea_client_initialization(monkeypatch):

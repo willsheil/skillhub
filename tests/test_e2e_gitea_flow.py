@@ -2,7 +2,8 @@ import pytest
 from pathlib import Path
 import tempfile
 import zipfile
-from gitea_push_service import GiteaPushService
+# 修正导入路径
+from services.gitea.gitea_push_service import GiteaPushService
 from database import get_connection, init_db
 
 @pytest.fixture

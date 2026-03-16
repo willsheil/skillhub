@@ -23,6 +23,7 @@ router.include_router(external.router, tags=["External API"])
 router.include_router(pages.router, tags=["Pages"])
 router.include_router(downloads.router, tags=["Downloads"])
 router.include_router(notifications.router, tags=["Notifications"])
+# users 和 keys 路由已在内部定义了 /api/admin 前缀，不需要再加前缀
 router.include_router(users.router, tags=["Users"])
 router.include_router(keys.router, tags=["API Keys"])
 
