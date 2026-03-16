@@ -885,39 +885,6 @@ async def download_plugin(filename: str, request: Request):
     )
 
 
-@app.get("/login", response_class=HTMLResponse)
-async def user_login_page(request: Request, error: str = None):
-    """Display user login page."""
-    error_msg = None
-    if error == "invalid":
-        error_msg = "工号或 API 密钥错误"
-
-    return templates.TemplateResponse("login.html", {
-        "request": request,
-        "error": error_msg
-    })
-
-
-async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    """Process admin login."""
-    # First verify against ADMIN_USERNAME/ADMIN_PASSWORD (static admin)
-    if verify_credentials(username, password):
-        # For static admin, query the database to get user info
-        user = get_user_by_credentials(username, "static_admin") or get_user_by_id(1)
-        if user:
-            request.session["user_id"] = user["id"]
-            request.session["employee_id"] = user["employee_id"]
-            request.session["role"] = user["role"]
-            return RedirectResponse(url="/admin/upload", status_code=302)
-    return RedirectResponse(url="/admin/login?error=invalid", status_code=302)
-
-
-@app.post("/api/login")
-async def api_login(
-    request: Request,
-    employee_id: str = Form(...),
-    api_key: str = Form(...)
-):
     """User login API endpoint.
 
     Accepts employee_id and api_key as form parameters.

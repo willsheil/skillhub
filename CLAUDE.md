@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. **开发验证流程**: 每次开发完成后必须执行以下验证流程：
    - 启动后端服务: `py main.py`（端口 28000）
    - 打开浏览器访问: `http://localhost:28000/login`
-   - 登录账号: `admin` / 密码: `admin123`
+   - 登录账号: `admin001` / 密码: `admin_key_001`
    - 验证修改功能是否正常工作
 
 ## Project Overview
