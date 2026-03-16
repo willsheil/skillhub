@@ -8,7 +8,7 @@ This module imports and combines routes from submodules.
 from fastapi import APIRouter
 
 # Import all route modules
-from . import auth, skills, admin, stats, gitea, external, pages, downloads, notifications, users, keys
+from . import auth, skills, admin, stats, gitea, external, pages, downloads, notifications, users, keys, health
 
 # Create main API router
 router = APIRouter()
@@ -25,5 +25,6 @@ router.include_router(downloads.router, tags=["Downloads"])
 router.include_router(notifications.router, tags=["Notifications"])
 router.include_router(users.router, tags=["Users"])
 router.include_router(keys.router, tags=["API Keys"])
+router.include_router(health.router, prefix="/api", tags=["Health"])
 
 __all__ = ["router"]

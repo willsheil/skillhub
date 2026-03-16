@@ -2895,49 +2895,6 @@ skills-batch/
 
 
 # Health check endpoint for third-party monitoring
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint for monitoring services.
-
-    Returns:
-        Service status information including:
-        - status: "healthy" or "unhealthy"
-        - timestamp: Current server time
-        - version: API version
-        - uptime: Service uptime (if available)
-    """
-    import time
-
-    # Basic health checks
-    health_status = {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0",
-        "service": "Skill Registry"
-    }
-
-    # Check if plugins directory is accessible
-    try:
-        if not PLUGINS_DIR.exists():
-            health_status["status"] = "unhealthy"
-            health_status["error"] = "Plugins directory not accessible"
-    except Exception as e:
-        health_status["status"] = "unhealthy"
-        health_status["error"] = str(e)
-
-    # Return appropriate status code
-    if health_status["status"] == "healthy":
-        return health_status
-    else:
-        raise HTTPException(status_code=503, detail=health_status)
-
-
-# Statistics APIs
-@app.get("/api/stats/top")
-async def api_stats_top(
-    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)")
-):
     """Get download statistics with rankings."""
     try:
         # Parse dates

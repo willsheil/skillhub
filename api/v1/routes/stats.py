@@ -2,9 +2,9 @@
 Statistics routes - Download stats, user stats, system stats.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from db.repositories import SkillRepository, DownloadRepository, UserRepository
 from api.v1.dependencies import get_current_user

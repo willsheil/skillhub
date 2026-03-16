@@ -58,7 +58,25 @@ async def upload_skill(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload a new (simplified version - full implementation would:
+    """Upload a new skill.
+
+    Requires authentication.
+    """
+    settings = get_settings()
+
+    # Read file content
+    content = await file.read()
+
+    # Check file size
+    if len(content) > settings.MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large")
+
+    # Validate ZIP file
+    if not file.filename or not file.filename.endswith('.zip'):
+        raise HTTPException(status_code=400, detail="Only ZIP files allowed")
+
+    # TODO: Parse skill metadata and save to pending directory
+    # This is a simplified version - full implementation would:
     # 1. Extract ZIP to temp directory
     # 2. Parse SKILL.md for metadata
     # 3. Create skill record in database
@@ -79,7 +97,7 @@ async def list_skills(
     current_user: dict = Depends(get_current_user)
 ):
     """List skills with filters.
-    
+
     Requires authentication.
     """
     skills, total = SkillRepository.search(
@@ -102,7 +120,13 @@ async def list_skills(
 
 @router.get("/my-skills")
 async def get_my_skills(current_user: dict = Depends(get_current_user)):
-    """Get skills uploaded by current (skill.skill_name not) in grouped:
+    """Get skills uploaded by current user."""
+    skills = SkillRepository.get_by_uploader(current_user["id"])
+
+    # Group by skill name
+    grouped = {}
+    for skill in skills:
+        if skill.skill_name not in grouped:
             grouped[skill.skill_name] = {
                 "skill_name": skill.skill_name,
                 "versions": []
