@@ -944,49 +944,7 @@ async def api_me(request: Request):
     }
 
 
-@app.get("/upload", response_class=HTMLResponse)
-async def user_upload_page(request: Request):
-    """Display user upload page (requires auth)."""
-    # Get current user
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
 
-    return templates.TemplateResponse("upload.html", {
-        "request": request,
-        "user": user,
-        "success": None,
-        "error": None
-    })
-
-
-@app.get("/admin/upload", response_class=HTMLResponse)
-async def upload_page(request: Request, _: bool = Depends(require_auth)):
-    """Display admin upload page (requires auth)."""
-    user = get_current_user(request)
-
-    return templates.TemplateResponse("admin_upload.html", {
-        "request": request,
-        "user": user,
-        "success": None,
-        "error": None
-    })
-
-
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
-    """Display admin dashboard (requires admin)."""
-    # Get current user
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    # Check admin role
-    if user["role"] != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
 
     return templates.TemplateResponse("admin.html", {
         "request": request,
@@ -994,80 +952,8 @@ async def admin_dashboard(request: Request):
     })
 
 
-@app.get("/admin/users", response_class=HTMLResponse)
-async def admin_users_page(request: Request):
-    """Display user management page (requires admin)."""
-    # Get current user
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    # Check admin role
-    if user["role"] != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-
-    return templates.TemplateResponse("admin_users.html", {
-        "request": request,
-        "user": user
-    })
-
-
-@app.get("/admin/api-keys", response_class=HTMLResponse)
-async def admin_api_keys_page(request: Request):
-    """Display API Keys management page (requires admin)."""
-    # Get current user
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    # Check admin role
-    if user["role"] != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-
-    return templates.TemplateResponse("admin_api_keys.html", {
-        "request": request,
-        "user": user
-    })
-
-
 def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_author: str = None) -> tuple[bool, dict]:
     """Validate a skill ZIP file according to Agent Skills specification.
-
-    Args:
-        zip_path: Path to the ZIP file
-        allow_missing: If True, return missing fields info instead of rejecting
-        default_author: Default author to use if not specified in SKILL.md
-
-    The ZIP should have structure:
-        skill-name/
-        ├── SKILL.md          # Required
-        ├── scripts/          # Optional
-        ├── references/       # Optional
-        └── assets/           # Optional
-
-    SKILL.md must contain YAML frontmatter with required fields:
-        - name: skill identifier (max 64 chars, lowercase letters/numbers/hyphens only)
-        - description: what the skill does (max 1024 chars)
-        - metadata.version: version string (e.g., "1.0.0")
-        - metadata.author: author identifier (format: lowercase letter + 8 digits, e.g., "w00545471")
-
-    Optional fields:
-        - license: license name or reference
-        - compatibility: environment requirements (max 500 chars)
-        - metadata: arbitrary key-value mapping (other custom fields)
-        - allowed-tools: space-delimited list of pre-approved tools
-
-    Args:
-        zip_path: Path to the skill ZIP file
-        allow_missing: If True, return missing fields info instead of rejecting
-
-    Returns:
         (is_valid, metadata or error_info)
         When allow_missing=True and fields are missing, returns:
         (False, {"error": "MISSING_FIELDS", "missing_fields": [...], "metadata": {...}})
@@ -1075,14 +961,6 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_auth
     import zipfile
 
     try:
-        with zipfile.ZipFile(zip_path, 'r') as zf:
-            namelist = zf.namelist()
-
-            # Find SKILL.md (may be in root or subdirectory)
-            skill_md_paths = [name for name in namelist
-                             if name.endswith('SKILL.md') or name == 'SKILL.md']
-
-            if not skill_md_paths:
                 return False, {"error": "Missing SKILL.md in ZIP"}
 
             # Read and parse SKILL.md
@@ -1748,19 +1626,6 @@ async def api_my_skills(
         )
 
 
-@app.get("/my-skills", response_class=HTMLResponse)
-async def my_skills_page(request: Request):
-    """Render the my_skills.html page (requires auth)."""
-    user = get_current_user(request)
-
-    return templates.TemplateResponse("my_skills.html", {
-        "request": request,
-        "user": user
-    })
-
-
-class BatchOperationRequest(BaseModel):
-    """Request model for batch operations."""
     skill_ids: List[int]
 
 
@@ -3217,27 +3082,6 @@ async def api_stats_export(
         raise HTTPException(500, f"Failed to export stats: {e}")
 
 
-@app.get("/stats", response_class=HTMLResponse)
-async def stats_page(request: Request):
-    """Display download statistics page (public access)."""
-    return templates.TemplateResponse("stats.html", {
-        "request": request
-    })
-
-
-@app.get("/skill/{skill_name}", response_class=HTMLResponse)
-async def skill_detail_page(request: Request, skill_name: str, version: str = None, compare: str = None):
-    """Display skill detail page with Skill.md content."""
-    # Check if user is authenticated
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
-
-    # Try to get skill from database first
-    from database import get_skill_by_name
-    skill = get_skill_by_name(skill_name)
-
-    # Get all versions of this skill
     from db.repositories import SkillRepository
     all_versions = SkillRepository.get_versions(skill_name)
 
@@ -3378,23 +3222,6 @@ async def skill_detail_page(request: Request, skill_name: str, version: str = No
     })
 
 
-@app.get("/skill/{skill_name}/skill.md", response_class=PlainTextResponse)
-async def get_skill_md_file(skill_name: str):
-    """Get SKILL.md file for Agent installation.
-
-    Returns the SKILL.md file content as plain text for curl download.
-    """
-    logger.debug(f"SKILL.md requested for: '{skill_name}'")
-
-    # Find the skill ZIP file
-    skill_zip = None
-
-    # Try exact match first
-    exact_match = PLUGINS_DIR / f"{skill_name}.zip"
-    if exact_match.exists():
-        skill_zip = exact_match
-    else:
-        # Try pattern match (skill-name-*.zip)
         matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
         if matching_zips:
             skill_zip = matching_zips[0]
@@ -4318,29 +4145,6 @@ async def api_get_api_key_stats(
 
 # ==================== UI Routes ====================
 
-@app.get("/admin/gitea-tasks", response_class=HTMLResponse)
-async def gitea_tasks_page(request: Request):
-    """Display Gitea push tasks status page."""
-    return templates.TemplateResponse("gitea_tasks.html", {
-        "request": request
-    })
-
-
-# ==================== Route Modules ====================
-# Register additional route modules (lower priority than @app routes)
-
-def _register_additional_routes():
-    """Register additional route modules."""
-    from apps import pages, downloads, notifications, users, keys
-
-    # Set templates for pages router
-    pages.set_templates(templates)
-
-    # Include routers - these have lower priority than @app routes
-    app.include_router(pages.router, tags=["Pages"])
-    app.include_router(downloads.router, tags=["Downloads"])
-    app.include_router(notifications.router, tags=["Notifications"])
-    app.include_router(users.router, tags=["Users"])
     app.include_router(keys.router, tags=["API Keys"])
 
 
