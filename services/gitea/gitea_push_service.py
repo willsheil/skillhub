@@ -1,11 +1,81 @@
 import asyncio
 import logging
 from pathlib import Path
-from gitea_client import GiteaClient
-from gitea_integration import get_pending_tasks, update_push_status
-from database import get_connection
+from .gitea_client import GiteaClient
+from .gitea_integration import get_pending_tasks, update_push_status
+from db.connection import get_connection
 
 logger = logging.getLogger(__name__)
+
+# Sync wrapper for APScheduler
+def run_push_task():
+    """Synchronous wrapper for APScheduler to run async process_once."""
+    asyncio.run(process_push_tasks_once())
+
+
+async def process_push_tasks_once():
+    """Process pending tasks once (async version)."""
+    try:
+        logger.info("Processing pending Gitea push tasks...")
+        tasks = get_pending_tasks(limit=5)
+
+        if tasks:
+            logger.info(f"Found {len(tasks)} pending tasks")
+            client = GiteaClient()
+            for task in tasks:
+                await process_task_sync(client, task)
+        else:
+            logger.info("No pending tasks to process")
+    except Exception as e:
+        logger.error(f"Error in process_push_tasks_once: {e}")
+
+
+async def process_task_sync(client: GiteaClient, task: dict):
+    """Process a single push task (async version)."""
+    task_id = task['id']
+    skill_zip = Path("./plugins") / task['filename']
+
+    if not skill_zip.exists():
+        error = f"Skill ZIP not found: {skill_zip}"
+        update_push_status(task_id, "failed", error_message=error)
+        logger.error(f"Task {task_id} failed: {error}")
+        return
+
+    # Update status to pushing
+    update_push_status(task_id, "pushing")
+
+    try:
+        # Get skill_name and version from task
+        skill_name = task.get('skill_name', task['filename'].replace('.zip', '').rsplit('-', 1)[0])
+        version = task.get('version', '1.0.0')
+
+        # Push to Gitea using push_with_retry
+        result = client.push_with_retry(
+            skill_zip,
+            skill_name,
+            version,
+            max_retries=3
+        )
+
+        if result['success']:
+            # Update status to success
+            update_push_status(
+                task_id,
+                "success",
+                commit_hash=result['commit_hash'],
+                gitea_path=result.get('folder', f'skills/{skill_name}')
+            )
+            logger.info(f"Task {task_id} completed successfully")
+        else:
+            # Push failed
+            error_msg = result.get('error', 'Unknown error')
+            logger.error(f"Task {task_id} failed: {error_msg}")
+            update_push_status(task_id, "failed", error_message=error_msg)
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Task {task_id} failed: {error_msg}")
+        update_push_status(task_id, "failed", error_message=error_msg)
+
 
 class GiteaPushService:
     """Background service to process Gitea push tasks."""

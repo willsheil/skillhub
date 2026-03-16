@@ -1,73 +1,138 @@
-from fastapi import Header, HTTPException, status
+"""
+FastAPI dependencies - Authentication and authorization.
+"""
+
+import logging
 from typing import Optional
-from database import verify_api_key, get_api_key_info
+from fastapi import HTTPException, Header, Request, status
 
-# 速率限制内存存储（生产环境建议使用 Redis）
-_rate_limit_store = {}
+from db.repositories import UserRepository, ApiKeyRepository
 
-def verify_api_key_header(x_api_key: Optional[str] = Header(None, alias="X-API-Key")) -> dict:
-    """验证 API Key 依赖注入
+logger = logging.getLogger(__name__)
 
-    Raises:
-        HTTPException: 401 如果 API Key 无效
+
+# Rate limiting storage (in-memory, reset every minute)
+_rate_limit_storage: dict = {}
+
+
+def get_current_user(request: Request) -> dict:
+    """Get current authenticated user from session.
+
+    Args:
+        request: FastAPI request object
 
     Returns:
-        API Key 信息字典
+        User info dict
+
+    Raises:
+        HTTPException: If not authenticated
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    user = UserRepository.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+
+    return {
+        "id": user.id,
+        "employee_id": user.employee_id,
+        "role": user.role,
+    }
+
+
+def require_admin(request: Request) -> dict:
+    """Require admin role for access.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        User info dict
+
+    Raises:
+        HTTPException: If not admin
+    """
+    user = get_current_user(request)
+
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return user
+
+
+def verify_api_key_header(x_api_key: Optional[str] = Header(None)) -> dict:
+    """Verify API key from header.
+
+    Args:
+        x_api_key: API key from X-API-Key header
+
+    Returns:
+        API key info dict
+
+    Raises:
+        HTTPException: If API key is invalid
     """
     if not x_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API Key is required",
-            headers={"WWW-Authenticate": "ApiKey"},
+            detail="API key required"
         )
 
-    api_key_info = verify_api_key(x_api_key)
-    if not api_key_info:
+    api_key = ApiKeyRepository.verify(x_api_key)
+    if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API Key",
-            headers={"WWW-Authenticate": "ApiKey"},
+            detail="Invalid API key"
         )
 
-    return api_key_info
+    # Update last used
+    ApiKeyRepository.update_last_used(api_key.id)
 
-def get_rate_limit(api_key: str) -> int:
-    """获取 API Key 的速率限制
+    # Get associated user
+    user = UserRepository.get_by_id(api_key.user_id)
 
-    Returns:
-        每分钟允许的请求数
-    """
-    info = get_api_key_info(api_key)
-    if info:
-        return info.get('rate_limit', 100)
-    return 100
+    return {
+        "api_key_id": api_key.id,
+        "user_id": api_key.user_id,
+        "rate_limit": api_key.rate_limit,
+        "user": user.to_dict() if user else None,
+    }
 
-def check_rate_limit(api_key: str, rate_limit: int) -> bool:
-    """检查速率限制
+
+def check_rate_limit(api_key: str, limit: int) -> bool:
+    """Check if API key has exceeded rate limit.
 
     Args:
-        api_key: API Key 字符串
-        rate_limit: 每分钟请求数限制
+        api_key: API key string
+        limit: Requests per minute limit
 
     Returns:
-        True 如果未超限，False 如果超限
+        True if within limit, False if exceeded
     """
     import time
-    current_time = int(time.time())
 
-    if api_key not in _rate_limit_store:
-        _rate_limit_store[api_key] = []
-        return True
+    current_minute = int(time.time() // 60)
 
-    # 移除超过 60 秒的记录
-    _rate_limit_store[api_key] = [
-        t for t in _rate_limit_store[api_key]
-        if current_time - t < 60
-    ]
+    if api_key not in _rate_limit_storage:
+        _rate_limit_storage[api_key] = {}
 
-    # 检查请求数
-    if len(_rate_limit_store[api_key]) >= rate_limit:
-        return False
+    key_data = _rate_limit_storage[api_key]
 
-    _rate_limit_store[api_key].append(current_time)
-    return True
+    if key_data.get("minute") != current_minute:
+        key_data["count"] = 0
+        key_data["minute"] = current_minute
+
+    key_data["count"] += 1
+
+    return key_data["count"] <= limit

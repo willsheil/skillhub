@@ -20,9 +20,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 import time
 
-from gitea_client import GiteaClient, GiteaError, NetworkError
-from gitea_integration import get_pending_tasks, update_push_status
-from database import get_connection
+from .gitea_client import GiteaClient, GiteaError, NetworkError
+from .gitea_integration import get_pending_tasks, update_push_status
+from db.connection import get_connection
 
 logger = logging.getLogger(__name__)
 

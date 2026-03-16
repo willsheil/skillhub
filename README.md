@@ -10,7 +10,7 @@
 # 1. 启动服务
 docker-compose up -d
 
-# 2. 访问 http://localhost:8000
+# 2. 访问 http://localhost:28000
 ```
 
 ### 方式 2: 直接运行
@@ -22,7 +22,7 @@ pip install -r requirements.txt
 # 2. 启动服务
 python main.py
 
-# 3. 访问 http://localhost:8000
+# 3. 访问 http://localhost:28000
 ```
 
 ## 导入已有的 Skill 包
@@ -41,7 +41,7 @@ python import-skills.py marketplace.zip
 
 ### 方法 1: 通过 Web 管理界面上传（推荐）
 
-访问 `http://localhost:8000/admin/upload`，支持两种上传方式：
+访问 `http://localhost:28000/admin/upload`，支持两种上传方式：
 
 #### 上传 Skill 集（多个技能）
 
@@ -74,7 +74,7 @@ skills-marketplace.zip
 
 **上传 Skill 集（自动提取）：**
 ```bash
-curl -X POST http://localhost:8000/admin/upload \
+curl -X POST http://localhost:28000/admin/upload \
   -F "organization=my-org" \
   -F "collection=my-collection" \
   -F "file=@skills-marketplace.zip"
@@ -82,7 +82,7 @@ curl -X POST http://localhost:8000/admin/upload \
 
 **上传单个 Skill：**
 ```bash
-curl -X POST http://localhost:8000/admin/upload \
+curl -X POST http://localhost:28000/admin/upload \
   -F "organization=my-org" \
   -F "collection=my-collection" \
   -F "name=my-skill" \
@@ -160,7 +160,7 @@ registry/
 
 或通过 API 获取集合下的所有 skills：
 ```bash
-curl http://localhost:8000/api/collections/company-a/security-tools
+curl http://localhost:28000/api/collections/company-a/security-tools
 ```
 
 ## 在 Claude Code 中使用
@@ -256,7 +256,7 @@ Skills will be automatically pushed to Gitea when approved by admin.
 ### 安装整个 Skill Set（技能集）
 
 **方式 1：通过 Web 界面**
-1. 访问 Registry 首页 `http://localhost:8000`
+1. 访问 Registry 首页 `http://localhost:28000`
 2. 找到目标 Skill 集（如 `ICSL / Base`）
 3. 点击"查看集合"按钮
 4. 在弹窗中选择要安装的技能（勾选复选框）
@@ -267,7 +267,7 @@ Skills will be automatically pushed to Gitea when approved by admin.
 
 ```bash
 # 获取集合下的所有 skills
-curl http://localhost:8000/api/collections/ICSL/Base
+curl http://localhost:28000/api/collections/ICSL/Base
 
 # 安装集合中的所有 skills（手动逐个安装）
 /plugin install ICSL/Base/ask-questions-if-underspecified
@@ -298,7 +298,7 @@ curl http://localhost:8000/api/collections/ICSL/Base
 **从特定 Registry 安装：**
 ```bash
 # 1. 添加 Registry
-/plugins marketplace add http://localhost:8000/marketplace.json
+/plugins marketplace add http://localhost:28000/marketplace.json
 
 # 2. 查看可用技能
 /plugin menu
@@ -311,7 +311,7 @@ curl http://localhost:8000/api/collections/ICSL/Base
 
 ### 通过 Web 界面上传
 
-1. 访问 `http://localhost:8000/admin/login`
+1. 访问 `http://localhost:28000/admin/login`
 2. 使用 `.env` 中配置的账号密码登录
 3. 选择上传类型：
    - **Skill 集**：包含多个技能的 ZIP 文件（自动提取）

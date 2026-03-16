@@ -101,7 +101,7 @@ def extract_and_repackage(skills_zip: Path, output_dir: Path, collection: str = 
         "output_dir": str(output_dir)
     })
     logger.info(f"Collection: {collection}")
-    logger.info("Next steps: Start registry with 'docker-compose up -d', visit http://localhost:8000")
+    logger.info("Next steps: Start registry with 'docker-compose up -d', visit http://localhost:28000")
 
 
 if __name__ == "__main__":

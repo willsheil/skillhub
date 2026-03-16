@@ -33,7 +33,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
 # Import and setup logging configuration
-from logging_config import setup_logging, audit_log, PerformanceTracker
+from utils.logging_config import setup_logging, audit_log, PerformanceTracker
 
 # Initialize logging system
 setup_logging(
@@ -100,16 +100,19 @@ async def lifespan(app: FastAPI):
     if gitea_url:
         try:
             logger.info("Starting Gitea push service with APScheduler...")
-            from gitea_push_service import GiteaPushService
+            from services.gitea import GiteaPushService
 
             push_service = GiteaPushService(
                 interval=int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
             )
 
+            # Import the sync wrapper
+            from services.gitea.gitea_push_service import run_push_task
+
             # Start APScheduler with interval trigger
             interval_seconds = int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
             scheduler.add_job(
-                push_service.process_once,
+                run_push_task,
                 trigger=IntervalTrigger(seconds=interval_seconds),
                 id="gitea_push_task",
                 name="Gitea Push Service",
@@ -141,7 +144,7 @@ app = FastAPI(
 )
 
 # Register external API v1 router
-from api.v1.routes import router as api_v1_router
+from apps import router as api_v1_router
 app.include_router(api_v1_router)
 
 # 配置 API Key 安全方案
@@ -183,6 +186,10 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 # Static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+# Set templates for pages router
+from apps.pages import set_templates
+set_templates(templates)
 
 
 def require_auth(request: Request):
@@ -490,12 +497,21 @@ def scan_plugins() -> List[dict]:
             SELECT
                 id, skill_name, version, filename, uploader_id, status,
                 source_type, uploaded_at, reviewed_at, reviewer_id,
-                review_comment, is_active
+                review_comment, is_active, is_default_version
             FROM skills
             WHERE status = 'approved' AND is_active = 1
-            ORDER BY skill_name, uploaded_at DESC
+            ORDER BY skill_name, is_default_version DESC, version DESC
             """
         ).fetchall()
+
+        # Deduplicate: only keep the first (default/latest) version for each skill
+        seen_skills = set()
+        deduplicated_rows = []
+        for row in rows:
+            if row["skill_name"] not in seen_skills:
+                seen_skills.add(row["skill_name"])
+                deduplicated_rows.append(row)
+        rows = deduplicated_rows
 
         # Build result list with metadata from ZIP files
         for row in rows:
@@ -541,14 +557,20 @@ def scan_plugins() -> List[dict]:
             if os.path.exists(file_path):
                 file_size = os.path.getsize(file_path)
 
+            # Extract category from metadata
+            inner_meta = metadata.get("metadata", {})
+            category = inner_meta.get("category") if isinstance(inner_meta, dict) else None
+
             result.append({
                 "name": skill_name,
                 "metadata": metadata,
+                "category": category,  # Add category field
                 "latest_version": row["version"],
                 "source_type": row["source_type"] or "opensource",
                 "uploaded_at": row["uploaded_at"].isoformat() if row["uploaded_at"] else None,
                 "updated_at": row["uploaded_at"].strftime("%Y-%m-%d") if row["uploaded_at"] else None,
                 "download_count": 0,  # TODO: Add download count if tracking
+                "rating": 4.5,  # Default rating, TODO: Add actual rating
                 "uploader_employee_id": uploader_employee_id,  # Add uploader info
                 "versions": [{
                     "version": row["version"],
@@ -709,15 +731,6 @@ def _get_spec_html() -> str:
     except (FileNotFoundError, OSError):
         return "<h1>规范文档未找到</h1><p>请联系管理员添加规范文档。</p>"
 
-
-@app.get("/skill-specification", response_class=HTMLResponse)
-def skill_specification(request: Request):
-    """Skill technical specification page - renders markdown content."""
-    return templates.TemplateResponse("skill_specification.html", {
-        "request": request,
-        "content": _get_spec_html(),
-        "version": "v1.0"
-    })
 
 
 @app.get("/.well-known/skills/index.json")
@@ -1482,7 +1495,7 @@ async def api_review_skill(
             # NEW: Create Gitea push task
             task_id = None
             try:
-                from gitea_integration import create_push_task
+                from services.gitea.gitea_integration import create_push_task
                 task_id = create_push_task(skill_id)
                 logger.info(f"Created Gitea push task {task_id} for skill {skill_id}")
             except Exception as e:
@@ -2175,32 +2188,38 @@ async def upload_plugin(
         target_filename = f"{skill_name}-{version}.zip"
         target_path = PENDING_DIR / target_filename
 
-        # Check if skill with same name already exists
-        from database import get_skill_by_name
-        existing_skill = get_skill_by_name(skill_name)
+        # Check if skill with same name AND version already exists
+        from database import get_connection
+        with get_connection() as conn:
+            existing_skill = conn.execute("""
+                SELECT id, skill_name, version, uploader_id, status
+                FROM skills
+                WHERE skill_name = %s AND version = %s
+                LIMIT 1
+            """, (skill_name, version)).fetchone()
+
         if existing_skill:
+            # Same name and version exists
             if existing_skill["uploader_id"] != user_id:
                 error_msg = f"技能 {skill_name} 已被其他用户创建，您无权更新"
                 return JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
                     content={"success": False, "error": error_msg}
                 )
-            # Skill exists and belongs to user
-            # If overwrite flag is True, proceed with update; otherwise ask for confirmation
+            # Skill exists with same version - ask for confirmation to overwrite
             if not overwrite:
                 return JSONResponse(
                     status_code=status.HTTP_409_CONFLICT,
                     content={
                         "success": False,
                         "error": "SKILL_EXISTS",
-                        "message": f"技能 {skill_name} 已存在（当前版本: {existing_skill['version']}），是否覆盖更新？",
+                        "message": f"技能 {skill_name} v{version} 已存在，是否覆盖更新？",
                         "skill_name": skill_name,
-                        "existing_version": existing_skill["version"]
+                        "existing_version": version
                     }
                 )
-            # If overwrite is True, update the existing record instead of creating a new one
             # Delete the old pending file if exists
-            old_filename = f"{skill_name}-{existing_skill['version']}.zip"
+            old_filename = f"{skill_name}-{version}.zip"
             old_pending_path = PENDING_DIR / old_filename
             if old_pending_path.exists():
                 old_pending_path.unlink()
@@ -3291,7 +3310,7 @@ async def stats_page(request: Request):
 
 
 @app.get("/skill/{skill_name}", response_class=HTMLResponse)
-async def skill_detail_page(request: Request, skill_name: str):
+async def skill_detail_page(request: Request, skill_name: str, version: str = None, compare: str = None):
     """Display skill detail page with Skill.md content."""
     # Check if user is authenticated
     user_id = request.session.get("user_id")
@@ -3302,37 +3321,46 @@ async def skill_detail_page(request: Request, skill_name: str):
     from database import get_skill_by_name
     skill = get_skill_by_name(skill_name)
 
+    # Get all versions of this skill
+    from db.repositories import SkillRepository
+    all_versions = SkillRepository.get_versions(skill_name)
+
+    # Get all approved versions for display
+    approved_versions = [v for v in all_versions if v.get("status") == "approved"]
+
     skill_zip = None
     real_skill_name = skill_name
+    selected_version = version
 
-    if skill and skill["status"] == "approved" and skill["is_active"]:
-        # Use the skill's filename
-        skill_zip = PLUGINS_DIR / skill["filename"]
-        if not skill_zip.exists():
-            skill_zip = None
-
-    # If not found in database, try to find in plugins directory
-    if not skill_zip:
+    # Function to find skill zip by version
+    def find_skill_zip(name: str, ver: str = None):
+        if ver:
+            # Try exact version match: skill-name-version.zip
+            exact = PLUGINS_DIR / f"{name}-{ver}.zip"
+            if exact.exists():
+                return exact
+        # Try default or latest
+        if skill and skill["status"] == "approved" and skill["is_active"]:
+            zip_path = PLUGINS_DIR / skill["filename"]
+            if zip_path.exists():
+                return zip_path
         # Try exact match first
-        exact_match = PLUGINS_DIR / f"{skill_name}.zip"
+        exact_match = PLUGINS_DIR / f"{name}.zip"
         if exact_match.exists():
-            skill_zip = exact_match
-        else:
-            # Try pattern match (skill-name-*.zip)
-            matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
-            if matching_zips:
-                skill_zip = matching_zips[0]
+            return exact_match
+        # Try pattern match (skill-name-*.zip)
+        matching_zips = list(PLUGINS_DIR.glob(f"{name}-*.zip"))
+        if matching_zips:
+            return matching_zips[0]
+        return None
+
+    skill_zip = find_skill_zip(skill_name, version)
 
     if not skill_zip:
-        # No skill found or file not found, try exact match
-        skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
-        if not skill_zip.exists():
-            # Try to find a ZIP that starts with skill_name-
-            matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
-            if matching_zips:
-                skill_zip = matching_zips[0]  # Use the first match
-            else:
-                raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
+        # No skill found or file not found
+        skill_zip = find_skill_zip(skill_name)
+        if not skill_zip:
+            raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
 
     # Extract metadata from the skill
     metadata = extract_metadata(skill_zip.name)
@@ -3381,19 +3409,56 @@ async def skill_detail_page(request: Request, skill_name: str):
     # Build skill directory path for Gitea (format: {skill_name}/SKILL.md)
     skill_dir = real_skill_name
 
+    # Get version for display (use selected version or default)
+    display_version = selected_version if selected_version else version
+
+    # Prepare version list for template
+    version_list = []
+    for v in approved_versions:
+        v_info = {
+            "version": v.get("version", "unknown"),
+            "is_default": v.get("is_default_version", 0) == 1,
+            "is_active": v.get("is_active", 1) == 1,
+            "created_at": v.get("created_at", "").strftime("%Y-%m-%d") if hasattr(v.get("created_at"), "strftime") else str(v.get("created_at", ""))
+        }
+        version_list.append(v_info)
+
+    # Get compare version content if specified
+    compare_content = None
+    compare_version_display = None
+    if compare:
+        compare_zip = find_skill_zip(skill_name, compare)
+        if compare_zip:
+            import zipfile
+            try:
+                with zipfile.ZipFile(compare_zip, 'r') as zf:
+                    # Find SKILL.md (may be in root or subdirectory)
+                    skill_md_paths = [name for name in zf.namelist()
+                                     if 'SKILL.md' in name or name.endswith('SKILL.md')]
+                    if skill_md_paths:
+                        compare_content = zf.read(skill_md_paths[0]).decode('utf-8')
+            except Exception as e:
+                logger.warning(f"Failed to extract compare content: {e}")
+            compare_version_display = compare
+
     return templates.TemplateResponse("skill_detail.html", {
         "request": request,
         "skill_name": real_skill_name,
         "author": author,
         "download_count": download_count,
-        "version": version,
+        "version": display_version,
         "updated_at": updated_at,
         "download_url": f"/plugins/{skill_zip.name}",
         "filename": skill_zip.name,
         "request_url": str(request.base_url).rstrip("/"),
         "user": user,
         "gitea_repo_url": gitea_repo_url,
-        "skill_dir": skill_dir
+        "skill_dir": skill_dir,
+        "version_list": version_list,
+        "selected_version": selected_version,
+        "compare": compare,
+        "compare_content": compare_content,
+        "compare_version_display": compare_version_display
     })
 
 
@@ -3446,27 +3511,32 @@ async def get_skill_md_file(skill_name: str):
 
 
 @app.get("/api/skill/{skill_name}/content")
-async def get_skill_content_api(skill_name: str):
+async def get_skill_content_api(skill_name: str, version: str = None):
     """Get Skill.md content for a skill.
 
     Returns the complete SKILL.md file content (including YAML frontmatter).
     """
-    logger.debug(f"API called with skill_name: '{skill_name}'", extra={"skill_name": skill_name})
+    logger.debug(f"API called with skill_name: '{skill_name}', version: '{version}'", extra={"skill_name": skill_name, "version": version})
 
-    # Find the skill ZIP file
-    # First try exact match, then try with version pattern
-    skill_zip = PLUGINS_DIR / f"{skill_name}.zip"
-    logger.debug(f"Trying exact match: {skill_zip}, exists: {skill_zip.exists()}", extra={"skill_name": skill_name, "zip_path": str(skill_zip)})
-
-    if not skill_zip.exists():
-        # Try to find a ZIP that starts with skill_name-
-        matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
-        logger.debug(f"Pattern match found: {len(matching_zips)} files", extra={"skill_name": skill_name, "match_count": len(matching_zips)})
+    # Find the skill ZIP file by version
+    def find_zip(name: str, ver: str = None):
+        if ver:
+            zip_path = PLUGINS_DIR / f"{name}-{ver}.zip"
+            if zip_path.exists():
+                return zip_path
+        # Fallback to default behavior
+        zip_path = PLUGINS_DIR / f"{name}.zip"
+        if zip_path.exists():
+            return zip_path
+        matching_zips = list(PLUGINS_DIR.glob(f"{name}-*.zip"))
         if matching_zips:
-            skill_zip = matching_zips[0]  # Use the first match
-            logger.debug(f"Using: {skill_zip}", extra={"skill_name": skill_name, "zip_path": str(skill_zip)})
-        else:
-            raise HTTPException(status_code=404, detail=f"Skill ZIP file not found for: {skill_name}")
+            return matching_zips[0]
+        return None
+
+    skill_zip = find_zip(skill_name, version)
+
+    if not skill_zip:
+        raise HTTPException(status_code=404, detail=f"Skill ZIP file not found for: {skill_name}")
 
     try:
         import zipfile
@@ -3765,6 +3835,33 @@ async def api_retry_gitea_task(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retry task: {str(e)}"
+        )
+
+
+@app.post("/api/admin/gitea-push/trigger")
+async def api_trigger_gitea_push(
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Manually trigger Gitea push service to process pending tasks.
+
+    Returns:
+        Success message with task count
+    """
+    try:
+        from services.gitea.gitea_push_service import run_push_task
+
+        # Run the push task synchronously
+        run_push_task()
+
+        return {
+            "success": True,
+            "message": "Push triggered successfully"
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger push: {str(e)}"
         )
 
 
@@ -4311,6 +4408,28 @@ async def gitea_tasks_page(request: Request):
     return templates.TemplateResponse("gitea_tasks.html", {
         "request": request
     })
+
+
+# ==================== Route Modules ====================
+# Register additional route modules (lower priority than @app routes)
+
+def _register_additional_routes():
+    """Register additional route modules."""
+    from apps import pages, downloads, notifications, users, keys
+
+    # Set templates for pages router
+    pages.set_templates(templates)
+
+    # Include routers - these have lower priority than @app routes
+    app.include_router(pages.router, tags=["Pages"])
+    app.include_router(downloads.router, tags=["Downloads"])
+    app.include_router(notifications.router, tags=["Notifications"])
+    app.include_router(users.router, tags=["Users"])
+    app.include_router(keys.router, tags=["API Keys"])
+
+
+# Register additional routes
+_register_additional_routes()
 
 
 if __name__ == "__main__":

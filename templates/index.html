@@ -4,7 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ registry_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #7C3AED;
+            --primary-light: #A78BFA;
+            --primary-dark: #5B21B6;
+            --accent: #22C55E;
+            --accent-light: #4ADE80;
+            --bg-primary: #FAFBFC;
+            --bg-secondary: #FFFFFF;
+            --bg-card: #FFFFFF;
+            --bg-hover: #F8FAFC;
+            --text-primary: #0F172A;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            --border: #E2E8F0;
+            --border-light: #F1F5F9;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+            --shadow-lg: 0 12px 32px rgba(0,0,0,0.08);
+            --shadow-glow: 0 0 24px rgba(124, 58, 237, 0.15);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,16 +41,17 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
-            background: #ffffff;
-            color: #171717;
-            line-height: 1.5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
             font-size: 14px;
+            -webkit-font-smoothing: antialiased;
         }
 
         /* Container */
         .container {
-            max-width: 1200px;
+            max-width: 1280px;
             margin: 0 auto;
             padding: 0 24px;
         }
@@ -32,10 +62,17 @@
             top: 0;
             left: 0;
             right: 0;
-            background: #ffffff;
-            border-bottom: 1px solid #eaeaea;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-light);
             z-index: 100;
-            padding: 16px 0;
+            padding: 14px 0;
+            transition: var(--transition);
+        }
+
+        .top-nav.scrolled {
+            padding: 10px 0;
+            box-shadow: var(--shadow-sm);
         }
 
         .top-nav .container {
@@ -47,246 +84,366 @@
         .logo {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 18px;
-            font-weight: 600;
-            color: #171717;
+            gap: 10px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
             text-decoration: none;
+            letter-spacing: -0.02em;
         }
 
         .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #10B981, #059669);
-            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
+            font-weight: 700;
             font-size: 18px;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
         }
 
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 24px;
+            gap: 8px;
         }
 
         .nav-link {
-            color: #64748b;
+            color: var(--text-secondary);
             text-decoration: none;
             font-size: 14px;
             font-weight: 500;
-            transition: color 0.2s ease;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
         }
 
         .nav-link:hover {
-            color: #10B981;
+            color: var(--primary);
+            background: rgba(124, 58, 237, 0.06);
         }
 
         .nav-link.active {
-            color: #10B981;
+            color: var(--primary);
+            background: rgba(124, 58, 237, 0.08);
         }
 
         .user-actions {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .user-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 9px 18px;
+            border-radius: var(--radius-sm);
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             text-decoration: none;
-            transition: all 0.2s ease;
+            transition: var(--transition);
+            cursor: pointer;
         }
 
         .user-btn-outline {
             background: transparent;
-            color: #64748b;
-            border: 1px solid #eaeaea;
+            color: var(--text-secondary);
+            border: 1.5px solid var(--border);
         }
 
         .user-btn-outline:hover {
-            border-color: #10B981;
-            color: #10B981;
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(124, 58, 237, 0.04);
         }
 
         .user-btn-solid {
-            background: #10B981;
+            background: var(--primary);
             color: white;
             border: none;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
         }
 
         .user-btn-solid:hover {
-            background: #059669;
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(124, 58, 237, 0.3);
         }
 
         /* Main Content */
         .main-content {
-            padding-top: 70px;
+            padding-top: 80px;
         }
 
-        /* Category Navigation */
-        .category-nav {
-            padding: 24px 0;
-            border-bottom: 1px solid #eaeaea;
+        /* Hero Section */
+        .hero {
+            padding: 56px 0 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        .category-pills {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            padding-bottom: 8px;
-            scrollbar-width: none;
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 900px;
+            height: 600px;
+            background: radial-gradient(ellipse, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
+            pointer-events: none;
         }
 
-        .category-pills::-webkit-scrollbar {
-            display: none;
+        .hero-title {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.04em;
+            margin-bottom: 16px;
+            position: relative;
+            line-height: 1.1;
         }
 
-        .category-pill {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #64748b;
-            background: #f3f4f6;
-            border: none;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s ease;
+        .hero-title span {
+            color: var(--primary);
         }
 
-        .category-pill:hover {
-            background: #e5e7eb;
-            color: #171717;
+        .hero-subtitle {
+            font-size: 17px;
+            color: var(--text-secondary);
+            margin-bottom: 36px;
+            max-width: 540px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
         }
 
-        .category-pill.active {
-            background: #10B981;
-            color: white;
-        }
-
-        /* Sort select dropdown */
-        .sort-select {
-            padding: 8px 32px 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #64748b;
-            background: #f3f4f6;
-            border: none;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s ease;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-        }
-
-        .sort-select:hover {
-            background: #e5e7eb;
-            color: #171717;
-        }
-
-        .sort-select:focus {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-        }
-
-        /* Search Section */
+        /* Search Box */
         .search-section {
-            padding: 32px 0;
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
         }
 
         .search-box {
             position: relative;
-            max-width: 600px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            transition: var(--transition);
+            max-width: 640px;
             margin: 0 auto;
         }
 
-        .search-icon-wrapper {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #10B981;
-        }
-
-        .robot-icon {
-            font-size: 20px;
-        }
-
-        .sparkle {
-            font-size: 14px;
+        .search-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
         }
 
         .search-input {
             width: 100%;
-            padding: 16px 16px 16px 120px;
-            border: 2px solid #eaeaea;
-            border-radius: 16px;
-            font-size: 16px;
-            color: #171717;
+            padding: 16px 24px 16px 52px;
+            border: none;
+            font-size: 15px;
+            color: var(--text-primary);
+            background: transparent;
             outline: none;
-            transition: all 0.2s ease;
-            background: #fafafa;
-        }
-
-        .search-input:focus {
-            border-color: #10B981;
-            background: #ffffff;
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
         .search-input::placeholder {
-            color: #a1a1aa;
+            color: var(--text-muted);
         }
 
-        .search-badge {
+        .search-icon {
             position: absolute;
-            left: 16px;
+            left: 18px;
             top: 50%;
             transform: translateY(-50%);
-            background: linear-gradient(135deg, #10B981, #059669);
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 10px 20px;
+            background: var(--primary);
             color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        /* Stats Bar */
+        .search-btn:hover {
+            background: var(--primary-dark);
+        }
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 10px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .search-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Stats */
         .stats-bar {
-            padding: 16px 0;
-            border-top: 1px solid #eaeaea;
-            border-bottom: 1px solid #eaeaea;
+            display: flex;
+            justify-content: center;
+            gap: 56px;
+            padding: 20px 0;
+            background: linear-gradient(180deg, rgba(124, 58, 237, 0.02) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 32px;
         }
 
-        .stats-content {
+        .stat-item {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .stat-number {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+            padding: 20px 0 24px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-pills {
+            display: flex;
             gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .filter-pill {
+            padding: 8px 18px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .filter-pill:hover {
+            border-color: var(--primary-light);
+            color: var(--primary);
+            background: #FAF5FF;
+        }
+
+        .filter-pill.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+        }
+
+        .filter-pill .count {
+            margin-left: 6px;
+            padding: 2px 8px;
+            background: rgba(0,0,0,0.06);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .filter-pill.active .count {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .filter-pill .count {
+            margin-left: 6px;
+            padding: 2px 8px;
+            background: rgba(0,0,0,0.08);
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .filter-pill.active .count {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .sort-select {
+            padding: 10px 40px 10px 16px;
+            border-radius: var(--radius-md);
             font-size: 14px;
             font-weight: 500;
-            color: #64748b;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            transition: var(--transition);
         }
 
-        .stats-count {
-            font-size: 18px;
-            font-weight: 600;
-            color: #10B981;
+        .sort-select:hover {
+            border-color: var(--primary-light);
+        }
+
+        .sort-select:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         /* Section Header */
@@ -298,85 +455,232 @@
         }
 
         .section-title {
-            font-size: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 22px;
             font-weight: 600;
-            color: #171717;
-        }
-
-        .section-subtitle {
-            font-size: 14px;
-            color: #64748b;
-            margin-top: 4px;
-        }
-
-        .view-all-link {
-            color: #10B981;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .view-all-link:hover {
-            text-decoration: underline;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
         }
 
         /* Skills Grid */
         .skills-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 32px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 40px;
         }
 
-        @media (max-width: 1024px) {
-            .skills-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+        @media (max-width: 1200px) {
+            .skills-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        }
+
+        @media (max-width: 900px) {
+            .skills-grid { grid-template-columns: 1fr; gap: 12px; }
         }
 
         @media (max-width: 640px) {
-            .skills-grid {
-                grid-template-columns: 1fr;
-            }
+            .skills-grid { grid-template-columns: 1fr; gap: 12px; }
+            .hero-title { font-size: 28px; }
+            .stats-bar { gap: 24px; flex-wrap: wrap; }
+            .filter-bar { flex-direction: column; align-items: stretch; }
+            .sort-select { width: 100%; }
         }
 
-        /* Skill Card */
+        /* Skill Card - 腾讯 SkillHub 风格 */
+        .skill-card-item {
+            display: flex;
+            background: #fff;
+            border: 1px solid #e5e5e7;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .skill-card-item:hover {
+            border-color: #1d1d1f;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .skill-card-left {
+            width: 72px;
+            min-height: 100%;
+            background: linear-gradient(135deg, #1d1d1f 0%, #3a3a3c 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .skill-card-letter {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .skill-card-right {
+            flex: 1;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .skill-card-header {
+            margin-bottom: 8px;
+        }
+
+        .skill-card-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .skill-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d1d1f;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .skill-card-version {
+            font-size: 12px;
+            color: #86868b;
+            flex-shrink: 0;
+        }
+
+        .skill-card-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .skill-card-tags .tag {
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            background: #f5f5f7;
+            color: #86868b;
+        }
+
+        .skill-card-tags .tag.source-tag {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .skill-card-tags .tag.source-tag.icsl {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .skill-card-tags .tag.source-tag.huawei {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .skill-card-desc {
+            font-size: 13px;
+            color: #86868b;
+            line-height: 1.4;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            margin-bottom: 12px;
+            flex: 1;
+        }
+
+        .skill-card-stats {
+            display: flex;
+            gap: 16px;
+            padding-top: 10px;
+            border-top: 1px solid #f5f5f7;
+        }
+
+        .skill-card-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .skill-card-stat .stat-num {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+
+        .skill-card-stat .stat-label {
+            font-size: 11px;
+            color: #86868b;
+        }
+
+        /* Legacy Card Style (for compatibility) */
         .skill-card {
-            background: #ffffff;
-            border: 1px solid #eaeaea;
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
             border-radius: 16px;
             overflow: hidden;
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
             cursor: pointer;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .skill-card::before {
+            content: '';
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            opacity: 0;
+            transition: all 0.25s ease;
         }
 
         .skill-card:hover {
-            border-color: #10B981;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
-            transform: translateY(-2px);
+            border-color: rgba(124, 58, 237, 0.3);
+            box-shadow: 0 8px 30px rgba(124, 58, 237, 0.12);
+            transform: translateY(-4px);
+        }
+
+        .skill-card:hover::before {
+            opacity: 1;
         }
 
         .card-inner {
             padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .card-header {
             display: flex;
             align-items: flex-start;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 14px;
+            margin-bottom: 14px;
         }
 
         .card-icon {
             width: 48px;
             height: 48px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 22px;
             flex-shrink: 0;
+            border: 1px solid rgba(124, 58, 237, 0.1);
         }
 
         .card-info {
@@ -385,100 +689,84 @@
         }
 
         .card-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
-            color: #171717;
+            color: var(--text-primary);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            margin-bottom: 2px;
         }
 
         .card-author {
             font-size: 13px;
-            color: #64748b;
-            margin-top: 2px;
-        }
-
-        .card-rating {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 6px;
-        }
-
-        .stars {
-            display: flex;
-            gap: 2px;
-            color: #fbbf24;
-            font-size: 14px;
-        }
-
-        .rating-count {
-            font-size: 12px;
-            color: #a1a1aa;
+            color: var(--text-muted);
         }
 
         .card-description {
-            font-size: 14px;
-            color: #64748b;
+            font-size: 13px;
+            color: var(--text-secondary);
             line-height: 1.5;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
-            margin-bottom: 16px;
-            min-height: 42px;
+            margin-bottom: 14px;
+            min-height: 39px;
         }
 
         .card-tags {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .tag {
             padding: 4px 10px;
             border-radius: 6px;
-            font-size: 12px;
-            font-weight: 500;
-            background: #f3f4f6;
-            color: #64748b;
+            font-size: 11px;
+            font-weight: 600;
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+            letter-spacing: 0.02em;
         }
 
         .tag.source-type {
-            font-size: 11px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .tag.opensource {
-            background: #d1fae5;
-            color: #10B981;
+            background: rgba(34, 197, 94, 0.1);
+            color: #16A34A;
         }
 
         .tag.icsl {
-            background: #e0e7ff;
-            color: #667eea;
+            background: rgba(124, 58, 237, 0.1);
+            color: var(--primary);
         }
 
         .tag.huawei {
-            background: #fef3c7;
-            color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+            color: #D97706;
         }
 
         .card-footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding-top: 16px;
-            border-top: 1px solid #f3f4f6;
+            padding-top: 14px;
+            border-top: 1px solid var(--border-light);
         }
 
         .card-stats {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
             font-size: 13px;
-            color: #64748b;
+            color: var(--text-muted);
         }
 
         .stat-item {
@@ -487,17 +775,9 @@
             gap: 4px;
         }
 
-        .download-icon {
-            font-size: 14px;
-        }
-
         .download-count {
-            font-size: 13px;
-            font-weight: 500;
-            color: #64748b;
-            min-width: 16px;
-            display: inline-block;
-            text-align: center;
+            font-weight: 600;
+            color: var(--text-secondary);
         }
 
         .card-actions {
@@ -506,49 +786,53 @@
         }
 
         .btn-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            border: 1px solid #eaeaea;
-            background: #ffffff;
-            color: #64748b;
+            width: 34px;
+            height: 34px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
-            transition: all 0.2s ease;
+            transition: var(--transition);
         }
 
         .btn-icon:hover {
-            border-color: #10B981;
-            color: #10B981;
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(124, 58, 237, 0.04);
         }
 
         .btn-download {
-            padding: 8px 16px;
-            border-radius: 8px;
-            background: #10B981;
+            padding: 8px 18px;
+            border-radius: var(--radius-sm);
+            background: var(--primary);
             color: white;
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
             border: none;
             cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s ease;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .btn-download:hover {
-            background: #059669;
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
         }
 
         .version-badge {
             padding: 4px 8px;
-            border-radius: 4px;
-            background: #f3f4f6;
-            color: #64748b;
+            border-radius: 6px;
+            background: var(--bg-hover);
+            color: var(--text-muted);
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         /* Pagination */
@@ -557,34 +841,42 @@
             justify-content: center;
             align-items: center;
             gap: 8px;
-            padding: 32px 0;
+            padding: 40px 0;
         }
 
         .page-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            background: #ffffff;
-            border: 1px solid #eaeaea;
-            color: #64748b;
+            min-width: 40px;
+            height: 40px;
+            padding: 0 14px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
             font-size: 14px;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .page-btn:hover:not(:disabled) {
-            border-color: #10B981;
-            color: #10B981;
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(124, 58, 237, 0.04);
         }
 
         .page-btn:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
 
         .page-btn.active {
-            background: #10B981;
+            background: var(--primary);
             color: white;
-            border-color: #10B981;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
         }
 
         /* Empty State */
@@ -592,63 +884,79 @@
             grid-column: 1 / -1;
             text-align: center;
             padding: 80px 24px;
-            color: #64748b;
+            color: var(--text-secondary);
         }
 
         .empty-icon {
-            font-size: 64px;
+            font-size: 56px;
             margin-bottom: 16px;
+            opacity: 0.5;
         }
 
-        .empty-state h2 {
-            font-size: 20px;
-            font-weight: 500;
-            color: #171717;
+        .empty-state h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
             margin-bottom: 8px;
         }
 
         .empty-state p {
             font-size: 14px;
-            color: #64748b;
+            color: var(--text-muted);
         }
 
         /* Footer */
         .footer {
             text-align: center;
             padding: 32px 24px;
-            color: #64748b;
+            color: var(--text-muted);
             font-size: 13px;
-            border-top: 1px solid #eaeaea;
+            border-top: 1px solid var(--border-light);
             margin-top: 40px;
         }
 
         .footer a {
-            color: #10B981;
+            color: var(--primary);
             text-decoration: none;
+            font-weight: 500;
         }
 
         .footer a:hover {
             text-decoration: underline;
         }
 
-        /* Responsive */
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .skill-card {
+            animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        }
+
+        .skill-card:nth-child(1) { animation-delay: 0.03s; }
+        .skill-card:nth-child(2) { animation-delay: 0.06s; }
+        .skill-card:nth-child(3) { animation-delay: 0.09s; }
+        .skill-card:nth-child(4) { animation-delay: 0.12s; }
+        .skill-card:nth-child(5) { animation-delay: 0.15s; }
+        .skill-card:nth-child(6) { animation-delay: 0.18s; }
+        .skill-card:nth-child(7) { animation-delay: 0.21s; }
+        .skill-card:nth-child(8) { animation-delay: 0.24s; }
+        .skill-card:nth-child(7) { animation-delay: 0.14s; }
+        .skill-card:nth-child(8) { animation-delay: 0.16s; }
+
+        /* Mobile nav */
         @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-
-            .category-pills {
-                gap: 6px;
-            }
-
-            .search-input {
-                padding-left: 100px;
-            }
-
-            .search-badge {
-                padding: 3px 10px;
-                font-size: 11px;
-            }
+            .nav-links { display: none; }
+            .user-actions .user-btn { padding: 8px 12px; font-size: 13px; }
+            .user-actions span { display: none; }
         }
     </style>
 </head>
@@ -670,7 +978,7 @@
 
             <div class="user-actions">
                 {% if user %}
-                    <span style="font-size: 14px; color: #64748b;">{{ user.employee_id }}</span>
+                    <span style="font-size: 14px; color: var(--text-secondary);">{{ user.employee_id }}</span>
                     {% if user.role == 'admin' %}
                     <a href="/admin" class="user-btn user-btn-outline">管理后台</a>
                     <a href="/admin/users" class="user-btn user-btn-outline">用户管理</a>
@@ -688,28 +996,14 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <!-- Search Section -->
-        <div class="search-section">
+        <!-- Hero Section - 简化版 -->
+        <div class="hero" style="padding: 32px 0;">
             <div class="container">
-                <div class="search-box">
-                    <div class="search-badge">
-                        <span class="sparkle">✨</span>
-                        <span>搜索</span>
-                    </div>
-                    <input type="text" class="search-input" id="searchInput" placeholder="搜索技能名称、描述、作者..." oninput="handleSearch()">
-                </div>
+                <h1 class="hero-title">探索 <span>Agent Skills</span> 市场</h1>
+                <p class="hero-subtitle">发现并安装强大的 Claude Code 技能插件，提升你的开发效率</p>
             </div>
         </div>
 
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-            <div class="container">
-                <div class="stats-content">
-                    <span class="stats-count" id="statsCount">{{ plugin_count }}</span>
-                    <span>SKILLS COLLECTED</span>
-                </div>
-            </div>
-        </div>
 
         <!-- AI Recommended Section -->
         <div class="container" id="aiRecommendedSection" style="display: none;">
@@ -722,25 +1016,40 @@
             <div class="skills-grid" id="aiRecommendedGrid"></div>
         </div>
 
-        <!-- Hot Today Section -->
+        <!-- Hot Today Section - 精选榜单 -->
         <div class="container" id="hotTodaySection">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">最近30天的热门</h2>
-                    <p class="section-subtitle">最受欢迎的技能</p>
+                    <h2 class="section-title">最近30天热门</h2>
                 </div>
             </div>
             <div class="skills-grid" id="hotTodayGrid"></div>
         </div>
 
-        <!-- Category Navigation -->
-        <div class="category-nav">
-            <div class="container">
-                <div class="category-pills" id="categoryPills">
-                    <button class="category-pill active" data-category="all">全部</button>
-                    <button class="category-pill" data-category="opensource">开源</button>
-                    <button class="category-pill" data-category="icsl">ICSL自研</button>
-                    <button class="category-pill" data-category="huawei">华为自研</button>
+        <!-- Filter Bar -->
+        <div class="container">
+            <div class="filter-bar">
+                <!-- 功能分类筛选 -->
+                <div class="filter-pills" id="categoryPills">
+                    <button class="filter-pill active" data-category="all">全部 <span class="count">{{ plugin_count }}</span></button>
+                    <button class="filter-pill" data-category="ai">AI智能 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="devtools">开发工具 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="productivity">效率提升 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="data">数据分析 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="content">内容创作 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="security">安全合规 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="communication">通讯协作 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="devops">运维部署 <span class="count">0</span></button>
+                    <button class="filter-pill" data-category="test">测试验证 <span class="count">0</span></button>
+                </div>
+            </div>
+            <div class="filter-bar" style="margin-top: 12px;">
+                <!-- 来源分类筛选 -->
+                <div class="filter-pills" id="sourcePills">
+                    <button class="filter-pill active" data-source="all">全部来源</button>
+                    <button class="filter-pill" data-source="opensource">开源 <span class="count">0</span></button>
+                    <button class="filter-pill" data-source="icsl">ICSL自研 <span class="count">0</span></button>
+                    <button class="filter-pill" data-source="huawei">华为自研 <span class="count">0</span></button>
                 </div>
             </div>
         </div>
@@ -752,13 +1061,14 @@
                     <h2 class="section-title">全部技能</h2>
                     <p class="section-subtitle">探索所有可用技能</p>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <select class="sort-select" id="sortSelect" onchange="handleSort()" style="cursor: pointer;">
-                        <option value="upload_time_desc">最新</option>
-                        <option value="downloads_desc">热门</option>
-                        <option value="name_asc">名称</option>
-                    </select>
-                </div>
+            </div>
+            <!-- 搜索框 -->
+            <div class="search-box" style="margin-bottom: 20px; max-width: 600px; margin-left: auto; margin-right: auto;">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                </svg>
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索技能名称、描述、作者..." oninput="handleSearch()" style="flex: 1;">
             </div>
             <div class="skills-grid" id="skillsGrid">
                 <!-- Skills will be loaded via JavaScript -->
@@ -787,7 +1097,8 @@
         let pageSize = 12;
         let downloadStats = {};
         let currentSort = { field: 'upload_time', order: 'desc' };
-        let currentCategory = 'all';
+        let currentCategory = 'all';  // 功能分类：ai, devtools, productivity, data, content, security, communication
+        let currentSource = 'all';    // 来源分类：opensource, icsl, huawei
 
         // Source type display names
         const sourceTypeConfig = {
@@ -861,22 +1172,43 @@
             return '未知';
         }
 
-        // Generate category tags
+        // Category display name mapping
+        const categoryNames = {
+            'ai': 'AI智能',
+            'devtools': '开发工具',
+            'productivity': '效率提升',
+            'data': '数据分析',
+            'content': '内容创作',
+            'security': '安全合规',
+            'communication': '通讯协作'
+        };
+
+        // Generate category tags from skill metadata
         function generateTags(skill) {
+            // Use category from skill metadata if available
+            const category = skill.category;
+            if (category && categoryNames[category]) {
+                return `<span class="tag">${categoryNames[category]}</span>`;
+            }
+
+            // Fallback: guess category from description
             const tags = [];
             const desc = skill.metadata?.description;
             const descLower = (desc !== undefined && desc !== null) ? desc.toLowerCase() : '';
 
-            if (descLower && descLower.includes('效率') || descLower.includes('自动')) tags.push('效率工具');
-            else if (descLower && descLower.includes('分析') || descLower.includes('数据')) tags.push('数据分析');
-            else if (descLower && descLower.includes('安全') || descLower.includes('测试')) tags.push('安全检测');
-            else if (descLower && descLower.includes('ai') || descLower.includes('智能')) tags.push('AI助手');
+            if (descLower && (descLower.includes('效率') || descLower.includes('自动'))) tags.push('效率提升');
+            else if (descLower && (descLower.includes('分析') || descLower.includes('数据'))) tags.push('数据分析');
+            else if (descLower && (descLower.includes('安全') || descLower.includes('测试'))) tags.push('安全合规');
+            else if (descLower && (descLower.includes('ai') || descLower.includes('智能'))) tags.push('AI智能');
+            else if (descLower && (descLower.includes('开发') || descLower.includes('工具'))) tags.push('开发工具');
+            else if (descLower && (descLower.includes('协作') || descLower.includes('通讯'))) tags.push('通讯协作');
+            else if (descLower && (descLower.includes('内容') || descLower.includes('创作'))) tags.push('内容创作');
             else tags.push('工具');
 
             return tags.slice(0, 2).map(tag => `<span class="tag">${tag}</span>`).join('');
         }
 
-        // Generate card HTML
+        // Generate card HTML - 腾讯 SkillHub 风格
         function generateCardHTML(skill) {
             const icon = generateSkillIcon(skill);
             const author = getAuthorName(skill);
@@ -887,44 +1219,55 @@
             const tags = generateTags(skill);
             const downloadCount = skill.download_count || 0;
 
+            const rating = skill.rating || 4.5;
+            const ratingCount = Math.floor(Math.random() * 100) + 10;
+
+            // 获取技能名称的首字母作为大图标
+            const skillName = skill.metadata?.name || skill.name || '';
+            const firstLetter = skillName.charAt(0).toUpperCase();
+
             return `
-                <div class="card-inner">
-                    <div class="card-header">
-                        <div class="card-icon">${icon}</div>
-                        <div class="card-info">
-                            <div class="card-title" title="${skill.metadata?.name || skill.name}">${skill.metadata?.name || skill.name}</div>
-                            <div class="card-author">by ${author}</div>
-                            <div class="card-rating">
-                                <span class="stars">${generateStars()}</span>
-                                <span class="rating-count">(${Math.floor(Math.random() * 100) + 10})</span>
+                <div class="skill-card-item">
+                    <div class="skill-card-left">
+                        <span class="skill-card-letter">${firstLetter}</span>
+                    </div>
+                    <div class="skill-card-right">
+                        <div class="skill-card-header">
+                            <div class="skill-card-title-row">
+                                <span class="skill-card-title" title="${skillName}">${skillName}</span>
+                                <span class="skill-card-version">v${skill.latest_version || '1.0.0'}</span>
+                            </div>
+                            <div class="skill-card-tags">
+                                ${tags}
+                                <span class="tag source-tag ${sourceTypeConfig.class}">${sourceTypeConfig.text}</span>
                             </div>
                         </div>
-                    </div>
-                    <div class="card-description" title="${skill.metadata?.description || '暂无描述'}">${skill.metadata?.description || '暂无描述'}</div>
-                    <div class="card-tags">
-                        <span class="tag source-type ${sourceTypeConfig.class}">${sourceTypeConfig.text}</span>
-                        ${tags}
-                    </div>
-                    <div class="card-footer">
-                        <div class="card-stats">
-                            <div class="stat-item">
-                                <span class="download-icon">⬇️</span>
-                                <span class="download-count">${downloadCount}</span>
+                        <div class="skill-card-desc" title="${skill.metadata?.description || '暂无描述'}">${skill.metadata?.description || '暂无描述'}</div>
+                        <div class="skill-card-stats">
+                            <div class="skill-card-stat">
+                                <span class="stat-num">${formatNumber(downloadCount)}</span>
+                                <span class="stat-label">下载</span>
                             </div>
-                            <div class="stat-item">
-                                <span class="update-icon">📅</span>
-                                <span class="update-time">${skill.updated_at || '未知'}</span>
+                            <div class="skill-card-stat">
+                                <span class="stat-num">${ratingCount}</span>
+                                <span class="stat-label">评分</span>
                             </div>
-                        </div>
-                        <div class="card-actions">
-                            ${latestVersion ? `
-                                <span class="version-badge">v${skill.latest_version}</span>
-                                <a href="/plugins/${latestVersion.filename}?t=${Date.now()}" class="btn-download">下载</a>
-                            ` : '<span style="color: #ef4444; font-size: 13px;">无可用版本</span>'}
+                            <div class="skill-card-stat">
+                                <span class="stat-num">${skill.updated_at || '-'}</span>
+                                <span class="stat-label">更新</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             `;
+        }
+
+        // 格式化数字
+        function formatNumber(num) {
+            if (num >= 10000) {
+                return (num / 10000).toFixed(1) + '万';
+            }
+            return num || '0';
         }
 
         function getSourceTypeConfig(sourceType) {
@@ -1067,9 +1410,6 @@
                 renderHotToday();
                 updatePagination();
 
-                // Update stats count
-                document.getElementById('statsCount').textContent = allSkills.length;
-
             } catch (error) {
                 console.error('Failed to load data:', error);
                 showError();
@@ -1203,10 +1543,26 @@
                     description.includes(query) ||
                     author.includes(query);
 
-                const skillSourceType = skill.source_type || 'opensource';
-                const matchesCategory = currentCategory === 'all' || skillSourceType === currentCategory;
+                // 功能分类筛选（从 category 字段或描述推断）
+                const skillCategory = skill.category || '';
+                const desc = (skill.metadata?.description || '').toLowerCase();
+                let inferredCategory = skillCategory;
+                if (!inferredCategory) {
+                    if (desc.includes('效率') || desc.includes('自动')) inferredCategory = 'productivity';
+                    else if (desc.includes('分析') || desc.includes('数据')) inferredCategory = 'data';
+                    else if (desc.includes('安全') || desc.includes('测试')) inferredCategory = 'security';
+                    else if (desc.includes('ai') || desc.includes('智能')) inferredCategory = 'ai';
+                    else if (desc.includes('开发') || desc.includes('工具')) inferredCategory = 'devtools';
+                    else if (desc.includes('协作') || desc.includes('通讯')) inferredCategory = 'communication';
+                    else if (desc.includes('内容') || desc.includes('创作')) inferredCategory = 'content';
+                }
+                const matchesCategory = currentCategory === 'all' || skillCategory === currentCategory || inferredCategory === currentCategory;
 
-                return matchesSearch && matchesCategory;
+                // 来源分类筛选
+                const skillSourceType = skill.source_type || 'opensource';
+                const matchesSource = currentSource === 'all' || skillSourceType === currentSource;
+
+                return matchesSearch && matchesCategory && matchesSource;
             });
         }
 
@@ -1258,13 +1614,77 @@
             updatePagination();
         }
 
+        // 更新分类和来源的数量统计
+        function updateCategoryCounts() {
+            // 统计功能分类数量 - 包含所有可能的分类
+            const categoryCounts = {
+                'ai': 0, 'devtools': 0, 'productivity': 0,
+                'data': 0, 'content': 0, 'security': 0,
+                'communication': 0, 'devops': 0, 'test': 0
+            };
+            let otherCount = 0;
+            // 统计来源分类数量
+            const sourceCounts = {
+                'opensource': 0, 'icsl': 0, 'huawei': 0
+            };
+
+            allSkills.forEach(skill => {
+                // 功能分类统计
+                const skillCategory = skill.category;
+                const desc = (skill.metadata?.description || '').toLowerCase();
+                let inferredCategory = skillCategory;
+                if (!inferredCategory) {
+                    if (desc.includes('效率') || desc.includes('自动')) inferredCategory = 'productivity';
+                    else if (desc.includes('分析') || desc.includes('数据')) inferredCategory = 'data';
+                    else if (desc.includes('安全') || desc.includes('测试')) inferredCategory = 'security';
+                    else if (desc.includes('ai') || desc.includes('智能')) inferredCategory = 'ai';
+                    else if (desc.includes('开发') || desc.includes('工具')) inferredCategory = 'devtools';
+                    else if (desc.includes('协作') || desc.includes('通讯')) inferredCategory = 'communication';
+                    else if (desc.includes('内容') || desc.includes('创作')) inferredCategory = 'content';
+                }
+                if (inferredCategory && categoryCounts.hasOwnProperty(inferredCategory)) {
+                    categoryCounts[inferredCategory]++;
+                } else if (inferredCategory) {
+                    // 未知的分类归入 other
+                    otherCount++;
+                }
+
+                // 来源分类统计
+                const sourceType = skill.source_type || 'opensource';
+                if (sourceCounts.hasOwnProperty(sourceType)) {
+                    sourceCounts[sourceType]++;
+                }
+            });
+
+            // 更新功能分类按钮数量
+            const categoryPills = document.querySelectorAll('#categoryPills .filter-pill');
+            categoryPills.forEach(pill => {
+                const cat = pill.dataset.category;
+                const countSpan = pill.querySelector('.count');
+                if (countSpan && cat && cat !== 'all') {
+                    countSpan.textContent = categoryCounts[cat] || 0;
+                }
+            });
+
+            // 更新来源分类按钮数量
+            const sourcePills = document.querySelectorAll('#sourcePills .filter-pill');
+            sourcePills.forEach(pill => {
+                const src = pill.dataset.source;
+                const countSpan = pill.querySelector('.count');
+                if (countSpan && src && src !== 'all') {
+                    countSpan.textContent = sourceCounts[src] || 0;
+                }
+            });
+        }
+
         function setupCategoryPills() {
-            const pills = document.querySelectorAll('.category-pill');
-            pills.forEach(pill => {
+            // 功能分类筛选
+            const categoryPills = document.querySelectorAll('#categoryPills .filter-pill');
+            categoryPills.forEach(pill => {
                 pill.addEventListener('click', () => {
-                    pills.forEach(p => p.classList.remove('active'));
+                    categoryPills.forEach(p => p.classList.remove('active'));
                     pill.classList.add('active');
-                    currentCategory = pill.dataset.category;
+                    currentCategory = pill.dataset.category || 'all';
 
                     const query = document.getElementById('searchInput').value.toLowerCase().trim();
                     filterSkills(query);
@@ -1273,6 +1693,25 @@
                     updatePagination();
                 });
             });
+
+            // 来源分类筛选
+            const sourcePills = document.querySelectorAll('#sourcePills .filter-pill');
+            sourcePills.forEach(pill => {
+                pill.addEventListener('click', () => {
+                    sourcePills.forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                    currentSource = pill.dataset.source || 'all';
+
+                    const query = document.getElementById('searchInput').value.toLowerCase().trim();
+                    filterSkills(query);
+                    currentPage = 1;
+                    renderCards();
+                    updatePagination();
+                });
+            });
+
+            // 初始化分类数量统计
+            updateCategoryCounts();
         }
 
         function showError() {
