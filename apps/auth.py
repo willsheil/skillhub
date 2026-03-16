@@ -67,29 +67,16 @@ async def login(request: Request, credentials: LoginRequest):
 
 @router.post("/logout")
 async def logout(request: Request):
-    """User logout endpoint."""
+"""User logout endpoint."""
     request.session.clear()
     return {"success": True, "message": "Logged out"}
-
-
+ 
 @router.get("/me")
 async def get_current_user(request: Request):
     """Get current logged in user.
-
+ 
     Requires authentication.
     """
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user = UserRepository.get_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return {
-        "id": user.id,
-        "employee_id": user.employee_id,
-        "role": user.role,
-        "skills_count": user.skills_count,
-        "last_login": user.last_login.isoformat() if user.last_login else None,
-    }
+    # 统一使用 api/v1/dependencies.py 中的认证函数
+    from api.v1.dependencies import get_current_user as api_get_current_user
+    return api_get_current_user(request)

@@ -423,21 +423,12 @@ async def gitea_tasks_page(request: Request):
     return get_templates().TemplateResponse("gitea_tasks.html", {"request": request, "user": user})
 
 
-# Helper function from main.py
+# Helper function - 统一使用 api/v1/dependencies.py 中的认证函数
 def get_current_user(request: Request):
     """Get current user from session.
-
+ 
     Returns user dictionary if authenticated, None otherwise.
     """
-    user_id = request.session.get("user_id") or request.session.get("employee_id")
-    if not user_id:
-        return None
-
-    # Import here to avoid circular imports
-    from database import get_connection
-    with get_connection() as conn:
-        result = conn.execute(
-            "SELECT * FROM users WHERE id = %s",
-            (user_id,)
-        ).fetchone()
-        return result
+    # 统一使用 api/v1/dependencies.py 中的认证函数
+    from api.v1.dependencies import get_current_user as api_get_current_user
+    return api_get_current_user(request)

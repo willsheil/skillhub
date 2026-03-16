@@ -1,5 +1,6 @@
 """User management routes."""
 
+from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from pydantic import BaseModel
 
@@ -21,18 +22,16 @@ class UserUpdateRequest(BaseModel):
 
 def get_current_user_from_request(request):
     """Get current user from request."""
-    from main import get_current_user as main_get_current_user
-    return main_get_current_user(request)
-
-
+    # 统一使用 api/v1/dependencies.py 中的认证函数
+    from api.v1.dependencies import get_current_user as api_get_current_user
+    return api_get_current_user(request)
+ 
+ 
 def require_admin_from_request(request):
     """Require admin access."""
-    user = get_current_user_from_request(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
+    # 统一使用 api/v1/dependencies.py 中的认证函数
+    from api.v1.dependencies import require_admin as api_require_admin
+    return api_require_admin(request)
 
 
 @router.get("/api/admin/users")
