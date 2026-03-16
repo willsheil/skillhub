@@ -687,16 +687,6 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
 
 
 # 隐藏安装指南页面
-# @app.get("/install-guide", response_class=HTMLResponse)
-# async def install_guide(request: Request):
-#     """Installation guide page."""
-#     return templates.TemplateResponse("install_guide.html", {
-#         "request": request
-#     })
-
-
-# Markdown extensions for rendering docs
-MARKDOWN_EXTENSIONS = ["tables", "fenced_code", "toc", "nl2br"]
 
 
 @lru_cache(maxsize=1)
@@ -747,8 +737,6 @@ async def skills_well_known_index(request: Request):
     return skills_index
 
 
-@app.get("/.well-known/skills/{skill_name}/SKILL.md", response_class=PlainTextResponse)
-async def get_skill_well_known(skill_name: str):
     """Serve SKILL.md file for npx skills CLI.
 
     Extracts SKILL.md from the skill ZIP file.
@@ -1198,8 +1186,6 @@ def reject_skill_file(skill_id: int, comment: Optional[str] = None) -> bool:
         return False
 
 
-@app.get("/api/pending")
-async def api_pending_skills(
     _: bool = Depends(require_admin)
 ):
     """Get all pending skills awaiting approval (admin only)."""
@@ -1217,8 +1203,6 @@ async def api_pending_skills(
         )
 
 
-@app.post("/api/review/{skill_id}")
-async def api_review_skill(
     skill_id: int,
     request: Request,
     _: bool = Depends(require_admin)
@@ -1329,8 +1313,6 @@ async def api_review_skill(
         )
 
 
-@app.get("/api/user/downloads")
-async def api_user_downloads(
     request: Request,
     page: int = Query(1, ge=1, description="Page number (starts from 1)"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
@@ -1387,8 +1369,6 @@ async def api_user_downloads(
         )
 
 
-@app.get("/api/user/uploads")
-async def api_user_uploads(
     request: Request,
     _: bool = Depends(require_auth)
 ):
@@ -1418,8 +1398,6 @@ async def api_user_uploads(
         )
 
 
-@app.get("/api/notifications")
-async def api_get_notifications(
     request: Request,
     unread_only: bool = Query(False, description="Filter to only unread notifications"),
     limit: int = Query(50, ge=1, le=100, description="Maximum number of notifications to return"),
@@ -1459,8 +1437,6 @@ async def api_get_notifications(
         )
 
 
-@app.get("/api/notifications/unread-count")
-async def api_get_unread_count(
     request: Request,
     _: bool = Depends(require_auth)
 ):
@@ -1491,8 +1467,6 @@ async def api_get_unread_count(
         )
 
 
-@app.post("/api/notifications/{notification_id}/read")
-async def api_mark_notification_read(
     notification_id: int,
     request: Request,
     _: bool = Depends(require_auth)
@@ -1533,8 +1507,6 @@ async def api_mark_notification_read(
         )
 
 
-@app.post("/api/notifications/read-all")
-async def api_mark_all_read(
     request: Request,
     _: bool = Depends(require_auth)
 ):
@@ -1566,8 +1538,6 @@ async def api_mark_all_read(
         )
 
 
-@app.get("/api/my-skills")
-async def api_my_skills(
     request: Request,
     status: str = Query("all", description="Filter by status: all, active, unlisted, pending, rejected"),
     page: int = Query(1, ge=1, description="Page number (starts from 1)"),
@@ -1629,8 +1599,6 @@ async def api_my_skills(
     skill_ids: List[int]
 
 
-@app.post("/api/my-skills/batch/unlist")
-async def api_batch_unlist_skills(
     request_data: BatchOperationRequest,
     request: Request,
     _: bool = Depends(require_auth)
@@ -1669,8 +1637,6 @@ async def api_batch_unlist_skills(
         )
 
 
-@app.post("/api/my-skills/batch/delete")
-async def api_batch_delete_skills(
     request_data: BatchOperationRequest,
     request: Request,
     _: bool = Depends(require_admin)
@@ -1709,8 +1675,6 @@ async def api_batch_delete_skills(
         )
 
 
-@app.post("/api/my-skills/{skill_id}/unlist")
-async def api_unlist_skill(
     skill_id: int,
     request: Request,
     _: bool = Depends(require_auth)
@@ -1760,8 +1724,6 @@ async def api_unlist_skill(
         )
 
 
-@app.post("/api/my-skills/{skill_id}/publish")
-async def api_publish_skill(
     skill_id: int,
     request: Request,
     _: bool = Depends(require_auth)
@@ -1811,8 +1773,6 @@ async def api_publish_skill(
         )
 
 
-@app.delete("/api/my-skills/{skill_id}")
-async def api_delete_skill(
     skill_id: int,
     request: Request,
     _: bool = Depends(require_admin)
@@ -1863,8 +1823,6 @@ async def api_delete_skill(
         )
 
 
-@app.post("/api/upload")
-async def upload_plugin(
     request: Request,
     file: UploadFile = File(...),
     source_type: str = Form(default="opensource"),
@@ -2167,8 +2125,6 @@ def update_skill_metadata_in_zip(zip_path: Path, version: str, author: str) -> P
         raise ValueError(f"Failed to update ZIP metadata: {str(e)}")
 
 
-@app.post("/api/upload/complete")
-async def complete_upload_with_metadata(
     request: Request,
     temp_file_id: str = Form(...),
     version: str = Form(...),
@@ -2294,8 +2250,6 @@ async def complete_upload_with_metadata(
             temp_zip.unlink()
 
 
-@app.post("/admin/upload-batch")
-async def upload_batch(
     request: Request,
     files: List[UploadFile] = File(...),
     source_type: str = Form(default="opensource"),
@@ -2438,8 +2392,6 @@ async def delete_plugin(
 
 
 
-@app.post("/api/batch-download")
-async def batch_download(request: Request):
     """Generate a batch download package (ZIP) for selected skills.
 
     Each skill is packaged with installer scripts (install.bat and install.sh).
@@ -2980,8 +2932,6 @@ async def get_skill_content_api(skill_name: str, version: str = None):
         )
 
 
-@app.get("/api/admin/stats")
-async def api_admin_stats(
     _: bool = Depends(require_admin)
 ):
     """Get admin statistics (admin only).
@@ -3024,8 +2974,6 @@ async def api_admin_stats(
         )
 
 
-@app.put("/api/admin/skills/{skill_id}/source-type")
-async def api_update_skill_source_type(
     skill_id: int,
     request: Request,
     _: bool = Depends(require_admin)
@@ -3095,8 +3043,6 @@ async def api_update_skill_source_type(
         )
 
 
-@app.get("/api/admin/skills")
-async def api_get_all_skills(
     status: Optional[str] = None,
     limit: int = Query(100, ge=1, le=500),
     _: bool = Depends(require_admin)
@@ -3147,8 +3093,6 @@ async def api_get_all_skills(
         )
 
 
-@app.get("/api/admin/gitea-tasks")
-async def api_get_gitea_tasks(
     status: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     _: bool = Depends(require_admin)
@@ -3199,8 +3143,6 @@ async def api_get_gitea_tasks(
         )
 
 
-@app.post("/api/admin/gitea-tasks/{task_id}/retry")
-async def api_retry_gitea_task(
     task_id: int,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3249,8 +3191,6 @@ async def api_retry_gitea_task(
         )
 
 
-@app.post("/api/admin/gitea-push/trigger")
-async def api_trigger_gitea_push(
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Manually trigger Gitea push service to process pending tasks.
@@ -3278,8 +3218,6 @@ async def api_trigger_gitea_push(
 
 # ==================== User Management API Endpoints ====================
 
-@app.get("/api/admin/users")
-async def api_get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: Optional[str] = Query(None, pattern="^(admin|user)$"),
@@ -3318,8 +3256,6 @@ async def api_get_users(
         )
 
 
-@app.post("/api/admin/users")
-async def api_create_user(
     request: Request,
     employee_id: str = Form(..., max_length=50),
     role: str = Form(..., pattern="^(admin|user)$"),
@@ -3380,8 +3316,6 @@ async def api_create_user(
         )
 
 
-@app.put("/api/admin/users/{user_id}")
-async def api_update_user_role(
     user_id: int,
     request: Request,
     role: str = Form(..., pattern="^(admin|user)$"),
@@ -3438,8 +3372,6 @@ async def api_update_user_role(
         )
 
 
-@app.patch("/api/admin/users/{user_id}/disable")
-async def api_disable_user(
     user_id: int,
     request: Request,
     _: bool = Depends(require_admin)
@@ -3493,8 +3425,6 @@ async def api_disable_user(
         )
 
 
-@app.delete("/api/admin/users/{user_id}")
-async def api_delete_user(
     user_id: int,
     request: Request,
     _: bool = Depends(require_admin)
@@ -3555,8 +3485,6 @@ async def api_delete_user(
         )
 
 
-@app.patch("/api/admin/users/{user_id}/enable")
-async def api_enable_user(
     user_id: int,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3600,8 +3528,6 @@ async def api_enable_user(
         )
 
 
-@app.post("/api/admin/users/{user_id}/reset-key")
-async def api_reset_user_api_key(
     user_id: int,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3669,8 +3595,6 @@ async def api_reset_user_api_key(
 
 # ==================== API Key Management Routes ====================
 
-@app.get("/api/admin/api-keys")
-async def api_get_api_keys(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None, max_length=50),
@@ -3696,8 +3620,6 @@ async def api_get_api_keys(
         )
 
 
-@app.post("/api/admin/api-keys")
-async def api_create_api_key(
     name: str = Form(None, max_length=100),
     rate_limit: int = Form(100, ge=1, le=1000),
     _: bool = Depends(require_admin)
@@ -3729,8 +3651,6 @@ async def api_create_api_key(
         )
 
 
-@app.delete("/api/admin/api-keys/{api_key_id}")
-async def api_delete_api_key(
     api_key_id: int,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3756,8 +3676,6 @@ async def api_delete_api_key(
         )
 
 
-@app.put("/api/admin/api-keys/{api_key_id}/toggle")
-async def api_toggle_api_key(
     api_key_id: int,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3784,8 +3702,6 @@ async def api_toggle_api_key(
         )
 
 
-@app.get("/api/admin/api-keys/{api_key_id}/stats")
-async def api_get_api_key_stats(
     api_key_id: int,
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
