@@ -229,7 +229,14 @@ def get_current_user(request: Request) -> Optional[dict]:
 
 def verify_credentials(username: str, password: str) -> bool:
     """Verify admin credentials."""
-    return username == ADMIN_USERNAME and password == ADMIN_PASSWORD
+    # 使用 secrets.compare_digest() 防止时序攻击
+    return secrets.compare_digest(
+        secrets.digest(username.encode()),
+        secrets.digest(ADMIN_USERNAME.encode())
+    ) and secrets.compare_digest(
+        secrets.digest(password.encode()),
+        secrets.digest(ADMIN_PASSWORD.encode())
+    )
 
 
 class PluginMetadata(BaseModel):
@@ -498,7 +505,23 @@ def scan_plugins() -> List[dict]:
                 seen_skills.add(row["skill_name"])
                 deduplicated_rows.append(row)
         rows = deduplicated_rows
-
+ 
+        # 优化：一次性获取所有 uploader 信息，避免 N+1 查询
+        uploader_ids = [row.get("uploader_id") for row in rows if row.get("uploader_id")]
+        uploader_map = {}
+        if uploader_ids:
+            try:
+                # 使用 IN 子句一次性查询所有 uploader
+                placeholders = ",".join(["%s"] * len(uploader_ids))
+                uploader_rows = conn.execute(
+                    f"SELECT id, employee_id FROM users WHERE id IN ({placeholders})",
+                    uploader_ids
+                ).fetchall()
+                # 构建映射表
+                uploader_map = {row["id"]: row["employee_id"] for row in uploader_rows}
+            except Exception as e:
+                logger.warning(f"Failed to fetch uploader info: {e}")
+ 
         # Build result list with metadata from ZIP files
         for row in rows:
             skill_name = row["skill_name"]
@@ -515,20 +538,10 @@ def scan_plugins() -> List[dict]:
                     "metadata": {"version": row["version"], "author": "未知"},
                     "allowed_tools": None
                 }
-
-            # Get uploader employee_id from database
+ 
+            # 从映射表中获取 uploader employee_id
             uploader_id = row.get("uploader_id")
-            uploader_employee_id = None
-            if uploader_id:
-                try:
-                    uploader_row = conn.execute(
-                        "SELECT employee_id FROM users WHERE id = %s",
-                        (uploader_id,)
-                    ).fetchone()
-                    if uploader_row:
-                        uploader_employee_id = uploader_row["employee_id"]
-                except Exception:
-                    pass
+            uploader_employee_id = uploader_map.get(uploader_id) if uploader_id else None
 
             # Use uploader employee_id as author if no author in metadata
             if uploader_employee_id:
@@ -721,44 +734,8 @@ async def skills_well_known_index(request: Request):
         })
 
     return skills_index
-
-
-
-@app.get("/marketplace.json")
-async def marketplace_json(request: Request):
-    """Claude Code marketplace index."""
-    plugins = scan_plugins()
-
-    marketplace = {
-        "name": "private-registry",
-        "owner": {
-            "name": "Internal Registry",
-            "email": "admin@company.local"
-        },
-        "metadata": {
-            "version": "1.0.0",
-            "description": "Internal Claude Code Skill Registry",
-            "updated_at": datetime.now().isoformat()
-        },
-        "plugins": []
-    }
-
-    for plugin in plugins:
-        meta = plugin["metadata"]
-        latest = plugin["versions"][-1]
-
-        marketplace["plugins"].append({
-            "name": meta.get("name", plugin["name"]),
-            "version": latest["version"],
-            "description": meta.get("description", "No description"),
-            "author": meta.get("author", {"name": "Unknown"}),
-            "download_url": f"http://{request.headers.get('host', 'localhost:28000')}/plugins/{latest['filename']}",
-            "size_kb": round(latest["size"] / 1024, 1)
-        })
-
-    return marketplace
-
-
+ 
+ 
 @app.get("/plugins/{filename}")
 async def download_plugin(filename: str, request: Request):
     """Download plugin ZIP file (original uploaded file).
@@ -810,13 +787,6 @@ async def download_plugin(filename: str, request: Request):
         filename=filename,
         media_type="application/zip"
     )
-
-
-@app.get("/logout")
-async def logout(request: Request):
-    """Logout and clear session."""
-    request.session.clear()
-    return RedirectResponse(url="/", status_code=302)
 
 
 @app.get("/api/me")

@@ -1,5 +1,5 @@
 import pytest
-from gitea_integration import create_push_task
+from services.gitea.gitea_integration import create_push_task
 from database import get_connection, init_db
 
 

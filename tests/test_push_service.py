@@ -1,5 +1,5 @@
 import pytest
-from gitea_push_service import GiteaPushService
+from services.gitea.gitea_push_service import GiteaPushService
 
 def test_service_initialization():
     service = GiteaPushService(interval=1)

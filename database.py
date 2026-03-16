@@ -1319,11 +1319,12 @@ def get_users_list(
         params.append(status_filter)
 
     if search:
+        # 使用参数化查询，避免 SQL 注入
         conditions.append("employee_id LIKE %s")
         params.append(f"%{search}%")
-
+    
     where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
-
+    
     with get_connection() as conn:
         # Get total count
         total_row = conn.execute(
