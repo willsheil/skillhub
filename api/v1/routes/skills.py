@@ -14,6 +14,8 @@ from core.config import get_settings
 
 router = APIRouter()
 
+# Import scan_plugins from main.py (will be refactored later)
+from main import scan_plugins
 
 class SkillUploadResponse(BaseModel):
     """Skill upload response."""
@@ -22,7 +24,6 @@ class SkillUploadResponse(BaseModel):
     version: str
     status: str
 
-
 class SkillListQuery(BaseModel):
     """Skill list query parameters."""
     source_type: Optional[str] = None
@@ -30,6 +31,26 @@ class SkillListQuery(BaseModel):
     page: int = 1
     page_size: int = 20
 
+@router.get("/skills")
+async def api_skills(page: int = 1, per_page: int = 1000):
+    """API endpoint for skill list (for AJAX requests) with pagination support."""
+    all_plugins = scan_plugins()
+
+    # Calculate pagination
+    total = len(all_plugins)
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+
+    # Return paginated results
+    paginated_plugins = all_plugins[start_idx:end_idx]
+
+    return {
+        "data": paginated_plugins,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page
+    }
 
 @router.post("/upload")
 async def upload_skill(
@@ -37,25 +58,7 @@ async def upload_skill(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload a new skill.
-
-    Requires authentication.
-    """
-    settings = get_settings()
-
-    # Read file content
-    content = await file.read()
-
-    # Check file size
-    if len(content) > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="File too large")
-
-    # Validate ZIP file
-    if not file.filename.endswith('.zip'):
-        raise HTTPException(status_code=400, detail="Only ZIP files allowed")
-
-    # TODO: Parse skill metadata and save to pending directory
-    # This is a simplified version - full implementation would:
+    """Upload a new (simplified version - full implementation would:
     # 1. Extract ZIP to temp directory
     # 2. Parse SKILL.md for metadata
     # 3. Create skill record in database
@@ -67,7 +70,6 @@ async def upload_skill(
         "filename": file.filename
     }
 
-
 @router.get("/list")
 async def list_skills(
     source_type: Optional[str] = None,
@@ -77,7 +79,7 @@ async def list_skills(
     current_user: dict = Depends(get_current_user)
 ):
     """List skills with filters.
-
+    
     Requires authentication.
     """
     skills, total = SkillRepository.search(
@@ -98,16 +100,9 @@ async def list_skills(
         }
     }
 
-
 @router.get("/my-skills")
 async def get_my_skills(current_user: dict = Depends(get_current_user)):
-    """Get skills uploaded by current user."""
-    skills = SkillRepository.get_by_uploader(current_user["id"])
-
-    # Group by skill name
-    grouped = {}
-    for skill in skills:
-        if skill.skill_name not in grouped:
+    """Get skills uploaded by current (skill.skill_name not) in grouped:
             grouped[skill.skill_name] = {
                 "skill_name": skill.skill_name,
                 "versions": []
@@ -121,7 +116,6 @@ async def get_my_skills(current_user: dict = Depends(get_current_user)):
         })
 
     return {"skills": list(grouped.values())}
-
 
 @router.post("/{skill_id}/set-default")
 async def set_default_version(
@@ -140,7 +134,6 @@ async def set_default_version(
 
     return {"success": True, "message": "Default version set"}
 
-
 @router.post("/{skill_id}/unlist")
 async def unlist_skill(
     skill_id: int,
@@ -157,7 +150,6 @@ async def unlist_skill(
     SkillRepository.update_active_status(skill_id, False)
 
     return {"success": True, "message": "Skill unlisted"}
-
 
 @router.delete("/{skill_id}")
 async def delete_skill(
