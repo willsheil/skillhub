@@ -796,7 +796,8 @@ class GiteaClient:
                 else:
                     logger.error(f"Failed after {max_retries} attempts: {e}")
 
-            except Exception as e:
+        except Exception as e:
+            logger.error(f"Unexpected error in push verification: {e}")
                 # Unknown error
                 last_error = e
                 logger.error(f"Unexpected error: {e}")

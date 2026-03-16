@@ -668,11 +668,11 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
                         "metadata": {
                             "author": author_name,
                             "version": legacy_metadata.get("version", version if version != "unknown" else "1.0.0")
-                        },
-                        "legacy": True
-                    }
-    except Exception:
-        pass
+                },
+                "legacy": True
+            }
+        except Exception as e:
+            logger.warning(f"Failed to extract metadata from {filename}: {e}")
 
     # Final fallback
     return {

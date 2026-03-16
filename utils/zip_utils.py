@@ -149,8 +149,8 @@ def get_skill_zip_info(zip_path: Path) -> Optional[dict]:
                     content = zf.read("SKILL.md").decode("utf-8")
                     metadata = parse_skill_metadata(content)
                     info["metadata"] = metadata.to_dict()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to parse skill metadata from {zip_path}: {e}")
 
             return info
     except Exception as e:
