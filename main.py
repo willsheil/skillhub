@@ -686,28 +686,6 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
     }
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Web UI - Display all skills."""
-    # Check if user is authenticated
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
-
-    plugins = scan_plugins()
-
-    # Get current user if authenticated
-    user = get_current_user(request)
-
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "plugins": plugins,
-        "registry_name": "Private Skill Registry",
-        "plugin_count": len(plugins),
-        "user": user
-    })
-
-
 # 隐藏安装指南页面
 # @app.get("/install-guide", response_class=HTMLResponse)
 # async def install_guide(request: Request):
@@ -905,28 +883,6 @@ async def download_plugin(filename: str, request: Request):
         filename=filename,
         media_type="application/zip"
     )
-
-
-@app.get("/api/skills")
-async def api_skills(page: int = 1, per_page: int = 1000):
-    """API endpoint for skill list (for AJAX requests) with pagination support."""
-    all_plugins = scan_plugins()
-
-    # Calculate pagination
-    total = len(all_plugins)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-
-    # Return paginated results
-    paginated_plugins = all_plugins[start_idx:end_idx]
-
-    return {
-        "data": paginated_plugins,
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": (total + per_page - 1) // per_page
-    }
 
 
 @app.get("/login", response_class=HTMLResponse)
