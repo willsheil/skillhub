@@ -272,64 +272,7 @@ Cookie: session=xxx
 
 ---
 
-### 5. 上传统计
-
-获取技能上传统计数据，用于数据看板展示。
-
-**接口**: `GET /api/stats/uploads`
-
-**权限**: 无需认证
-
-**请求参数**: 无
-
-**响应示例**:
-```json
-{
-  "success": true,
-  "data": {
-    "total_skills": 156,
-    "this_month": 23,
-    "last_month": 18,
-    "top_uploaders": [
-      {
-        "username": "w00000001",
-        "name": "张三",
-        "minDepartment": "网络安全部",
-        "team": "安全研发团队",
-        "group": "AI安全组",
-        "upload_count": 45
-      },
-      {
-        "username": "w00000002",
-        "name": "李四",
-        "minDepartment": "云计算部",
-        "team": "平台研发团队",
-        "group": "基础架构组",
-        "upload_count": 32
-      }
-    ]
-  }
-}
-```
-
-**响应字段说明**:
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| total_skills | int | 技能总上传数量 |
-| this_month | int | 本月上传技能数量 |
-| last_month | int | 上月上传技能数量 |
-| top_uploaders | array | 上传排行榜前10名 |
-| top_uploaders[].username | string | 上传者工号 |
-| top_uploaders[].name | string | 上传者姓名（如无则显示工号) |
-| top_uploaders[].minDepartment | string | 所属部门 |
-| top_uploaders[].team | string | 所属团队 |
-| top_uploaders[].group | string | 所属小组 |
-| top_uploaders[].upload_count | int | 上传技能数量 |
-
----
-
-### 6. 导出统计
+### 5. 导出统计
 
 导出下载统计数据为 Excel 文件。
 

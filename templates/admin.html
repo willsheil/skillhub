@@ -3,1495 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理后台 - Skill Registry</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
-            background: #fafafa;
-            color: #171717;
-            line-height: 1.5;
-            font-size: 14px;
-        }
-
-        /* Navbar */
-        .navbar {
-            background: #ffffff;
-            border-bottom: 1px solid #eaeaea;
-            padding: 0 24px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 100;
-        }
-
-        .navbar-brand {
-            font-size: 18px;
-            font-weight: 600;
-            color: #667eea;
-            text-decoration: none;
-        }
-
-        .navbar-nav {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: #2563eb;
-            text-decoration: none;
-            font-size: 14px;
-            padding: 6px 12px;
-            border-radius: 4px;
-            transition: background 0.15s ease;
-        }
-
-        .nav-link:hover {
-            background: #f3f4f6;
-        }
-
-        .user-info {
-            font-size: 14px;
-            color: #64748b;
-        }
-
-        .user-info strong {
-            color: #171717;
-            font-weight: 500;
-        }
-
-        /* Main Content */
-        .main-content {
-            padding-top: 80px;
-            padding-bottom: 40px;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding-left: 24px;
-            padding-right: 24px;
-        }
-
-        .page-header {
-            margin-bottom: 32px;
-        }
-
-        .page-title {
-            font-size: 28px;
-            font-weight: 600;
-            color: #171717;
-            margin-bottom: 8px;
-        }
-
-        .page-subtitle {
-            font-size: 14px;
-            color: #64748b;
-        }
-
-        /* Tabs */
-        .tabs {
-            background: #ffffff;
-            border: 1px solid #eaeaea;
-            border-radius: 8px 8px 0 0;
-            border-bottom: none;
-            padding: 0 24px;
-            display: flex;
-            gap: 32px;
-        }
-
-        .tab {
-            padding: 16px 0;
-            font-size: 15px;
-            font-weight: 500;
-            color: #64748b;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.15s ease;
-        }
-
-        .tab:hover {
-            color: #171717;
-        }
-
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-        }
-
-        /* Tab Content */
-        .tab-content {
-            background: #ffffff;
-            border: 1px solid #eaeaea;
-            border-radius: 0 0 8px 8px;
-            padding: 24px;
-            min-height: 400px;
-        }
-
-        .tab-pane {
-            display: none;
-        }
-
-        .tab-pane.active {
-            display: block;
-        }
-
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 24px;
-            margin-bottom: 32px;
-        }
-
-        .stat-card {
-            background: #ffffff;
-            border: 1px solid #eaeaea;
-            border-radius: 8px;
-            padding: 24px;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 600;
-            color: #171717;
-        }
-
-        .stat-description {
-            font-size: 13px;
-            color: #64748b;
-            margin-top: 4px;
-        }
-
-        /* Table */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 16px;
-        }
-
-        .data-table thead {
-            background: #fafafa;
-            border-bottom: 1px solid #eaeaea;
-        }
-
-        .data-table th {
-            padding: 12px 16px;
-            text-align: left;
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #64748b;
-        }
-
-        .data-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid #eaeaea;
-            font-size: 14px;
-        }
-
-        .data-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* Search Box Styles */
-        .search-box {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #f5f5f5;
-            border: 1px solid #eaeaea;
-            border-radius: 8px;
-            flex-shrink: 0;
-        }
-
-        .search-box input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #eaeaea;
-            border-radius: 6px;
-            font-size: 14px;
-            outline: none;
-            color: #171717;
-            background: #ffffff;
-        }
-
-        .search-box input::placeholder {
-            color: #9ca3af;
-        }
-
-        .search-box input:focus {
-            border-color: #f97316;
-            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
-        }
-
-        .data-table tbody tr:hover {
-            background: #fafafa;
-        }
-
-        /* Status Badges */
-        .status-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .status-badge.pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-badge.approved {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .status-badge.rejected {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .status-badge.status-pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-badge.status-pushing {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .status-badge.status-success {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .status-badge.status-failed {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .status-badge.status-retry {
-            background: #e0e7ff;
-            color: #3730a3;
-        }
-
-        .error-message {
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: #dc2626;
-            font-size: 12px;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            outline: none;
-            transition: all 0.15s ease;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5a6fd6;
-        }
-
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #059669;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
-        .btn-secondary {
-            background: #ffffff;
-            color: #171717;
-            border: 1px solid #eaeaea;
-        }
-
-        .btn-secondary:hover {
-            background: #fafafa;
-            border-color: #d4d4d4;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-        }
-
-        /* Source Type Select */
-        .source-type-select {
-            padding: 4px 8px;
-            border: 1px solid #eaeaea;
-            border-radius: 4px;
-            font-size: 12px;
-            background: white;
-            cursor: pointer;
-            outline: none;
-        }
-
-        .source-type-select:focus {
-            border-color: #667eea;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 48px;
-            color: #64748b;
-        }
-
-        .spinner {
-            width: 32px;
-            height: 32px;
-            border: 2px solid #eaeaea;
-            border-top-color: #667eea;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 48px;
-            color: #64748b;
-        }
-
-        .empty-state-text {
-            font-size: 14px;
-        }
-
-        /* Messages */
-        .message {
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            font-size: 14px;
-        }
-
-        .message.success {
-            background: #f0fdf4;
-            color: #166534;
-            border: 1px solid #bbf7d0;
-        }
-
-        .message.error {
-            background: #fef2f2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
-        }
-
-        /* Toast Notification */
-        .toast-notification {
-            position: fixed;
-            top: 80px;
-            right: 24px;
-            background: #ffffff;
-            padding: 16px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            z-index: 9999;
-            min-width: 300px;
-            transform: translateX(400px);
-            transition: transform 0.3s ease;
-            border-left: 4px solid #10b981;
-        }
-
-        .toast-notification.show {
-            transform: translateX(0);
-        }
-
-        .toast-notification.error {
-            border-left-color: #dc2626;
-        }
-
-        .toast-notification-title {
-            font-weight: 600;
-            font-size: 14px;
-            color: #171717;
-            margin-bottom: 4px;
-        }
-
-        .toast-notification-message {
-            font-size: 13px;
-            color: #64748b;
-        }
-
-        /* Skill Info */
-        .skill-name {
-            font-weight: 500;
-            color: #171717;
-        }
-
-        .skill-version {
-            color: #64748b;
-            font-size: 12px;
-        }
-
-        .uploader-id {
-            color: #64748b;
-            font-size: 13px;
-        }
-
-        .upload-date {
-            color: #64748b;
-            font-size: 13px;
-        }
-
-        /* Comment */
-        .comment {
-            font-size: 13px;
-            color: #64748b;
-            font-style: italic;
-        }
-
-        /* Top Skills Table */
-        .top-skills-table {
-            margin-top: 24px;
-        }
-
-        /* Edit Modal */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: #ffffff;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        }
-
-        .modal-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid #eaeaea;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #171717;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #64748b;
-            cursor: pointer;
-            padding: 0;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-        }
-
-        .modal-close:hover {
-            background: #f3f4f6;
-        }
-
-        .modal-body {
-            padding: 24px;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-label {
-            display: block;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: #374151;
-            font-size: 14px;
-        }
-
-        .form-input,
-        .form-select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.2s;
-        }
-
-        .form-input:focus,
-        .form-select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .form-input:disabled {
-            background: #f3f4f6;
-            color: #64748b;
-        }
-
-        .form-readonly {
-            background: #f9fafb;
-            color: #64748b;
-        }
-
-        .form-select {
-            cursor: pointer;
-            background: #ffffff;
-        }
-
-        .modal-footer {
-            padding: 16px 24px;
-            border-top: 1px solid #eaeaea;
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .main-content {
-                padding-left: 16px;
-                padding-right: 16px;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .data-table {
-                font-size: 13px;
-            }
-
-            .data-table th,
-            .data-table td {
-                padding: 10px 8px;
-            }
-        }
-    </style>
+    <title>管理后台 - SkillHub</title>
+    <link rel="stylesheet" href="/static/css/skills4sec.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%E2%9A%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar">
-        <a href="/" class="navbar-brand">Skill 应用商店 - 管理后台</a>
-        <div class="navbar-nav">
-            <span class="user-info">管理员: <strong>{{ user.employee_id }}</strong></span>
-            <a href="/upload" class="nav-link">上传</a>
-            <a href="/admin/users" class="nav-link">用户管理</a>
-            <a href="/admin/api-keys" class="nav-link">API Keys</a>
-            <a href="/" class="nav-link">首页</a>
-            <a href="/logout" class="nav-link">退出</a>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="max-w-7xl px-container">
+            <div class="nav-inner">
+                <a class="nav-logo" href="/">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="32" height="32" rx="8" fill="#6366f1"/>
+                        <path d="M17.5 7L9 17.5h7L14.5 25 23 14.5h-7L17.5 7z" fill="white"/>
+                    </svg>
+                    <span>SkillHub</span>
+                </a>
+
+                <div class="nav-links">
+                    <a class="nav-link" href="/">首页</a>
+                    <a class="nav-link" href="/browse">浏览技能</a>
+                </div>
+
+                <div class="nav-right">
+                    <a class="nav-link" href="/my-skills">我的技能</a>
+                    <a class="nav-link active" href="/admin">管理</a>
+                    <span class="nav-user-name">{{ user.employee_id }}</span>
+                    <a class="nav-link" href="/logout">退出</a>
+                </div>
+            </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="page-header">
-            <h1 class="page-title">管理后台</h1>
-            <p class="page-subtitle">管理技能审核和查看系统统计</p>
-        </div>
+    <!-- Admin Layout -->
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="admin-sidebar-header">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--muted-foreground);">管理菜单</h3>
+            </div>
+            <nav class="admin-sidebar-nav">
+                <a href="/admin" class="admin-nav-item active" data-section="dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    仪表盘
+                </a>
+                <a href="/admin/pending" class="admin-nav-item" data-section="pending">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    待审核技能
+                </a>
+                <a href="/admin/users" class="admin-nav-item" data-section="users">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    用户管理
+                </a>
+                <a href="/admin/api-keys" class="admin-nav-item" data-section="api-keys">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                    API 密钥
+                </a>
+            </nav>
+        </aside>
 
-        <!-- Tabs -->
-        <div class="tabs">
-            <div class="tab active" data-tab="pending">待审核技能</div>
-            <!-- <div class="tab" data-tab="gitea">Gitea推送</div> -->
-            <div class="tab" data-tab="skills">技能管理</div>
-            <div class="tab" data-tab="stats">统计信息</div>
-            <div class="tab" data-tab="users">用户管理</div>
-        </div>
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Dashboard Section -->
+            <div id="section-dashboard">
+                <div class="admin-header">
+                    <h1>管理仪表盘</h1>
+                    <p>欢迎来到 SkillHub 管理后台</p>
+                </div>
 
-        <!-- Tab Content -->
-        <div class="tab-content">
-            <!-- Pending Skills Tab -->
-            <div class="tab-pane active" id="pendingPane">
-                <div id="pendingContent">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <div>加载中...</div>
+                <!-- Stats Cards -->
+                <div class="stats-grid" style="margin-bottom: 2rem;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-pending">-</div>
+                        <div class="stat-label">待审核</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-approved">-</div>
+                        <div class="stat-label">已通过</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-users">-</div>
+                        <div class="stat-label">用户数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-downloads">-</div>
+                        <div class="stat-label">总下载</div>
+                    </div>
+                </div>
+
+                <!-- Recent Uploads -->
+                <div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 1.5rem;">
+                    <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">最近上传</h2>
+                    <div id="recent-uploads">
+                        <div class="loading"><div class="spinner"></div></div>
                     </div>
                 </div>
             </div>
-
-            <!-- Gitea Push Tab -->
-            <div class="tab-pane" id="giteaPane">
-                <div id="giteaContent">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <div>加载中...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Skills Management Tab -->
-            <div class="tab-pane" id="skillsPane">
-                <div id="skillsContent">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <div>加载中...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Stats Tab -->
-            <div class="tab-pane" id="statsPane">
-                <div id="statsContent">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <div>加载中...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Users Tab -->
-            <div class="tab-pane" id="usersPane">
-                <div id="usersContent">
-                    <div style="padding: 40px; text-align: center;">
-                        <p style="color: #64748b; margin-bottom: 20px;">访问完整的用户管理界面</p>
-                        <a href="/admin/users" class="btn btn-success" style="display: inline-block; text-decoration: none;">前往用户管理页面</a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </main>
     </div>
 
+    <script src="/static/js/skills4sec.js"></script>
     <script>
-        // Tab switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const tabName = tab.dataset.tab;
+        // Load dashboard data
+        function loadDashboard() {
+            fetch('/api/admin/stats')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success && data.data) {
+                        document.getElementById('stat-pending').textContent = data.data.pending_skills || 0;
+                        document.getElementById('stat-approved').textContent = data.data.approved_skills || 0;
+                        document.getElementById('stat-users').textContent = data.data.total_users || 0;
+                        document.getElementById('stat-downloads').textContent = data.data.today_downloads || 0;
+                    }
+                })
+                .catch(function() {});
 
-                // Update active tab
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
+            fetch('/api/pending')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    var container = document.getElementById('recent-uploads');
+                    var items = data.data || data || [];
+                    if (items.length === 0) {
+                        container.innerHTML = '<p style="color: var(--muted-foreground);">暂无待审核技能</p>';
+                        return;
+                    }
+                    var html = '<div class="table-container"><table><thead><tr><th>技能名称</th><th>版本</th><th>上传者</th><th>时间</th><th>操作</th></tr></thead><tbody>';
+                    items.slice(0, 5).forEach(function(skill) {
+                        html += '<tr>' +
+                            '<td>' + skill.skill_name + '</td>' +
+                            '<td>' + skill.version + '</td>' +
+                            '<td>' + (skill.uploader_id || '-') + '</td>' +
+                            '<td>' + (skill.uploaded_at || '-') + '</td>' +
+                            '<td><a href="/admin/pending" class="btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">审核</a></td>' +
+                            '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    container.innerHTML = html;
+                })
+                .catch(function() {
+                    document.getElementById('recent-uploads').innerHTML = '<p style="color: var(--muted-foreground);">加载失败</p>';
+                });
+        }
 
-                // Update active pane
-                document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-                document.getElementById(`${tabName}Pane`).classList.add('active');
-
-                // Load content
-                if (tabName === 'pending') {
-                    loadPendingSkills();
-                } else if (tabName === 'gitea') {
-                    loadGiteaTasks();
-                } else if (tabName === 'skills') {
-                    loadSkillsManagement();
-                } else if (tabName === 'stats') {
-                    loadStats();
-                } else if (tabName === 'users') {
-                    // Users tab - show link to dedicated page
-                    // Content is static HTML
-                }
+        // Sidebar navigation - navigate to corresponding page
+        document.querySelectorAll('.admin-nav-item').forEach(function(item) {
+            item.addEventListener('click', function(e) {
+                // Let the default link behavior work - navigate to the href
             });
         });
 
-        // Load pending skills
-        async function loadPendingSkills() {
-            const content = document.getElementById('pendingContent');
-
-            try {
-                const response = await fetch('/api/pending');
-                const result = await response.json();
-
-                if (!result.success) {
-                    throw new Error('Failed to load pending skills');
-                }
-
-                const pendingSkills = result.data || [];
-
-                if (pendingSkills.length === 0) {
-                    content.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-text">暂无待审核技能</div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const table = document.createElement('table');
-                table.className = 'data-table';
-                table.innerHTML = `
-                    <thead>
-                        <tr>
-                            <th>Skill 名称</th>
-                            <th>版本</th>
-                            <th>上传者</th>
-                            <th>上传时间</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${pendingSkills.map(skill => `
-                            <tr data-skill-id="${skill.id}">
-                                <td>
-                                    <div class="skill-name">${skill.skill_name}</div>
-                                </td>
-                                <td>
-                                    <span class="skill-version">${skill.version}</span>
-                                </td>
-                                <td>
-                                    <div class="uploader-id">${skill.uploader_employee_id}</div>
-                                </td>
-                                <td>
-                                    <div class="upload-date">${formatDate(skill.uploaded_at)}</div>
-                                </td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="btn btn-success" onclick="reviewSkill(${skill.id}, 'approve')">
-                                            通过
-                                        </button>
-                                        <button class="btn btn-danger" onclick="reviewSkill(${skill.id}, 'reject')">
-                                            拒绝
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                `;
-
-                content.innerHTML = '';
-                content.appendChild(table);
-
-            } catch (error) {
-                console.error('Failed to load pending skills:', error);
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-text">加载失败</div>
-                    </div>
-                `;
-            }
-        }
-
-        // Review skill
-        async function reviewSkill(skillId, action) {
-            let comment = null;
-
-            if (action === 'reject') {
-                comment = prompt('请输入拒绝原因（可选）:');
-                if (comment === null) return; // User cancelled
-            }
-
-            try {
-                const response = await fetch(`/api/review/${skillId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        action: action,
-                        comment: comment
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Show success message
-                    showMessage(result.message, 'success');
-
-                    // Remove row from table
-                    const row = document.querySelector(`tr[data-skill-id="${skillId}"]`);
-                    if (row) {
-                        row.style.opacity = '0.5';
-                        setTimeout(() => row.remove(), 500);
-                    }
-
-                    // Check if table is empty
-                    const tbody = document.querySelector('#pendingContent tbody');
-                    if (tbody && tbody.children.length === 0) {
-                        loadPendingSkills();
-                    }
-                } else {
-                    showMessage('操作失败: ' + (result.detail || '未知错误'), 'error');
-                }
-
-            } catch (error) {
-                console.error('Review failed:', error);
-                showMessage('操作失败: ' + error.message, 'error');
-            }
-        }
-
-        // Store original skills data for filtering (module scope)
-        let originalSkills = [];
-        let currentSearchQuery = '';
-
-        // Search filter function (global scope)
-        function handleAdminSearch() {
-            const query = document.getElementById('adminSearchInput').value.toLowerCase().trim();
-            currentSearchQuery = query;
-            const filteredSkills = originalSkills.filter(skill => {
-                if (!query) return true;
-                const searchFields = [
-                    skill.skill_name.toLowerCase(),
-                    skill.version.toLowerCase(),
-                    skill.uploader_name ? skill.uploader_name.toLowerCase() : ''
-                ];
-                return searchFields.some(field => field.includes(query));
-            });
-            renderSkillsTable(filteredSkills);
-        }
-
-        // Render skills table (global scope)
-        function renderSkillsTable(skills = []) {
-            const content = document.getElementById('skillsContent');
-
-            // Preserve search input value before re-rendering
-            const searchInput = document.getElementById('adminSearchInput');
-            const searchValue = searchInput ? searchInput.value : '';
-
-            if (skills.length === 0) {
-                const emptyMsg = currentSearchQuery ? '未找到匹配的技能' : '暂无技能';
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-text">${emptyMsg}</div>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = `
-                    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-                        <div class="search-box" style="flex: 1; min-width: 300px;">
-                            <span style="font-size: 14px; color: #64748b;">🔍</span>
-                            <input type="text" id="adminSearchInput" placeholder="搜索技能名称、上传者..."
-                                value="${searchValue}"
-                                style="flex: 1; padding: 8px 12px; border: 1px solid #eaeaea; border-radius: 8px; font-size: 14px; outline: none;"
-                                oninput="handleAdminSearch()">
-                        </div>
-                        <button class="btn btn-primary" onclick="loadSkillsManagement()">刷新</button>
-                    </div>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>技能名称</th>
-                                <th>版本</th>
-                                <th>来源类型</th>
-                                <th>状态</th>
-                                <th>上传者</th>
-                                <th>上传时间</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-            const sourceTypeLabels = {
-                'opensource': '开源',
-                'icsl': 'ICSL自研',
-                'huawei': '华为自研'
-            };
-
-            const statusLabels = {
-                'pending': '待审核',
-                'approved': '已通过',
-                'rejected': '已拒绝'
-            };
-
-            const statusColors = {
-                'pending': '#f59e0b',
-                'approved': '#10b981',
-                'rejected': '#ef4444'
-            };
-
-            for (const skill of skills) {
-                const uploadedAt = new Date(skill.uploaded_at).toLocaleString('zh-CN');
-                const sourceTypeLabel = sourceTypeLabels[skill.source_type] || skill.source_type;
-                const statusLabel = statusLabels[skill.status] || skill.status;
-
-                html += `
-                    <tr data-skill-id="${skill.id}">
-                        <td>${skill.id}</td>
-                        <td>${skill.skill_name}</td>
-                        <td>${skill.version}</td>
-                        <td>
-                            <select class="source-type-select" data-skill-id="${skill.id}" onchange="updateSourceType(${skill.id}, this.value)">
-                                <option value="opensource" ${skill.source_type === 'opensource' ? 'selected' : ''}>开源</option>
-                                <option value="icsl" ${skill.source_type === 'icsl' ? 'selected' : ''}>ICSL自研</option>
-                                <option value="huawei" ${skill.source_type === 'huawei' ? 'selected' : ''}>华为自研</option>
-                            </select>
-                        </td>
-                        <td><span style="color: ${statusColors[skill.status] || '#64748b'}">${statusLabel}</span></td>
-                        <td>${skill.uploader_name || '-'}</td>
-                        <td>${uploadedAt}</td>
-                        <td>
-                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="editSkill(${skill.id})">编辑</button>
-                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;" onclick="deleteAdminSkill(${skill.id}, '${encodeURIComponent(skill.skill_name)}', '${skill.version}')">删除</button>
-                        </td>
-                    </tr>
-                `;
-            }
-
-            html += `
-                        </tbody>
-                    </table>
-                `;
-
-            content.innerHTML = html;
-        }
-
-        // Load Gitea push tasks
-        async function loadGiteaTasks() {
-            console.log('loadGiteaTasks called');
-            const content = document.getElementById('giteaContent');
-
-            try {
-                console.log('Fetching API...');
-                const response = await fetch('/api/admin/gitea-tasks?limit=50');
-                console.log('Response:', response.status);
-                const result = await response.json();
-                console.log('Result:', result);
-
-                if (!result.success) {
-                    throw new Error('Failed to load Gitea tasks');
-                }
-
-                const tasks = result.data || [];
-                console.log('Tasks:', tasks.length);
-
-                if (tasks.length === 0) {
-                    content.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📦</div>
-                            <div class="empty-state-text">暂无Gitea推送任务</div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                // Build table
-                let html = `
-                    <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>SKILL名称</th>
-                                <th>版本</th>
-                                <th>状态</th>
-                                <th>创建时间</th>
-                                <th>重试次数</th>
-                                <th>错误信息</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                tasks.forEach(task => {
-                    let statusClass = '';
-                    let statusText = '';
-                    switch(task.status) {
-                        case 'pending': statusClass = 'status-pending'; statusText = '等待推送'; break;
-                        case 'pushing': statusClass = 'status-pushing'; statusText = '推送中'; break;
-                        case 'success': statusClass = 'status-success'; statusText = '推送成功'; break;
-                        case 'failed': statusClass = 'status-failed'; statusText = '推送失败'; break;
-                        case 'retry_pending': statusClass = 'status-retry'; statusText = '等待重试'; break;
-                        default: statusText = task.status;
-                    }
-
-                    const retryBtn = (task.status === 'failed' || task.status === 'retry_pending')
-                        ? `<button class="btn-small" onclick="retryGiteaTask(${task.id})">重试</button>`
-                        : '';
-
-                    html += `
-                        <tr>
-                            <td>${escapeHtml(task.skill_name || '')}</td>
-                            <td>${escapeHtml(task.version || '')}</td>
-                            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                            <td>${escapeHtml(task.created_at || '')}</td>
-                            <td>${task.retry_count || 0}</td>
-                            <td class="error-message">${escapeHtml(task.error_message || '-')}</td>
-                            <td>${retryBtn}</td>
-                        </tr>
-                    `;
-                });
-
-                html += `
-                        </tbody>
-                    </table>
-                    </div>
-                `;
-
-                content.innerHTML = html;
-            } catch (error) {
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">❌</div>
-                        <div class="empty-state-text">加载失败: ${escapeHtml(error.message)}</div>
-                    </div>
-                `;
-            }
-        }
-
-        // Retry Gitea task
-        async function retryGiteaTask(taskId) {
-            if (!confirm('确定要重试这个推送任务吗？')) return;
-
-            try {
-                const response = await fetch('/api/admin/gitea-tasks/' + taskId + '/retry', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    alert('任务已加入重试队列');
-                    loadGiteaTasks();
-                } else {
-                    alert('重试失败: ' + (result.detail || result.error));
-                }
-            } catch (error) {
-                alert('错误: ' + error.message);
-            }
-        }
-
-        // Load skills management
-        async function loadSkillsManagement() {
-            const content = document.getElementById('skillsContent');
-            const searchInput = document.getElementById('adminSearchInput');
-            const searchValue = searchInput ? searchInput.value : '';
-
-            try {
-                const response = await fetch('/api/admin/skills?limit=100');
-                const result = await response.json();
-
-                if (!result.success) {
-                    throw new Error(result.detail || '加载失败');
-                }
-
-                const skills = result.data || [];
-
-                // Check empty state BEFORE rendering
-                if (skills.length === 0) {
-                    content.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-text">暂无技能</div>
-                        </div>
-                    `;
-                    // Clear originalSkills since no data exists
-                    originalSkills = [];
-                    return;
-                }
-
-                // Store original skills data for filtering
-                originalSkills = skills;
-
-                // Render the table (will preserve search input value internally)
-                renderSkillsTable(skills);
-
-            } catch (error) {
-                console.error('Failed to load skills:', error);
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-text">加载失败: ${error.message}</div>
-                    </div>
-                `;
-                // Clear originalSkills on error to prevent filtering stale data
-                originalSkills = [];
-            }
-        }
-
-        // Update source type
-        async function updateSourceType(skillId, newSourceType) {
-            try {
-                const response = await fetch(`/api/admin/skills/${skillId}/source-type`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        source_type: newSourceType
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showMessage(`已更新来源类型为: ${newSourceType}`, 'success');
-                } else {
-                    showMessage('更新失败: ' + (result.detail || '未知错误'), 'error');
-                    // Reset select to original value
-                    loadSkillsManagement();
-                }
-
-            } catch (error) {
-                console.error('Update failed:', error);
-                showMessage('更新失败: ' + error.message, 'error');
-                loadSkillsManagement();
-            }
-        }
-
-        // Delete skill
-        async function deleteAdminSkill(skillId, skillName, version) {
-            if (!confirm(`确定要删除 ${decodeURIComponent(skillName)}@${version} 吗？\n\n删除后无法恢复！`)) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/my-skills/${skillId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || '删除失败');
-                }
-
-                showMessage('技能已删除', 'success');
-
-                // Clear search and refresh to show all data
-                document.getElementById('adminSearchInput').value = '';
-                currentSearchQuery = '';
-                loadSkillsManagement();
-
-            } catch (error) {
-                console.error('Error deleting skill:', error);
-                showMessage('删除失败: ' + error.message, 'error');
-            }
-        }
-
-        // Load stats
-        async function loadStats() {
-            const content = document.getElementById('statsContent');
-
-            try {
-                // Load pending count
-                const pendingResponse = await fetch('/api/pending');
-                const pendingResult = await pendingResponse.json();
-                const pendingCount = pendingResult.count || 0;
-
-                // Load download stats
-                const statsResponse = await fetch('/api/stats/top');
-                const statsResult = await statsResponse.json();
-                const totalDownloads = statsResult.total_downloads || 0;
-                const rankings = statsResult.rankings || [];
-
-                content.innerHTML = `
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-label">待审核技能</div>
-                            <div class="stat-value">${pendingCount}</div>
-                            <div class="stat-description">等待管理员审核</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">总下载次数</div>
-                            <div class="stat-value">${totalDownloads}</div>
-                            <div class="stat-description">所有技能的累计下载</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">可用技能</div>
-                            <div class="stat-value">${rankings.length}</div>
-                            <div class="stat-description">已发布的技能数量</div>
-                        </div>
-                    </div>
-
-                    <div class="top-skills-table">
-                        <h3 style="font-size: 18px; font-weight: 500; margin-bottom: 16px; color: #171717;">
-                            下载排行 Top 10
-                        </h3>
-                        ${renderTopSkillsTable(rankings.slice(0, 10))}
-                    </div>
-                `;
-
-            } catch (error) {
-                console.error('Failed to load stats:', error);
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-text">加载失败</div>
-                    </div>
-                `;
-            }
-        }
-
-        function renderTopSkillsTable(rankings) {
-            if (rankings.length === 0) {
-                return '<div class="empty-state"><div class="empty-state-text">暂无数据</div></div>';
-            }
-
-            return `
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">排名</th>
-                            <th>Skill 名称</th>
-                            <th>作者</th>
-                            <th>下载次数</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rankings.map((item, index) => `
-                            <tr>
-                                <td>
-                                    <div style="font-weight: 600; color: #667eea;">
-                                        #${index + 1}
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="skill-name">${item.skill_name}</div>
-                                </td>
-                                <td>
-                                    <div class="uploader-id">${item.author || '未知'}</div>
-                                </td>
-                                <td>
-                                    <div style="font-weight: 500; color: #2563eb;">
-                                        ${item.downloads}
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
-
-        function formatDate(dateStr) {
-            const date = new Date(dateStr);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `${year}-${month}-${day} ${hours}:${minutes}`;
-        }
-
-        function showMessage(message, type) {
-            // Create toast notification
-            const toast = document.createElement('div');
-            toast.className = `toast-notification ${type === 'error' ? 'error' : ''}`;
-
-            const title = type === 'error' ? '操作失败' : '操作成功';
-
-            toast.innerHTML = `
-                <div class="toast-notification-title">${title}</div>
-                <div class="toast-notification-message">${message}</div>
-            `;
-
-            document.body.appendChild(toast);
-
-            // Show toast
-            setTimeout(() => toast.classList.add('show'), 10);
-
-            // Hide and remove after 3 seconds
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // Load pending skills on page load
-        document.addEventListener('DOMContentLoaded', loadPendingSkills);
-
-        // Edit skill modal
-        let currentEditingSkill = null;
-
-        async function editSkill(skillId) {
-            try {
-                // Get skill details from existing data
-                const response = await fetch('/api/admin/skills');
-                const result = await response.json();
-
-                if (!result.success) {
-                    showMessage('获取技能信息失败', 'error');
-                    return;
-                }
-
-                const skills = result.data || [];
-                const skill = skills.find(s => s.id === skillId);
-
-                if (!skill) {
-                    showMessage('未找到该技能', 'error');
-                    return;
-                }
-
-                currentEditingSkill = skill;
-                showEditModal(skill);
-            } catch (error) {
-                console.error('Failed to load skill details:', error);
-                showMessage('加载技能详情失败: ' + error.message, 'error');
-            }
-        }
-
-        function showEditModal(skill) {
-            // Create modal if it doesn't exist
-            let modal = document.getElementById('skillEditModal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'skillEditModal';
-                modal.className = 'modal-overlay';
-                modal.innerHTML = `
-                    <div class="modal">
-                        <div class="modal-header">
-                            <h3 class="modal-title">编辑技能</h3>
-                            <button class="modal-close" onclick="closeEditModal()">&times;</button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="form-group">
-                                <label class="form-label">技能名称</label>
-                                <input type="text" class="form-input form-readonly" id="editSkillName" disabled>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">版本</label>
-                                <input type="text" class="form-input form-readonly" id="editSkillVersion" disabled>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">来源类型</label>
-                                <select class="form-select" id="editSourceType">
-                                    <option value="opensource">开源</option>
-                                    <option value="icsl">ICSL自研</option>
-                                    <option value="huawei">华为自研</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">状态</label>
-                                <input type="text" class="form-input form-readonly" id="editSkillStatus" disabled>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">上传者</label>
-                                <input type="text" class="form-input form-readonly" id="editSkillUploader" disabled>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">创建时间</label>
-                                <input type="text" class="form-input form-readonly" id="editSkillCreatedAt" disabled>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
-                            <button class="btn btn-success" onclick="saveSkillEdit()">保存</button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-            }
-
-            // Fill in the skill data
-            document.getElementById('editSkillName').value = skill.skill_name || '';
-            document.getElementById('editSkillVersion').value = skill.version || '';
-            document.getElementById('editSourceType').value = skill.source_type || 'opensource';
-
-            const statusMap = {
-                'pending': '待审核',
-                'approved': '已通过',
-                'rejected': '已拒绝'
-            };
-            document.getElementById('editSkillStatus').value = statusMap[skill.status] || skill.status || '';
-            document.getElementById('editSkillUploader').value = skill.uploader_name || skill.uploader_employee_id || '-';
-            document.getElementById('editSkillCreatedAt').value = formatDate(skill.uploaded_at || skill.created_at || '');
-
-            // Show modal
-            modal.classList.add('active');
-        }
-
-        function closeEditModal() {
-            const modal = document.getElementById('skillEditModal');
-            if (modal) {
-                modal.classList.remove('active');
-            }
-            currentEditingSkill = null;
-        }
-
-        async function saveSkillEdit() {
-            if (!currentEditingSkill) return;
-
-            const sourceType = document.getElementById('editSourceType').value;
-
-            try {
-                const response = await fetch(`/api/admin/skills/${currentEditingSkill.id}/source-type`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        source_type: sourceType
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showMessage('技能信息已更新', 'success');
-                    closeEditModal();
-                    loadSkillsManagement(); // Reload the skills table
-                } else {
-                    showMessage(result.detail || '更新失败', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to update skill:', error);
-                showMessage('更新失败: ' + error.message, 'error');
-            }
-        }
-
-        // Close modal when clicking outside
-        document.addEventListener('click', (e) => {
-            const modal = document.getElementById('skillEditModal');
-            if (modal && e.target === modal) {
-                closeEditModal();
-            }
-        });
+        // Initial load
+        loadDashboard();
     </script>
 </body>
 </html>

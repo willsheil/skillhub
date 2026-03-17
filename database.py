@@ -289,7 +289,8 @@ def init_db():
     migrate_add_review_fields_to_skills()  # Add uploaded_at, reviewed_at, reviewer_id, review_comment
     migrate_add_user_management_features()
     migrate_add_skill_description_and_metadata()
-    migrate_to_single_version()
+    # TODO: Re-enable when multi-version is properly supported
+    # migrate_to_single_version()
     init_external_api_tables()  # 创建外部 API 相关表
     # 新增：评分评论、搜索、分类系统
     migrate_add_rating_comment_system()
@@ -412,11 +413,11 @@ def migrate_add_user_profile_fields():
             ("name", "VARCHAR(100) NULL"),
             ("minDepartment", "VARCHAR(100) NULL"),
             ("team", "VARCHAR(100) NULL"),
-            ("group", "VARCHAR(100) NULL"),
+            ("`group`", "VARCHAR(100) NULL"),  # group is reserved keyword
         ]
 
         for field_name, field_type in fields_to_add:
-            if field_name not in columns:
+            if field_name.replace("`", "") not in columns:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {field_name} {field_type}")
                 conn.commit()
                 logger.info(f"Migration: Added {field_name} column to users table")

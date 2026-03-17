@@ -97,3 +97,39 @@ class ErrorResponse(BaseModel):
     code: int
     message: str
     data: None = None
+
+
+# ========== User Schemas ==========
+
+class UserResponse(BaseModel):
+    """用户响应"""
+    id: int
+    employee_id: str
+    role: str
+    skills_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class UserCreateRequest(BaseModel):
+    """用户创建请求"""
+    employee_id: str = Field(..., min_length=1)
+    api_key: str = Field(..., min_length=1)
+    role: str = "user"
+
+
+# ========== Notification Schemas ==========
+
+class NotificationResponse(BaseModel):
+    """通知响应"""
+    id: int
+    user_id: int
+    type: str
+    title: str
+    content: Optional[str]
+    related_skill_id: Optional[int]
+    is_read: bool
+
+    class Config:
+        from_attributes = True

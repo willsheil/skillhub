@@ -184,6 +184,10 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+# Initialize templates for pages router
+from api.v1.routes.pages import set_templates
+set_templates(templates)
+
 
 def require_auth(request: Request):
     """Check if user is authenticated.
@@ -666,23 +670,49 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Web UI - Display all skills."""
-    # Check if user is authenticated
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
+    """Web UI - Display featured skills on homepage."""
+    # Allow public access - get user if authenticated
+    user = get_current_user(request)
 
     plugins = scan_plugins()
 
-    # Get current user if authenticated
-    user = get_current_user(request)
+    # Homepage shows only first 12 featured skills
+    featured_plugins = plugins[:12]
 
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "plugins": plugins,
-        "registry_name": "Private Skill Registry",
+        "plugins": featured_plugins,
+        "registry_name": "SkillHub",
         "plugin_count": len(plugins),
-        "user": user
+        "user": user,
+        "page_type": "home"
+    })
+
+
+@app.get("/browse", response_class=HTMLResponse)
+async def browse(request: Request, page: int = 1, per_page: int = 12):
+    """Web UI - Browse all skills (public access) with pagination."""
+    user = get_current_user(request)
+    plugins = scan_plugins()
+
+    # Pagination
+    total = len(plugins)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_plugins = plugins[start:end]
+
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "plugins": paginated_plugins,
+        "registry_name": "SkillHub",
+        "plugin_count": total,
+        "user": user,
+        "page_type": "browse",
+        "current_page": page,
+        "total_pages": total_pages,
+        "per_page": per_page
     })
 
 
@@ -1060,6 +1090,25 @@ async def admin_dashboard(request: Request):
         )
 
     return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "user": user
+    })
+
+
+@app.get("/admin/pending", response_class=HTMLResponse)
+async def admin_pending_page(request: Request):
+    """Display pending skills review page (requires admin)."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    if user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return templates.TemplateResponse("admin_pending.html", {
         "request": request,
         "user": user
     })
@@ -3293,11 +3342,6 @@ async def stats_page(request: Request):
 @app.get("/skill/{skill_name}", response_class=HTMLResponse)
 async def skill_detail_page(request: Request, skill_name: str):
     """Display skill detail page with Skill.md content."""
-    # Check if user is authenticated
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
-
     # Try to get skill from database first
     from database import get_skill_by_name
     skill = get_skill_by_name(skill_name)

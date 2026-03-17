@@ -1,237 +1,433 @@
-from typing import Dict, List, Any, Optional
-from database import get_connection
+"""
+API services - Business logic layer.
+
+Provides service classes that encapsulate business logic and interact with repositories.
+"""
+
 import logging
+from typing import Optional, List, Dict, Any
+from pathlib import Path
 
-logger = logging.getLogger("skillhub.api.services")
+from db.repositories import (
+    UserRepository,
+    SkillRepository,
+    DownloadRepository,
+    NotificationRepository,
+)
+from db.models import User, Skill
+from core.constants import SkillStatus, SourceType, NotificationType
+from core.config import get_settings
+from utils.skill_parser import parse_skill_metadata
+from utils.zip_utils import validate_skill_zip
 
-def get_skills_list(
-    source_type: str = "all",
-    page: int = 1,
-    page_size: int = 20,
-    keyword: Optional[str] = None,
-    tags: Optional[str] = None
-) -> Dict[str, Any]:
-    """获取技能列表
+logger = logging.getLogger(__name__)
 
-    Args:
-        source_type: 来源类型过滤
-        page: 页码
-        page_size: 每页数量
-        keyword: 搜索关键词
-        tags: 标签过滤
 
-    Returns:
-        包含 items 和 pagination 的字典
-    """
-    offset = (page - 1) * page_size
+class AuthService:
+    """Authentication service."""
 
-    # 构建查询条件
-    where_conditions = ["status = 'approved'", "is_active = 1"]
-    params = []
+    @staticmethod
+    def authenticate(employee_id: str, api_key: str) -> Optional[User]:
+        """Authenticate user with credentials.
 
-    if source_type != "all":
-        where_conditions.append("source_type = %s")
-        params.append(source_type)
+        Args:
+            employee_id: Employee ID
+            api_key: API key
 
-    if keyword:
-        where_conditions.append("(skill_name LIKE %s OR description LIKE %s)")
-        keyword_pattern = f"%{keyword}%"
-        params.extend([keyword_pattern, keyword_pattern])
-
-    if tags:
-        tag_list = [t.strip() for t in tags.split(',')]
-        # 简化实现：在 metadata 中搜索标签
-        for tag in tag_list:
-            where_conditions.append("metadata LIKE %s")
-            params.append(f"%{tag}%")
-
-    where_clause = " AND ".join(where_conditions)
-
-    # 查询总数
-    with get_connection() as conn:
-        count_result = conn.execute(
-            f"SELECT COUNT(*) as total FROM skills WHERE {where_clause}",
-            params
-        ).fetchone()
-        total = count_result['total']
-
-        # 查询数据
-        query = f"""
-            SELECT id, skill_name, description, metadata, source_type,
-                   version, filename
-            FROM skills
-            WHERE {where_clause}
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
+        Returns:
+            User object if authenticated, None otherwise
         """
-        params.extend([page_size, offset])
+        user = UserRepository.get_by_credentials(employee_id, api_key)
+        if user and user.is_active():
+            UserRepository.update_last_login(user.id)
+        return user
 
-        rows = conn.execute(query, params).fetchall()
+    @staticmethod
+    def create_user(employee_id: str, api_key: str, role: str = "user") -> User:
+        """Create a new user.
 
-    # 处理结果
-    items = []
-    for row in rows:
-        # 解析 metadata (JSON 格式)
-        import json
-        try:
-            metadata = json.loads(row['metadata']) if row['metadata'] else {}
-        except (json.JSONDecodeError, TypeError):
-            metadata = {}
+        Args:
+            employee_id: Employee ID
+            api_key: API key (plain text)
+            role: User role
 
-        # 确保必需字段存在，提供默认值
-        metadata = {
-            "version": metadata.get("version", row['version']),
-            "author": metadata.get("author", "Unknown"),
-            "tags": metadata.get("tags", []),
-            "category": metadata.get("category"),
-            "license": metadata.get("license"),
-            "compatibility": metadata.get("compatibility")
-        }
+        Returns:
+            Created User object
+        """
+        return UserRepository.create(employee_id, api_key, role)
 
-        # 获取所有版本
-        versions = _get_skill_versions(row['skill_name'])
+    @staticmethod
+    def reset_api_key(user_id: int) -> str:
+        """Reset user's API key.
 
-        items.append({
-            "name": row['skill_name'],
-            "description": row['description'] or "",
-            "metadata": metadata,
-            "source_type": row['source_type'],
-            "default_version": row['version'],
-            "versions": versions,
-            "download_url": f"/api/v1/skills/{row['skill_name']}/download"
-        })
+        Args:
+            user_id: User ID
 
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+        Returns:
+            New API key (plain text)
+        """
+        return UserRepository.reset_api_key(user_id)
 
-    return {
-        "items": items,
-        "pagination": {
-            "page": page,
-            "page_size": page_size,
-            "total": total,
-            "total_pages": total_pages
-        }
-    }
 
-def _get_skill_versions(skill_name: str) -> List[str]:
-    """获取技能的所有版本"""
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT version FROM skills
-            WHERE skill_name = %s AND status = 'approved' AND is_active = 1
-            ORDER BY version DESC
-            """,
-            (skill_name,)
-        ).fetchall()
-        return [row['version'] for row in rows]
+class SkillService:
+    """Skill management service."""
 
-def get_skill_detail(skill_name: str) -> Optional[Dict[str, Any]]:
-    """获取技能详情
+    @staticmethod
+    def search(
+        source_type: Optional[str] = None,
+        keyword: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> Dict[str, Any]:
+        """Search skills.
 
-    Args:
-        skill_name: 技能名称
+        Args:
+            source_type: Filter by source type
+            keyword: Search keyword
+            tags: Filter by tags
+            page: Page number
+            page_size: Page size
 
-    Returns:
-        技能详情字典，不存在返回 None
-    """
-    with get_connection() as conn:
-        # 获取技能信息（单版本模式）
-        row = conn.execute(
-            """
-            SELECT id, skill_name, description, metadata, source_type,
-                   version, filename
-            FROM skills
-            WHERE skill_name = %s AND status = 'approved' AND is_active = 1
-            LIMIT 1
-            """,
-            (skill_name,)
-        ).fetchone()
-
-        if not row:
-            return None
-
-        # 解析 metadata
-        import json
-        try:
-            metadata = json.loads(row['metadata']) if row['metadata'] else {}
-        except (json.JSONDecodeError, TypeError):
-            metadata = {}
-
-        # 确保必需字段存在，提供默认值
-        metadata = {
-            "version": metadata.get("version", row['version']),
-            "author": metadata.get("author", "Unknown"),
-            "tags": metadata.get("tags", []),
-            "category": metadata.get("category"),
-            "license": metadata.get("license"),
-            "compatibility": metadata.get("compatibility")
-        }
+        Returns:
+            Dict with items and pagination
+        """
+        skills, total = SkillRepository.search(
+            source_type=source_type,
+            keyword=keyword,
+            tags=tags,
+            page=page,
+            page_size=page_size,
+        )
 
         return {
-            "name": row['skill_name'],
-            "description": row['description'] or "",
-            "metadata": metadata,
-            "source_type": row['source_type'],
-            "versions": [
-                {
-                    "version": row['version'],
-                    "filename": row['filename'],
-                    "is_default": True,
-                    "download_url": f"/api/v1/skills/{skill_name}/download"
-                }
-            ]
+            "items": [s.to_dict() for s in skills],
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "pages": (total + page_size - 1) // page_size
+            }
         }
 
-def _get_skill_version_details(skill_name: str) -> List[Dict[str, Any]]:
-    """获取技能的所有版本详情（单版本模式，返回单个版本）"""
-    with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT version, filename
-            FROM skills
-            WHERE skill_name = %s AND status = 'approved' AND is_active = 1
-            LIMIT 1
-            """,
-            (skill_name,)
-        ).fetchone()
+    @staticmethod
+    def get_by_id(skill_id: int) -> Optional[Skill]:
+        """Get skill by ID.
 
-        if not row:
-            return []
+        Args:
+            skill_id: Skill ID
 
-        return [
-            {
-                "version": row['version'],
-                "filename": row['filename'],
-                "is_default": True,
-                "download_url": f"/api/v1/skills/{skill_name}/download"
+        Returns:
+            Skill object or None
+        """
+        return SkillRepository.get_by_id(skill_id)
+
+    @staticmethod
+    def get_by_name(skill_name: str, version: Optional[str] = None) -> Optional[Skill]:
+        """Get skill by name.
+
+        Args:
+            skill_name: Skill name
+            version: Optional version
+
+        Returns:
+            Skill object or None
+        """
+        return SkillRepository.get_by_name(skill_name, version)
+
+    @staticmethod
+    def get_my_skills(user_id: int) -> List[Dict[str, Any]]:
+        """Get skills for a user.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            List of user's skills grouped by name
+        """
+        skills = SkillRepository.get_by_uploader(user_id)
+
+        # Group by skill name
+        grouped = {}
+        for skill in skills:
+            if skill.skill_name not in grouped:
+                grouped[skill.skill_name] = {
+                    "skill_name": skill.skill_name,
+                    "description": skill.description,
+                    "versions": []
+                }
+            grouped[skill.skill_name]["versions"].append({
+                "id": skill.id,
+                "version": skill.version,
+                "status": skill.status,
+                "is_default": skill.is_default_version,
+                "is_active": skill.is_active,
+            })
+
+        return list(grouped.values())
+
+    @staticmethod
+    def set_default_version(skill_id: int) -> bool:
+        """Set skill as default version.
+
+        Args:
+            skill_id: Skill ID
+
+        Returns:
+            True if successful
+        """
+        return SkillRepository.set_default_version(skill_id)
+
+    @staticmethod
+    def unlist(skill_id: int) -> bool:
+        """Unlist a skill.
+
+        Args:
+            skill_id: Skill ID
+
+        Returns:
+            True if successful
+        """
+        return SkillRepository.update_active_status(skill_id, False)
+
+    @staticmethod
+    def delete(skill_id: int) -> bool:
+        """Delete a skill.
+
+        Args:
+            skill_id: Skill ID
+
+        Returns:
+            True if successful
+        """
+        return SkillRepository.delete(skill_id)
+
+
+class UploadService:
+    """Skill upload service."""
+
+    @staticmethod
+    def process_upload(
+        file_content: bytes,
+        filename: str,
+        uploader_id: int,
+    ) -> Dict[str, Any]:
+        """Process uploaded skill ZIP.
+
+        Args:
+            file_content: ZIP file content
+            filename: Original filename
+            uploader_id: Uploader user ID
+
+        Returns:
+            Dict with upload result
+
+        Raises:
+            ValueError: If validation fails
+        """
+        settings = get_settings()
+
+        # Validate file size
+        if len(file_content) > settings.MAX_UPLOAD_SIZE_BYTES:
+            raise ValueError(f"File too large. Max size: {settings.MAX_UPLOAD_SIZE_MB}MB")
+
+        # Validate file extension
+        if not filename.endswith('.zip'):
+            raise ValueError("Only ZIP files are allowed")
+
+        # Save to temp file for validation
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
+            tmp.write(file_content)
+            tmp_path = Path(tmp.name)
+
+        try:
+            # Validate ZIP
+            is_valid, errors = validate_skill_zip(tmp_path)
+            if not is_valid:
+                raise ValueError(f"Invalid skill package: {'; '.join(errors)}")
+
+            # Parse metadata
+            # (Would need to extract and parse SKILL.md here)
+
+            # Save to pending directory
+            pending_dir = settings.PENDING_DIR
+            pending_dir.mkdir(parents=True, exist_ok=True)
+
+            dest_path = pending_dir / filename
+
+            # Copy file
+            import shutil
+            shutil.copy(tmp_path, dest_path)
+
+            # TODO: Create database record
+
+            return {
+                "success": True,
+                "filename": filename,
+                "status": "pending"
             }
-        ]
 
-def get_skill_download_path(skill_name: str, version: Optional[str] = None) -> Optional[str]:
-    """获取技能下载文件路径
+        finally:
+            # Clean up temp file
+            tmp_path.unlink(missing_ok=True)
 
-    Args:
-        skill_name: 技能名称
-        version: 版本号（已忽略，单版本模式）
 
-    Returns:
-        文件路径，不存在返回 None
-    """
-    with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT filename FROM skills
-            WHERE skill_name = %s
-                AND status = 'approved' AND is_active = 1
-                LIMIT 1
-            """,
-            (skill_name,)
-        ).fetchone()
+class ReviewService:
+    """Skill review service."""
 
-        if row:
-            from pathlib import Path
-            plugins_dir = Path(__file__).parent.parent.parent / "plugins"
-            return str(plugins_dir / row['filename'])
+    @staticmethod
+    def approve(skill_id: int, reviewer_id: int, comment: Optional[str] = None) -> bool:
+        """Approve a skill.
 
-        return None
+        Args:
+            skill_id: Skill ID
+            reviewer_id: Admin user ID
+            comment: Optional review comment
+
+        Returns:
+            True if successful
+        """
+        skill = SkillRepository.get_by_id(skill_id)
+        if not skill:
+            return False
+
+        # Update skill status
+        SkillRepository.update_status(
+            skill_id,
+            SkillStatus.APPROVED.value,
+            reviewer_id=reviewer_id,
+            review_comment=comment
+        )
+
+        # Create notification
+        NotificationRepository.create(
+            user_id=skill.uploader_id,
+            notification_type=NotificationType.APPROVAL.value,
+            title="Skill Approved",
+            content=f"Your skill '{skill.skill_name}' has been approved.",
+            related_skill_id=skill_id
+        )
+
+        return True
+
+    @staticmethod
+    def reject(skill_id: int, reviewer_id: int, comment: str) -> bool:
+        """Reject a skill.
+
+        Args:
+            skill_id: Skill ID
+            reviewer_id: Admin user ID
+            comment: Review comment
+
+        Returns:
+            True if successful
+        """
+        skill = SkillRepository.get_by_id(skill_id)
+        if not skill:
+            return False
+
+        # Update skill status
+        SkillRepository.update_status(
+            skill_id,
+            SkillStatus.REJECTED.value,
+            reviewer_id=reviewer_id,
+            review_comment=comment
+        )
+
+        # Create notification
+        NotificationRepository.create(
+            user_id=skill.uploader_id,
+            notification_type=NotificationType.REJECTION.value,
+            title="Skill Rejected",
+            content=f"Your skill '{skill.skill_name}' has been rejected. Reason: {comment}",
+            related_skill_id=skill_id
+        )
+
+        return True
+
+
+class NotificationService:
+    """Notification service."""
+
+    @staticmethod
+    def get_user_notifications(user_id: int, limit: int = 50) -> List[Dict]:
+        """Get user notifications.
+
+        Args:
+            user_id: User ID
+            limit: Max results
+
+        Returns:
+            List of notifications
+        """
+        notifications = NotificationRepository.get_by_user(user_id, limit=limit)
+        return [n.to_dict() for n in notifications]
+
+    @staticmethod
+    def get_unread_count(user_id: int) -> int:
+        """Get unread notification count.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Count of unread notifications
+        """
+        return NotificationRepository.get_unread_count(user_id)
+
+    @staticmethod
+    def mark_as_read(notification_id: int) -> bool:
+        """Mark notification as read.
+
+        Args:
+            notification_id: Notification ID
+
+        Returns:
+            True if successful
+        """
+        return NotificationRepository.mark_as_read(notification_id)
+
+    @staticmethod
+    def mark_all_as_read(user_id: int) -> int:
+        """Mark all notifications as read.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Number of notifications marked
+        """
+        return NotificationRepository.mark_all_as_read(user_id)
+
+
+class MarketService:
+    """Marketplace service."""
+
+    @staticmethod
+    def generate_marketplace_json() -> Dict[str, Any]:
+        """Generate marketplace.json content.
+
+        Returns:
+            Marketplace JSON structure
+        """
+        skills = SkillRepository.get_active_skills(limit=1000)
+
+        items = []
+        for skill in skills:
+            import json
+            metadata = json.loads(skill.metadata) if skill.metadata else {}
+
+            items.append({
+                "name": skill.skill_name,
+                "description": skill.description,
+                "metadata": metadata,
+                "source_type": skill.source_type,
+            })
+
+        return {
+            "version": "1.0",
+            "skills": items
+        }

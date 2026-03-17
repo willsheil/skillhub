@@ -3,141 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户登录 - Skill Registry</title>
+    <title>登录 - SkillHub</title>
+    <link rel="stylesheet" href="/static/css/skills4sec.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%E2%9A%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        /* Login page specific styles */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            width: 100%;
-            max-width: 400px;
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 24px;
-        }
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-        }
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 5px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        input[type="text"]:focus,
-        input[type="password"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-        .error {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-size: 14px;
-        }
-        .back-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .back-link a {
-            color: #667eea;
-            text-decoration: none;
-        }
-        .back-link a:hover {
-            text-decoration: underline;
-        }
-        .info-text {
-            background: #f0f7ff;
-            color: #036;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 13px;
-            line-height: 1.5;
+            padding: 1rem;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h1>用户登录</h1>
-        <p class="subtitle">Skill 应用商店</p>
+    <div class="login-card">
+        <div class="login-logo">
+            <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="8" fill="#6366f1"/>
+                <path d="M17.5 7L9 17.5h7L14.5 25 23 14.5h-7L17.5 7z" fill="white"/>
+            </svg>
+            <span>SkillHub</span>
+        </div>
+
+        <h2 class="login-title">欢迎回来</h2>
+        <p class="login-subtitle">登录到技能管理平台</p>
 
         {% if error %}
-        <div class="error">{{ error }}</div>
+        <div class="login-error">{{ error }}</div>
         {% endif %}
-
-        <div class="info-text">
-            请输入您的工号和 API 密钥登录系统。<br>
-            如需账号，请联系管理员w00545471。
-        </div>
 
         <form method="post" action="/api/login">
             <div class="form-group">
-                <label for="employee_id">工号</label>
-                <input type="text" id="employee_id" name="employee_id" required autofocus
-                       placeholder="例如: w00545471">
+                <label class="form-label" for="employee_id">工号</label>
+                <input type="text" class="form-input" id="employee_id" name="employee_id"
+                       required autofocus placeholder="例如: w00545471">
             </div>
             <div class="form-group">
-                <label for="api_key">API 密钥</label>
-                <input type="password" id="api_key" name="api_key" required
-                       placeholder="请输入您的 API 密钥">
+                <label class="form-label" for="api_key">API 密钥</label>
+                <input type="password" class="form-input" id="api_key" name="api_key"
+                       required placeholder="请输入您的 API 密钥">
             </div>
-            <button type="submit">登录</button>
+            <button type="submit" class="login-btn">登录</button>
         </form>
 
-        <div class="back-link">
+        <div class="login-footer">
             <a href="/">返回首页</a>
+        </div>
+
+        <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.9); border-radius: var(--radius);">
+            <p style="font-size: 0.8125rem; color: var(--muted-foreground); margin-bottom: 0.5rem;">
+                <strong>测试账号：</strong>
+            </p>
+            <p style="font-size: 0.8125rem; color: var(--muted-foreground); margin: 0;">
+                工号: admin001<br>
+                密钥: dee3a0d9c2ed30526e26f71bbc59bd83cea8bc447f5e9c94a51e06afa8687e35
+            </p>
+            <p style="font-size: 0.8125rem; color: var(--muted-foreground); margin: 0.5rem 0 0 0;">
+                <strong>普通用户账号：</strong>
+            </p>
+            <p style="font-size: 0.8125rem; color: var(--muted-foreground); margin: 0;">
+                工号: test001<br>
+                密钥: e741a3f99dba7f3161537f54f071260e28953f2052b2fd797d30531f8aaf5d2f
+            </p>
         </div>
     </div>
 </body>

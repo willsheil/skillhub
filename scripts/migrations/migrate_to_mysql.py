@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+"""
+Migrate data from SQLite to MySQL.
+
+This script will:
+1. Read all data from SQLite database
+2. Create tables in MySQL (if not exist)
+3. Copy all data from SQLite to MySQL
+"""
+
+import sqlite3
+import pymysql
+from pathlib import Path
+import logging
+import os
+
+# 导入日志配置
+from logging_config import setup_logging
+
+# 初始化日志系统
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_dir="./logs",
+    enable_json=True,
+    enable_console=True
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
+
+# SQLite configuration
+SQLITE_DB_PATH = Path("./data/registry.db")
+
+# MySQL configuration
+MYSQL_CONFIG = {
+    'host': '127.0.0.1',
+    'port': 3306,
+    'user': 'root',
+    'password': 'root',
+    'database': 'skills',
+    'charset': 'utf8mb4',
+    'cursorclass': pymysql.cursors.DictCursor
+}
+
+
+def get_sqlite_connection():
+    """Get SQLite connection."""
+    conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_mysql_connection():
+    """Get MySQL connection."""
+    return pymysql.connect(**MYSQL_CONFIG)
+
+
+def create_mysql_tables():
+    """Create all tables in MySQL."""
+    logger.info("Creating tables in MySQL...")
+
+    with get_mysql_connection() as conn:
+        with conn.cursor() as cursor:
+            # Create users table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    employee_id VARCHAR(20) UNIQUE NOT NULL,
+                    api_key VARCHAR(255) NOT NULL,
+                    role VARCHAR(20) NOT NULL DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_login TIMESTAMP NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+
+            # Create skills table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS skills (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    skill_name VARCHAR(255) NOT NULL,
+                    version VARCHAR(50) NOT NULL,
+                    filename VARCHAR(255) NOT NULL,
+                    uploader_id INT NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP NULL,
+                    reviewer_id INT NULL,
+                    review_comment VARCHAR(255) NULL,
+                    FOREIGN KEY (uploader_id) REFERENCES users(id),
+                    FOREIGN KEY (reviewer_id) REFERENCES users(id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+
+            # Create downloads table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS downloads (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    skill_name VARCHAR(255) NOT NULL,
+                    version VARCHAR(50) NOT NULL,
+                    filename VARCHAR(255) NOT NULL,
+                    downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    ip_address VARCHAR(255) NULL,
+                    user_agent VARCHAR(255) NULL,
+                    user_id INT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """)
+
+            # Create indexes (check if exists first)
+            # Check and create idx_users_employee_id
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'users' AND index_name = 'idx_users_employee_id'
+            """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_users_employee_id
+                    ON users(employee_id)
+                """)
+
+            # Check and create idx_downloads_skill_date
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'downloads' AND index_name = 'idx_downloads_skill_date'
+            """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_downloads_skill_date
+                    ON downloads(skill_name, downloaded_at)
+                """)
+
+            # Check and create idx_skills_status
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'skills' AND index_name = 'idx_skills_status'
+            """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_skills_status
+                    ON skills(status)
+                """)
+
+            # Check and create idx_skills_uploader
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'skills' AND index_name = 'idx_skills_uploader'
+            """)
+            if cursor.fetchone()['count'] == 0:
+                cursor.execute("""
+                    CREATE INDEX idx_skills_uploader
+                    ON skills(uploader_id)
+                """)
+
+        conn.commit()
+        logger.info("Tables created successfully!", extra={"status": "success"})
+
+
+def migrate_users():
+    """Migrate users from SQLite to MySQL."""
+    logger.info("Migrating users...")
+
+    with get_sqlite_connection() as sqlite_conn:
+        with get_mysql_connection() as mysql_conn:
+            sqlite_cursor = sqlite_conn.execute("SELECT * FROM users")
+            users = sqlite_cursor.fetchall()
+
+            skipped = 0
+            with mysql_conn.cursor() as mysql_cursor:
+                for user in users:
+                    try:
+                        mysql_cursor.execute("""
+                            INSERT INTO users (id, employee_id, api_key, role, created_at, last_login)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            user['id'],
+                            user['employee_id'],
+                            user['api_key'],
+                            user['role'],
+                            user['created_at'],
+                            user['last_login']
+                        ))
+                    except pymysql.IntegrityError:
+                        logger.debug(f"User {user['employee_id']} already exists, skipping", extra={"employee_id": user['employee_id']})
+                        skipped += 1
+
+            mysql_conn.commit()
+            logger.info(f"Migrated users", extra={
+                "total": len(users),
+                "migrated": len(users) - skipped,
+                "skipped": skipped
+            })
+
+
+def migrate_skills():
+    """Migrate skills from SQLite to MySQL."""
+    logger.info("Migrating skills...")
+
+    with get_sqlite_connection() as sqlite_conn:
+        with get_mysql_connection() as mysql_conn:
+            sqlite_cursor = sqlite_conn.execute("SELECT * FROM skills")
+            skills = sqlite_cursor.fetchall()
+
+            with mysql_conn.cursor() as mysql_cursor:
+                for skill in skills:
+                    mysql_cursor.execute("""
+                        INSERT INTO skills (id, skill_name, version, filename, uploader_id,
+                                         status, uploaded_at, reviewed_at, reviewer_id, review_comment)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        skill['id'],
+                        skill['skill_name'],
+                        skill['version'],
+                        skill['filename'],
+                        skill['uploader_id'],
+                        skill['status'],
+                        skill['uploaded_at'],
+                        skill['reviewed_at'],
+                        skill['reviewer_id'],
+                        skill['review_comment']
+                    ))
+
+            mysql_conn.commit()
+            logger.info(f"Migrated skills", extra={"count": len(skills)})
+
+
+def migrate_downloads():
+    """Migrate downloads from SQLite to MySQL."""
+    logger.info("Migrating downloads...")
+
+    with get_sqlite_connection() as sqlite_conn:
+        with get_mysql_connection() as mysql_conn:
+            sqlite_cursor = sqlite_conn.execute("SELECT * FROM downloads")
+            downloads = sqlite_cursor.fetchall()
+
+            with mysql_conn.cursor() as mysql_cursor:
+                for download in downloads:
+                    mysql_cursor.execute("""
+                        INSERT INTO downloads (id, skill_name, version, filename,
+                                           downloaded_at, ip_address, user_agent, user_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        download['id'],
+                        download['skill_name'],
+                        download['version'],
+                        download['filename'],
+                        download['downloaded_at'],
+                        download['ip_address'],
+                        download['user_agent'],
+                        download['user_id']
+                    ))
+
+            mysql_conn.commit()
+            logger.info(f"Migrated downloads", extra={"count": len(downloads)})
+
+
+def verify_migration():
+    """Verify that all data was migrated successfully."""
+    logger.info("Verifying migration...")
+
+    with get_sqlite_connection() as sqlite_conn:
+        with get_mysql_connection() as mysql_conn:
+
+            # Count users
+            sqlite_users = sqlite_conn.execute("SELECT COUNT(*) as count FROM users").fetchone()['count']
+            mysql_users = mysql_conn.cursor()
+            mysql_users.execute("SELECT COUNT(*) as count FROM users")
+            mysql_users_count = mysql_users.fetchone()['count']
+            logger.info(f"Users count comparison", extra={
+                "sqlite_count": sqlite_users,
+                "mysql_count": mysql_users_count
+            })
+
+            # Count skills
+            sqlite_skills = sqlite_conn.execute("SELECT COUNT(*) as count FROM skills").fetchone()['count']
+            mysql_skills = mysql_conn.cursor()
+            mysql_skills.execute("SELECT COUNT(*) as count FROM skills")
+            mysql_skills_count = mysql_skills.fetchone()['count']
+            logger.info(f"Skills count comparison", extra={
+                "sqlite_count": sqlite_skills,
+                "mysql_count": mysql_skills_count
+            })
+
+            # Count downloads
+            sqlite_downloads = sqlite_conn.execute("SELECT COUNT(*) as count FROM downloads").fetchone()['count']
+            mysql_downloads = mysql_conn.cursor()
+            mysql_downloads.execute("SELECT COUNT(*) as count FROM downloads")
+            mysql_downloads_count = mysql_downloads.fetchone()['count']
+            logger.info(f"Downloads count comparison", extra={
+                "sqlite_count": sqlite_downloads,
+                "mysql_count": mysql_downloads_count
+            })
+
+    logger.info("Migration completed successfully!", extra={"status": "success"})
+
+
+def main():
+    """Run the complete migration."""
+    logger.info("="*60)
+    logger.info("SQLite to MySQL Migration")
+    logger.info("="*60)
+
+    # Check if SQLite database exists
+    if not SQLITE_DB_PATH.exists():
+        logger.error(f"SQLite database not found", extra={"path": str(SQLITE_DB_PATH)})
+        return
+
+    logger.info(f"SQLite database: {SQLITE_DB_PATH}", extra={"sqlite_path": str(SQLITE_DB_PATH)})
+    logger.info(f"MySQL server: {MYSQL_CONFIG['host']}", extra={"mysql_host": MYSQL_CONFIG['host']})
+    logger.info(f"MySQL database: {MYSQL_CONFIG['database']}", extra={"mysql_database": MYSQL_CONFIG['database']})
+
+    try:
+        # Step 1: Create tables
+        create_mysql_tables()
+
+        # Step 2: Migrate data
+        migrate_users()
+        migrate_skills()
+        migrate_downloads()
+
+        # Step 3: Verify
+        verify_migration()
+
+    except Exception as e:
+        logger.error(f"Error during migration: {e}", exc_info=True, extra={"error": str(e)})
+
+
+if __name__ == "__main__":
+    main()

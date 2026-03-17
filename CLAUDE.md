@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. **开发验证流程**: 每次开发完成后必须执行以下验证流程：
    - 启动后端服务: `py main.py`（端口 28000）
    - 打开浏览器访问: `http://localhost:28000/login`
-   - 登录账号: `admin001` / 密码: `admin_key_001`
+   - 登录账号: `admin` / 密码: `admin123`
    - 验证修改功能是否正常工作
 
 ## Project Overview
@@ -36,10 +36,10 @@ SkillHub is an enterprise-level Claude Code skill plugin registry system. It man
 pip install -r requirements.txt
 
 # Run development server (auto-reload)
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 28000
 
 # Run with explicit host/port
-python main.py  # Uses configured port from env, default 8000
+python main.py  # Uses configured port from env, default 28000
 
 # Initialize database and create admin user
 python -c "from database import init_db, create_user; init_db(); create_user('admin001', 'your_key', 'admin')"
@@ -98,15 +98,16 @@ python verify_mysql.py
 
 ### Module Structure
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `main.py` | ~3600 | FastAPI app, all API endpoints, plugin scanning, marketplace generation |
+| File/Directory | Lines | Purpose |
+|----------------|-------|---------|
+| `main.py` | ~4300 | FastAPI app, all API endpoints, plugin scanning, marketplace generation |
 | `database.py` | ~2150 | All DB operations, connection pooling, user/skill/statistics CRUD |
-| `gitea_client.py` | ~740 | Git operations wrapper (clone, add, commit, push) |
-| `gitea_push_service_v2.py` | ~590 | Async push service with concurrent workers |
-| `gitea_integration.py` | ~250 | Gitea webhook and integration endpoints |
-| `gitea_metrics.py` | ~270 | Push task metrics and health monitoring |
-| `gitea_alerts.py` | ~460 | Alerting for push failures |
+| `apps/` | - | Django-style route modules (pages, skills, users, admin, auth, stats, gitea, external, downloads, notifications, keys) |
+| `api/v1/` | - | API dependencies (services, schemas, dependencies) |
+| `db/` | - | Database models and repositories |
+| `core/` | - | Core constants and configuration |
+| `services/` | - | Business logic services (Gitea integration) |
+| `utils/` | - | Utility functions |
 
 ### Request Flow
 
