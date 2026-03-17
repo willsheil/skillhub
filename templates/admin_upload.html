@@ -583,6 +583,10 @@
                     <span class="nav-icon">📋</span>
                     <span>安装指南</span>
                 </a>
+                <a href="/skill-specification" class="nav-item">
+                    <span class="nav-icon">📖</span>
+                    <span>技术规范</span>
+                </a>
                 <a href="/stats" class="nav-item">
                     <span class="nav-icon">📊</span>
                     <span>下载统计</span>
@@ -640,11 +644,10 @@
                 </div>
                 <ul>
                     <li>ZIP 内必须包含 <code>SKILL.md</code>，且包含 YAML 前置内容（<code>name</code>, <code>description</code>）</li>
-                    <li><code>name</code>: 小写字母、数字、连字符，1-64字符（如: <code>pdf-processing</code>）</li>
+                    <li><code>name</code>: 技能名称（如: <code>pdf-processing</code>）</li>
                     <li><code>description</code>: 1-1024字符，描述技能功能和何时使用</li>
-                    <li><strong>必填</strong> <code>metadata.version</code>: 版本号（如: <code>1.0.0</code>）</li>
-                    <li><strong>必填</strong> <code>metadata.author</code>: 作者ID，格式为小写字母 + 8位数字（如: <code>w00545471</code>）</li>
-                    <li>文件名格式: <code>{skill-name}.zip</code>（如: <code>my-skill.zip</code>），版本号由 metadata.version 决定</li>
+                    <li><code>metadata.version</code>: 版本号（可选，默认 <code>1.0.0</code>）</li>
+                    <li><code>metadata.author</code>: 作者ID（可选，默认使用上传用户ID）</li>
                 </ul>
             </div>
 
@@ -732,7 +735,7 @@
                             <div class="requirement-icon">📄</div>
                             <div class="requirement-text">
                                 <h4>SKILL.md</h4>
-                                <p>必须包含 name、description、metadata.version、metadata.author 字段</p>
+                                <p>必须包含 name、description 字段</p>
                             </div>
                         </div>
                         <div class="requirement-item">
@@ -746,7 +749,7 @@
                             <div class="requirement-icon">🏷️</div>
                             <div class="requirement-text">
                                 <h4>版本与作者</h4>
-                                <p>metadata.version 和 metadata.author 为必填字段，author 格式：字母+8位数字</p>
+                                <p>metadata.version 和 metadata.author 为可选字段，未填写时使用默认值</p>
                             </div>
                         </div>
                         <div class="requirement-item">
@@ -935,15 +938,16 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showAlert(`成功上传 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    let msg = result.message || `成功上传 ${result.skill_name}@${result.version}，等待管理员审核`;
+                    if (result.warnings && result.warnings.length > 0) {
+                        msg += '\n⚠️ 警告: ' + result.warnings.join(', ');
+                    }
+                    showAlert(msg, 'success');
                     clearSingleFile();
                     loadUploadHistory();
                 } else if (result.error === 'SKILL_EXISTS') {
                     // 显示覆盖确认对话框
                     showOverwriteConfirmModal(result);
-                } else if (result.error === 'MISSING_FIELDS') {
-                    // 显示补充信息对话框
-                    showMissingFieldsModal(result.data);
                 } else {
                     showAlert(result.error || '上传失败', 'error');
                 }
@@ -1287,13 +1291,15 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showAlert(`成功更新 ${result.skill_name}@${result.version}，等待管理员审核`, 'success');
+                    let msg = result.message || `成功上传 ${result.skill_name}@${result.version}，等待管理员审核`;
+                    if (result.warnings && result.warnings.length > 0) {
+                        msg += '\n⚠️ 警告: ' + result.warnings.join(', ');
+                    }
+                    showAlert(msg, 'success');
                     clearSingleFile();
                     loadUploadHistory();
-                } else if (result.error === 'MISSING_FIELDS') {
-                    showMissingFieldsModal(result.data);
                 } else {
-                    showAlert(result.error || '上传失败', 'error');
+                    showAlert(result.error || result.message || '上传失败', 'error');
                 }
             } catch (error) {
                 console.error('Upload error:', error);

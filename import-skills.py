@@ -65,7 +65,7 @@ def extract_and_repackage(skills_zip: Path, output_dir: Path, collection: str = 
             try:
                 meta = json.loads(plugin_json.read_text())
                 version = meta.get("version", "1.0.0")
-            except:
+            except (json.JSONDecodeError, OSError):
                 pass
 
         # Check if already exists

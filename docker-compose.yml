@@ -1,37 +1,88 @@
 version: '3.8'
 
 services:
+  # MySQL 数据库
   mysql:
     image: mysql:8.0
-    container_name: skill-mysql
+    container_name: skillhub-mysql
     ports:
       - "3306:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=skills
+      - MYSQL_DATABASE=skills123
       - MYSQL_USER=skill_user
       - MYSQL_PASSWORD=skill_pass
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  registry:
-    build: .
-    container_name: skill-registry
+  # Gitea Git 服务
+  gitea:
+    image: gitea/gitea:latest
+    container_name: skillhub-gitea
     ports:
-      - "8000:8000"
+      - "3000:3000"
+      - "2222:22"
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=mysql
+      - GITEA__database__HOST=mysql:3306
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=root
+      - GITEA__database__PASSWD=root
+      - GITEA__server__ROOT_URL=http://localhost:3000/
+      - GITEA__server__HTTP_PORT=3000
+    volumes:
+      - gitea_data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SkillHub 应用
+  skillhub:
+    build: .
+    container_name: skillhub-app
+    ports:
+      - "28000:8000"
     volumes:
       - ./plugins:/app/plugins
+      - ./data:/app/data
+      - ./logs:/app/logs
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      gitea:
+        condition: service_healthy
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_USER=skill_user
-      - DB_PASSWORD=skill_pass
-      - DB_DATABASE=skills
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_DATABASE=skills123
+      - GITEA_REPO_URL=http://gitea:3000/admin/skills__hub.git
+      - GITEA_TOKEN=${GITEA_TOKEN:-}
+      - GITEA_PUSH_INTERVAL=30
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
 
 volumes:
   mysql_data:
+  gitea_data:

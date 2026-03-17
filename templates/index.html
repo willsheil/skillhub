@@ -4,1330 +4,495 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ registry_name }}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, 'Cantarell', 'Helvetica Neue', sans-serif;
-            background: #ffffff;
-            color: #171717;
-            line-height: 1.5;
-            font-size: 14px;
-        }
-
-        /* Container */
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 24px;
-        }
-
-        /* Top Navigation */
-        .top-nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #ffffff;
-            border-bottom: 1px solid #eaeaea;
-            z-index: 100;
-            padding: 16px 0;
-        }
-
-        .top-nav .container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 18px;
-            font-weight: 600;
-            color: #171717;
-            text-decoration: none;
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #10B981, #059669);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 18px;
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .nav-link {
-            color: #64748b;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: color 0.2s ease;
-        }
-
-        .nav-link:hover {
-            color: #10B981;
-        }
-
-        .nav-link.active {
-            color: #10B981;
-        }
-
-        .user-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .user-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .user-btn-outline {
-            background: transparent;
-            color: #64748b;
-            border: 1px solid #eaeaea;
-        }
-
-        .user-btn-outline:hover {
-            border-color: #10B981;
-            color: #10B981;
-        }
-
-        .user-btn-solid {
-            background: #10B981;
-            color: white;
-            border: none;
-        }
-
-        .user-btn-solid:hover {
-            background: #059669;
-        }
-
-        /* Main Content */
-        .main-content {
-            padding-top: 70px;
-        }
-
-        /* Category Navigation */
-        .category-nav {
-            padding: 24px 0;
-            border-bottom: 1px solid #eaeaea;
-        }
-
-        .category-pills {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            padding-bottom: 8px;
-            scrollbar-width: none;
-        }
-
-        .category-pills::-webkit-scrollbar {
-            display: none;
-        }
-
-        .category-pill {
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #64748b;
-            background: #f3f4f6;
-            border: none;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s ease;
-        }
-
-        .category-pill:hover {
-            background: #e5e7eb;
-            color: #171717;
-        }
-
-        .category-pill.active {
-            background: #10B981;
-            color: white;
-        }
-
-        /* Sort select dropdown */
-        .sort-select {
-            padding: 8px 32px 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #64748b;
-            background: #f3f4f6;
-            border: none;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s ease;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-        }
-
-        .sort-select:hover {
-            background: #e5e7eb;
-            color: #171717;
-        }
-
-        .sort-select:focus {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-        }
-
-        /* Search Section */
-        .search-section {
-            padding: 32px 0;
-        }
-
-        .search-box {
-            position: relative;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .search-icon-wrapper {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #10B981;
-        }
-
-        .robot-icon {
-            font-size: 20px;
-        }
-
-        .sparkle {
-            font-size: 14px;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 16px 16px 16px 120px;
-            border: 2px solid #eaeaea;
-            border-radius: 16px;
-            font-size: 16px;
-            color: #171717;
-            outline: none;
-            transition: all 0.2s ease;
-            background: #fafafa;
-        }
-
-        .search-input:focus {
-            border-color: #10B981;
-            background: #ffffff;
-            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
-        }
-
-        .search-input::placeholder {
-            color: #a1a1aa;
-        }
-
-        .search-badge {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: linear-gradient(135deg, #10B981, #059669);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        /* Stats Bar */
-        .stats-bar {
-            padding: 16px 0;
-            border-top: 1px solid #eaeaea;
-            border-bottom: 1px solid #eaeaea;
-        }
-
-        .stats-content {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #64748b;
-        }
-
-        .stats-count {
-            font-size: 18px;
-            font-weight: 600;
-            color: #10B981;
-        }
-
-        /* Section Header */
-        .section-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 32px 0 20px;
-        }
-
-        .section-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: #171717;
-        }
-
-        .section-subtitle {
-            font-size: 14px;
-            color: #64748b;
-            margin-top: 4px;
-        }
-
-        .view-all-link {
-            color: #10B981;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .view-all-link:hover {
-            text-decoration: underline;
-        }
-
-        /* Skills Grid */
-        .skills-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-
-        @media (max-width: 1024px) {
-            .skills-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 640px) {
-            .skills-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Skill Card */
-        .skill-card {
-            background: #ffffff;
-            border: 1px solid #eaeaea;
-            border-radius: 16px;
-            overflow: hidden;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-
-        .skill-card:hover {
-            border-color: #10B981;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
-            transform: translateY(-2px);
-        }
-
-        .card-inner {
-            padding: 20px;
-        }
-
-        .card-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-        }
-
-        .card-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #171717;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .card-author {
-            font-size: 13px;
-            color: #64748b;
-            margin-top: 2px;
-        }
-
-        .card-rating {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 6px;
-        }
-
-        .stars {
-            display: flex;
-            gap: 2px;
-            color: #fbbf24;
-            font-size: 14px;
-        }
-
-        .rating-count {
-            font-size: 12px;
-            color: #a1a1aa;
-        }
-
-        .card-description {
-            font-size: 14px;
-            color: #64748b;
-            line-height: 1.5;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            margin-bottom: 16px;
-            min-height: 42px;
-        }
-
-        .card-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 16px;
-        }
-
-        .tag {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 500;
-            background: #f3f4f6;
-            color: #64748b;
-        }
-
-        .tag.source-type {
-            font-size: 11px;
-        }
-
-        .tag.opensource {
-            background: #d1fae5;
-            color: #10B981;
-        }
-
-        .tag.icsl {
-            background: #e0e7ff;
-            color: #667eea;
-        }
-
-        .tag.huawei {
-            background: #fef3c7;
-            color: #f59e0b;
-        }
-
-        .card-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding-top: 16px;
-            border-top: 1px solid #f3f4f6;
-        }
-
-        .card-stats {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 13px;
-            color: #64748b;
-        }
-
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .download-icon {
-            font-size: 14px;
-        }
-
-        .download-count {
-            font-size: 13px;
-            font-weight: 500;
-            color: #64748b;
-            min-width: 16px;
-            display: inline-block;
-            text-align: center;
-        }
-
-        .card-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            border: 1px solid #eaeaea;
-            background: #ffffff;
-            color: #64748b;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-icon:hover {
-            border-color: #10B981;
-            color: #10B981;
-        }
-
-        .btn-download {
-            padding: 8px 16px;
-            border-radius: 8px;
-            background: #10B981;
-            color: white;
-            font-size: 13px;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .btn-download:hover {
-            background: #059669;
-        }
-
-        .version-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            background: #f3f4f6;
-            color: #64748b;
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            padding: 32px 0;
-        }
-
-        .page-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            background: #ffffff;
-            border: 1px solid #eaeaea;
-            color: #64748b;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .page-btn:hover:not(:disabled) {
-            border-color: #10B981;
-            color: #10B981;
-        }
-
-        .page-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .page-btn.active {
-            background: #10B981;
-            color: white;
-            border-color: #10B981;
-        }
-
-        /* Empty State */
-        .empty-state {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 80px 24px;
-            color: #64748b;
-        }
-
-        .empty-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-        }
-
-        .empty-state h2 {
-            font-size: 20px;
-            font-weight: 500;
-            color: #171717;
-            margin-bottom: 8px;
-        }
-
-        .empty-state p {
-            font-size: 14px;
-            color: #64748b;
-        }
-
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 32px 24px;
-            color: #64748b;
-            font-size: 13px;
-            border-top: 1px solid #eaeaea;
-            margin-top: 40px;
-        }
-
-        .footer a {
-            color: #10B981;
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-
-            .category-pills {
-                gap: 6px;
-            }
-
-            .search-input {
-                padding-left: 100px;
-            }
-
-            .search-badge {
-                padding: 3px 10px;
-                font-size: 11px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/skills4sec.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%E2%9A%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
 </head>
 <body>
-    <!-- Top Navigation -->
-    <nav class="top-nav">
-        <div class="container">
-            <a href="/" class="logo">
-                <div class="logo-icon">S</div>
-                <span>Skill应用商店</span>
-            </a>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="max-w-7xl px-container">
+            <div class="nav-inner">
+                <a class="nav-logo" href="/">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="32" height="32" rx="8" fill="#6366f1"/>
+                        <path d="M17.5 7L9 17.5h7L14.5 25 23 14.5h-7L17.5 7z" fill="white"/>
+                    </svg>
+                    <span>SkillHub</span>
+                </a>
 
-            <div class="nav-links">
-                <a href="/" class="nav-link active">首页</a>
-                <a href="/install-guide" class="nav-link">安装指南</a>
-                <a href="/stats" class="nav-link">下载统计</a>
-            </div>
-
-            <div class="user-actions">
-                {% if user %}
-                    <span style="font-size: 14px; color: #64748b;">{{ user.employee_id }}</span>
-                    {% if user.role == 'admin' %}
-                    <a href="/admin" class="user-btn user-btn-outline">管理后台</a>
-                    <a href="/admin/users" class="user-btn user-btn-outline">用户管理</a>
+                <div class="nav-links">
+                    <a class="nav-link active" href="/">首页</a>
+                    <a class="nav-link" href="/browse">浏览技能</a>
+                    {% if user %}
+                    <a class="nav-link" href="/upload">提交技能</a>
                     {% endif %}
-                    <a href="/upload" class="user-btn user-btn-solid">上传</a>
-                    <a href="/my-skills" class="user-btn user-btn-outline">我的技能</a>
-                    <a href="/logout" class="user-btn user-btn-outline">退出</a>
-                {% else %}
-                    <a href="/login" class="user-btn user-btn-outline">登录</a>
-                    <a href="/register" class="user-btn user-btn-solid">注册</a>
-                {% endif %}
+                </div>
+
+                <div class="nav-right">
+                    {% if user %}
+                    <a class="nav-link" href="/my-skills">我的技能</a>
+                    {% if user.role == 'admin' %}
+                    <a class="nav-link" href="/admin">管理</a>
+                    {% endif %}
+                    <a class="nav-link" href="/logout">退出</a>
+                    {% else %}
+                    <a class="nav-link" href="/login">登录</a>
+                    {% endif %}
+                    <button class="nav-mobile-btn" id="mobile-menu-btn" aria-label="菜单" aria-expanded="false">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="12" x2="21" y2="12"/>
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
+        </div>
+
+        <!-- Mobile dropdown -->
+        <div id="mobile-menu" style="display:none;border-top:1px solid var(--border);background:var(--card);padding:.5rem 1rem 1rem">
+            <a class="sidebar-item" href="/">首页</a>
+            <a class="sidebar-item" href="/browse">浏览技能</a>
+            {% if user %}
+            <a class="sidebar-item" href="/my-skills">我的技能</a>
+            {% if user.role == 'admin' %}
+            <a class="sidebar-item" href="/admin">管理</a>
+            {% endif %}
+            <a class="sidebar-item" href="/logout">退出</a>
+            {% else %}
+            <a class="sidebar-item" href="/login">登录</a>
+            {% endif %}
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Search Section -->
-        <div class="search-section">
-            <div class="container">
-                <div class="search-box">
-                    <div class="search-badge">
-                        <span class="sparkle">✨</span>
-                        <span>搜索</span>
+    <!-- Hero Section -->
+    {% if page_type == 'home' %}
+    <section class="hero">
+        <div class="hero-gradient"></div>
+        <div class="hero-content">
+            <h1>发现 <span class="gradient-text">AI 技能</span></h1>
+            <p>企业级 Claude Code 技能插件市场，发现、安装和管理您的 AI 技能</p>
+
+            <!-- Search Box -->
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" id="skill-search" placeholder="搜索技能..." autocomplete="off">
+            </div>
+
+            <!-- Category Pills -->
+            <div class="category-pills">
+                <button class="pill active" data-category="all">全部</button>
+                <button class="pill" data-category="productivity">效率</button>
+                <button class="pill" data-category="development">开发</button>
+                <button class="pill" data-category="security">安全</button>
+                <button class="pill" data-category="automation">自动化</button>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="hero-cta-btns">
+                <a href="/browse" class="hero-cta-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4"/>
+                        <path d="M12 8h.01"/>
+                    </svg>
+                    浏览全部
+                </a>
+                {% if not user %}
+                <a href="/login" class="hero-cta-btn hero-cta-btn-alt">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                        <polyline points="10 17 15 12 10 7"/>
+                        <line x1="15" y1="12" x2="3" y2="12"/>
+                    </svg>
+                    登录上传
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    {% else %}
+    <!-- Browse Page - Sidebar + Content Layout -->
+    <section class="section" style="padding-top: 2rem;">
+        <div class="max-w-7xl px-container">
+            <div class="browse-layout">
+                <!-- Left Sidebar -->
+                <aside class="browse-sidebar">
+                    <!-- Search Box -->
+                    <div class="sidebar-search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input type="text" id="skill-search" placeholder="搜索技能..." autocomplete="off">
                     </div>
-                    <input type="text" class="search-input" id="searchInput" placeholder="搜索技能名称、描述、作者..." oninput="handleSearch()">
-                </div>
-            </div>
-        </div>
 
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-            <div class="container">
-                <div class="stats-content">
-                    <span class="stats-count" id="statsCount">{{ plugin_count }}</span>
-                    <span>SKILLS COLLECTED</span>
-                </div>
-            </div>
-        </div>
+                    <!-- Categories -->
+                    <div class="sidebar-section">
+                        <h3 class="sidebar-title">分类</h3>
+                        <div class="sidebar-categories">
+                            <button class="sidebar-category active" data-category="all">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"/>
+                                    <rect x="14" y="3" width="7" height="7"/>
+                                    <rect x="14" y="14" width="7" height="7"/>
+                                    <rect x="3" y="14" width="7" height="7"/>
+                                </svg>
+                                全部
+                            </button>
+                            <button class="sidebar-category" data-category="opensource">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                                开源
+                            </button>
+                            <button class="sidebar-category" data-category="icsl">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <path d="M22 4L12 14.01l-3-3"/>
+                                </svg>
+                                ICSL自研
+                            </button>
+                            <button class="sidebar-category" data-category="huawei">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <path d="M22 4L12 14.01l-3-3"/>
+                                </svg>
+                                华为自研
+                            </button>
+                            <button class="sidebar-category" data-category="productivity">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                                </svg>
+                                效率
+                            </button>
+                            <button class="sidebar-category" data-category="development">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                                </svg>
+                                开发
+                            </button>
+                            <button class="sidebar-category" data-category="security">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                </svg>
+                                安全
+                            </button>
+                            <button class="sidebar-category" data-category="automation">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                    <path d="M3 9h18"/>
+                                    <path d="M9 21V9"/>
+                                </svg>
+                                自动化
+                            </button>
+                        </div>
+                    </div>
 
-        <!-- AI Recommended Section -->
-        <div class="container" id="aiRecommendedSection" style="display: none;">
+                    <!-- Security Level Filters -->
+                    <div class="sidebar-section">
+                        <h3 class="sidebar-title">安全级别</h3>
+                        <div class="sidebar-filters">
+                            <label class="filter-item">
+                                <input type="checkbox" checked>
+                                <span class="filter-dot safe"></span>
+                                安全
+                            </label>
+                            <label class="filter-item">
+                                <input type="checkbox">
+                                <span class="filter-dot low"></span>
+                                低风险
+                            </label>
+                            <label class="filter-item">
+                                <input type="checkbox">
+                                <span class="filter-dot medium"></span>
+                                中风险
+                            </label>
+                            <label class="filter-item">
+                                <input type="checkbox">
+                                <span class="filter-dot high"></span>
+                                高风险
+                            </label>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="browse-main">
+    {% endif %}
+
+    <!-- Skills Grid Section -->
+    <section class="section">
+        <div class="max-w-7xl px-container">
             <div class="section-header">
                 <div>
-                    <h2 class="section-title">AI 推荐</h2>
-                    <p class="section-subtitle">基于您的使用习惯智能推荐</p>
+                    <h2>{% if page_type == 'home' %}热门技能{% else %}全部技能{% endif %}</h2>
+                    <p>{% if page_type == 'home' %}发现最受欢迎的 AI 技能{% else %}浏览所有可用技能{% endif %}</p>
                 </div>
+                {% if page_type == 'home' %}
+                <a href="/browse" class="section-link">
+                    查看全部
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+                {% endif %}
             </div>
-            <div class="skills-grid" id="aiRecommendedGrid"></div>
-        </div>
 
-        <!-- Hot Today Section -->
-        <div class="container" id="hotTodaySection">
-            <div class="section-header">
-                <div>
-                    <h2 class="section-title">最近30天的热门</h2>
-                    <p class="section-subtitle">最受欢迎的技能</p>
-                </div>
-            </div>
-            <div class="skills-grid" id="hotTodayGrid"></div>
-        </div>
+            <div class="skills-grid" id="skills-grid">
+                {% if plugins %}
+                {% for plugin in plugins %}
+                <div class="skill-card" data-category="{{ plugin.source_type|default('productivity') }}">
+                    <!-- Top Right Badges -->
+                    <div class="skill-card-badges">
+                        <span class="badge-safe">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            安全
+                        </span>
+                        <span class="badge-rank">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+                                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+                                <path d="M4 22h16"/>
+                                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+                                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+                                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+                            </svg>
+                            {{ loop.index * 10 + 3 }}
+                        </span>
+                    </div>
 
-        <!-- Category Navigation -->
-        <div class="category-nav">
-            <div class="container">
-                <div class="category-pills" id="categoryPills">
-                    <button class="category-pill active" data-category="all">全部</button>
-                    <button class="category-pill" data-category="opensource">开源</button>
-                    <button class="category-pill" data-category="icsl">ICSL自研</button>
-                    <button class="category-pill" data-category="huawei">华为自研</button>
-                </div>
-            </div>
-        </div>
+                    <!-- Skill Content -->
+                    <div class="skill-card-header">
+                        <div class="skill-icon gradient" style="--icon-from: #6366f1; --icon-to: #8b5cf6;">
+                            {{ plugin.name[:1]|upper }}
+                        </div>
+                        <div class="skill-name-row">
+                            <span class="skill-name">{{ plugin.name }}</span>
+                            {% if plugin.latest_version %}
+                            <span class="version-badge">{{ plugin.latest_version }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <p class="skill-desc">{{ plugin.metadata.description|truncate(80) if plugin.metadata else plugin.name + ' - 技能描述' }}</p>
 
-        <!-- All Skills Section -->
-        <div class="container">
-            <div class="section-header">
-                <div>
-                    <h2 class="section-title">全部技能</h2>
-                    <p class="section-subtitle">探索所有可用技能</p>
+                    <!-- Card Footer -->
+                    <div class="skill-card-footer">
+                        <div class="skill-tags">
+                            <span class="tag-claude">Claude</span>
+                            <span class="tag-codex">Codex</span>
+                            <span class="tag-cc">Code(CC)</span>
+                        </div>
+                        <a href="/skill/{{ plugin.name }}" class="btn-install">安装</a>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <select class="sort-select" id="sortSelect" onchange="handleSort()" style="cursor: pointer;">
-                        <option value="upload_time_desc">最新</option>
-                        <option value="downloads_desc">热门</option>
-                        <option value="name_asc">名称</option>
-                    </select>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M20 7h-9"/>
+                        <path d="M14 17H5"/>
+                        <circle cx="17" cy="17" r="3"/>
+                        <circle cx="7" cy="7" r="3"/>
+                    </svg>
+                    <h3>暂无技能</h3>
+                    <p>上传您的第一个技能开始使用</p>
+                    {% if user %}
+                    <a href="/upload" class="hero-cta-btn" style="margin-top: 1rem;">上传技能</a>
+                    {% else %}
+                    <a href="/login" class="hero-cta-btn" style="margin-top: 1rem;">登录上传</a>
+                    {% endif %}
                 </div>
-            </div>
-            <div class="skills-grid" id="skillsGrid">
-                <!-- Skills will be loaded via JavaScript -->
+                {% endif %}
             </div>
 
             <!-- Pagination -->
-            <div class="pagination" id="pagination">
-                <!-- Pagination buttons will be added via JavaScript -->
+            {% if page_type == 'browse' and total_pages > 1 %}
+            <div class="pagination" style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 2rem; padding: 1rem;">
+                {% if current_page > 1 %}
+                <a href="/browse?page={{ current_page - 1 }}" class="btn-secondary" style="padding: 0.5rem 1rem;">上一页</a>
+                {% endif %}
+
+                <span style="color: var(--muted-foreground); font-size: 0.875rem;">
+                    第 {{ current_page }} / {{ total_pages }} 页，共 {{ plugin_count }} 个技能
+                </span>
+
+                {% if current_page < total_pages %}
+                <a href="/browse?page={{ current_page + 1 }}" class="btn-secondary" style="padding: 0.5rem 1rem;">下一页</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Features Section - Only show on homepage -->
+    {% if page_type == 'home' %}
+    <section class="section">
+        <div class="max-w-7xl px-container">
+            <div class="section-header">
+                <div>
+                    <h2>为什么选择 SkillHub</h2>
+                    <p>企业级技能管理解决方案</p>
+                </div>
+            </div>
+
+            <div class="features">
+                <div class="feature-item">
+                    <div class="feature-icon blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; margin-bottom: 0.25rem;">安全审计</h3>
+                        <p style="font-size: 0.875rem; color: var(--muted-foreground);">所有技能经过严格安全审查，确保安全可靠</p>
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; margin-bottom: 0.25rem;">快速安装</h3>
+                        <p style="font-size: 0.875rem; color: var(--muted-foreground);">一键安装，即刻使用，提升工作效率</p>
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon amber">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="font-weight: 600; margin-bottom: 0.25rem;">团队协作</h3>
+                        <p style="font-size: 0.875rem; color: var(--muted-foreground);">支持团队共享，统一管理企业技能资产</p>
+                    </div>
+                </div>
+            </div>
+                </main>
             </div>
         </div>
-    </main>
+    </section>
+    {% endif %}
 
     <!-- Footer -->
     <footer class="footer">
-        <p>Skill应用商店@内部网络安全实验室</p>
+        <div class="max-w-7xl px-container">
+            <div class="footer-inner">
+                <a class="nav-logo" href="/">
+                    <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+                        <rect width="32" height="32" rx="8" fill="#6366f1"/>
+                        <path d="M17.5 7L9 17.5h7L14.5 25 23 14.5h-7L17.5 7z" fill="white"/>
+                    </svg>
+                    <span style="font-weight: 600;">SkillHub</span>
+                </a>
+                <div class="footer-links">
+                    <a href="/browse">浏览技能</a>
+                    {% if user %}
+                    <a href="/upload">上传技能</a>
+                    <a href="/my-skills">我的技能</a>
+                    {% if user.role == 'admin' %}
+                    <a href="/admin">管理后台</a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                <p class="footer-copy">&copy; 2026 SkillHub. 保留所有权利。</p>
+            </div>
+        </div>
     </footer>
 
-    <!-- Notifications -->
-    <script src="/static/js/notifications.js"></script>
-
+    <script src="/static/js/skills4sec.js"></script>
     <script>
-        // State
-        let allSkills = [];
-        let filteredSkills = [];
-        let currentPage = 1;
-        let pageSize = 12;
-        let downloadStats = {};
-        let currentSort = { field: 'upload_time', order: 'desc' };
-        let currentCategory = 'all';
+        // Search functionality
+        const searchInput = document.getElementById('skill-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', debounce(function(e) {
+                const query = e.target.value.toLowerCase();
+                const cards = document.querySelectorAll('.skill-card');
 
-        // Source type display names
-        const sourceTypeConfig = {
-            'opensource': { text: '开源', class: 'opensource' },
-            'icsl': { text: 'ICSL自研', class: 'icsl' },
-            'huawei': { text: '华为自研', class: 'huawei' }
-        };
+                cards.forEach(function(card) {
+                    const name = card.querySelector('.skill-name')?.textContent.toLowerCase() || '';
+                    const desc = card.querySelector('.skill-desc')?.textContent.toLowerCase() || '';
 
-        // Generate stars HTML
-        function generateStars(rating = 4.5) {
-            let stars = '';
-            const fullStars = Math.floor(rating);
-            const hasHalfStar = rating % 1 >= 0.5;
-
-            for (let i = 0; i < fullStars; i++) {
-                stars += '★';
-            }
-            if (hasHalfStar) {
-                stars += '½';
-            }
-            const emptyStars = 5 - Math.ceil(rating);
-            for (let i = 0; i < emptyStars; i++) {
-                stars += '☆';
-            }
-
-            return stars;
-        }
-
-        // Generate skill icon emoji
-        function generateSkillIcon(skill) {
-            // Handle undefined or null metadata safely - ensure we always have a string
-            const metadataName = skill.metadata?.name;
-            const name = metadataName || skill.name || '';
-            const nameLower = name.toLowerCase();
-
-            if (nameLower.includes('代码') || nameLower.includes('code')) return '💻';
-            if (nameLower.includes('安全') || nameLower.includes('security')) return '🔒';
-            if (nameLower.includes('分析') || nameLower.includes('analysis')) return '📊';
-            if (nameLower.includes('搜索') || nameLower.includes('search')) return '🔍';
-            if (nameLower.includes('效率') || nameLower.includes('productivity')) return '⚡';
-            if (nameLower.includes('ai') || nameLower.includes('智能')) return '🤖';
-            if (nameLower.includes('文件') || nameLower.includes('file')) return '📁';
-            if (nameLower.includes('网络') || nameLower.includes('network')) return '🌐';
-            if (nameLower.includes('测试') || nameLower.includes('test')) return '🧪';
-            if (nameLower.includes('工具') || nameLower.includes('tool')) return '🛠️';
-
-            return '📦';
-        }
-
-        // Get author name
-        function getAuthorName(skill) {
-            // Author is now at skill.metadata.author (directly from YAML frontmatter)
-            const meta = skill.metadata || {};
-            const author = meta.author;
-
-            if (author) {
-                if (typeof author === 'object' && author !== null) {
-                    return author.name || '未知';
-                }
-                return author;
-            }
-
-            return '未知';
-        }
-
-        // Generate category tags
-        function generateTags(skill) {
-            const tags = [];
-            const desc = skill.metadata?.description;
-            const descLower = (desc !== undefined && desc !== null) ? desc.toLowerCase() : '';
-
-            if (descLower && descLower.includes('效率') || descLower.includes('自动')) tags.push('效率工具');
-            else if (descLower && descLower.includes('分析') || descLower.includes('数据')) tags.push('数据分析');
-            else if (descLower && descLower.includes('安全') || descLower.includes('测试')) tags.push('安全检测');
-            else if (descLower && descLower.includes('ai') || descLower.includes('智能')) tags.push('AI助手');
-            else tags.push('工具');
-
-            return tags.slice(0, 2).map(tag => `<span class="tag">${tag}</span>`).join('');
-        }
-
-        // Generate card HTML
-        function generateCardHTML(skill) {
-            const icon = generateSkillIcon(skill);
-            const author = getAuthorName(skill);
-            const latestVersion = skill.versions && skill.versions.length > 0 ? skill.versions[0] : null;
-            // Handle undefined or null source_type safely
-            const sourceType = skill.source_type || 'opensource';
-            const sourceTypeConfig = getSourceTypeConfig(sourceType);
-            const tags = generateTags(skill);
-            const downloadCount = skill.download_count || 0;
-
-            return `
-                <div class="card-inner">
-                    <div class="card-header">
-                        <div class="card-icon">${icon}</div>
-                        <div class="card-info">
-                            <div class="card-title" title="${skill.metadata?.name || skill.name}">${skill.metadata?.name || skill.name}</div>
-                            <div class="card-author">by ${author}</div>
-                            <div class="card-rating">
-                                <span class="stars">${generateStars()}</span>
-                                <span class="rating-count">(${Math.floor(Math.random() * 100) + 10})</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-description" title="${skill.metadata?.description || '暂无描述'}">${skill.metadata?.description || '暂无描述'}</div>
-                    <div class="card-tags">
-                        <span class="tag source-type ${sourceTypeConfig.class}">${sourceTypeConfig.text}</span>
-                        ${tags}
-                    </div>
-                    <div class="card-footer">
-                        <div class="card-stats">
-                            <div class="stat-item">
-                                <span class="download-icon">⬇️</span>
-                                <span class="download-count">${downloadCount}</span>
-                            </div>
-                        </div>
-                        <div class="card-actions">
-                            ${latestVersion ? `
-                                <span class="version-badge">v${skill.latest_version}</span>
-                                <a href="/plugins/${latestVersion.filename}" class="btn-download" download>下载</a>
-                            ` : '<span style="color: #ef4444; font-size: 13px;">无可用版本</span>'}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function getSourceTypeConfig(sourceType) {
-            return sourceTypeConfig[sourceType] || sourceTypeConfig['opensource'];
-        }
-
-        // Global variable to store hot skills data from API
-        let hotSkillsData = [];
-
-        // Render hot today section (top skills by downloads in last 30 days)
-        function renderHotToday() {
-            const grid = document.getElementById('hotTodayGrid');
-            if (!grid) return;
-
-            // hotSkillsData is set by loadData() from /api/stats/top
-            // Format: {skill_name: 'api-processing-798-3.1.0', downloads: 2, author: 'w59217063'}
-            const hotSkills = hotSkillsData || [];
-
-            if (hotSkills.length === 0) {
-                grid.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">📊</div>
-                        <p>暂无热门数据</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Map hot skills to full skill objects from allSkills
-            // Extract base name from versioned skill_name (e.g., 'api-processing-798' from 'api-processing-798-3.1.0')
-            const hotSkillsWithFullData = hotSkills.map(hotSkill => {
-                // Extract base name by removing version suffix (everything after and including the last dash followed by digits)
-                const skillNameParts = hotSkill.skill_name.split('-');
-                // The version pattern is typically: NAME-VERSION (e.g., api-processing-798-3.1.0)
-                // We need to find where the version starts (usually the last segment or two)
-                // Try to match by exact skill_name first, then by prefix
-                let fullSkill = allSkills.find(s => s.name === hotSkill.skill_name);
-
-                if (!fullSkill) {
-                    // Try to find by prefix match (remove version suffix)
-                    // Skill names can have format: name-version or name-id-version
-                    // Try progressively shorter prefixes
-                    for (let i = 1; i < skillNameParts.length; i++) {
-                        const prefix = skillNameParts.slice(0, -i).join('-');
-                        fullSkill = allSkills.find(s => s.name === prefix);
-                        if (fullSkill) break;
+                    if (!query || name.includes(query) || desc.includes(query)) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
                     }
-                }
+                });
+            }, 300));
+        }
 
-                if (fullSkill) {
-                    // Return full skill object with download count from stats
-                    return {
-                        ...fullSkill,
-                        download_count: hotSkill.downloads
-                    };
-                }
+        // Category filter
+        const pills = document.querySelectorAll('.pill[data-category]');
+        pills.forEach(function(pill) {
+            pill.addEventListener('click', function() {
+                pills.forEach(function(p) { p.classList.remove('active'); });
+                pill.classList.add('active');
 
-                // Fallback: create minimal skill object
-                return {
-                    name: hotSkill.skill_name,
-                    metadata: { name: hotSkill.skill_name, description: '暂无描述' },
-                    versions: [],
-                    source_type: 'opensource',
-                    download_count: hotSkill.downloads
-                };
-            });
+                const category = pill.dataset.category;
+                const cards = document.querySelectorAll('.skill-card');
 
-            grid.innerHTML = hotSkillsWithFullData.map(skill => `
-                <div class="skill-card" data-skill-id="${skill.name}">
-                    ${generateCardHTML(skill)}
-                </div>
-            `).join('');
+                cards.forEach(function(card) {
+                    const cardCategory = card.dataset.category || 'all';
 
-            // Add click event listeners to hot skill cards
-            document.querySelectorAll('#hotTodayGrid .skill-card').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    if (e.target.closest('a') || e.target.closest('.btn-download')) {
-                        return;
+                    if (category === 'all' || cardCategory === category) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
                     }
-                    const skillName = card.dataset.skillId;
-                    window.location.href = `/skill/${encodeURIComponent(skillName)}`;
                 });
             });
-        }
-
-        // Load data
-        window.addEventListener('DOMContentLoaded', async () => {
-            await loadData();
-            setupCategoryPills();
         });
 
-        async function loadData() {
-            try {
-                const skillsResponse = await fetch('/api/skills?page=1&per_page=1000');
-                const skillsResult = await skillsResponse.json();
-                allSkills = skillsResult.data || [];
+        // Category filter - sidebar categories
+        const sidebarCategories = document.querySelectorAll('.sidebar-category');
+        sidebarCategories.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sidebarCategories.forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
 
-                const statsResponse = await fetch('/api/stats/top');
-                if (!statsResponse.ok) {
-                    console.error('API request failed:', statsResponse.status);
-                    // Set empty data to prevent errors
-                    hotSkillsData = [];
-                    return;
-                }
-                const statsResult = await statsResponse.json();
+                const category = btn.dataset.category;
+                const cards = document.querySelectorAll('.skill-card');
 
-                // Store hot skills data globally for renderHotToday()
-                hotSkillsData = statsResult.rankings || [];
-                console.log('Hot skills (last 30 days, top 6):', hotSkillsData);
+                cards.forEach(function(card) {
+                    const cardCategory = card.dataset.category || 'all';
 
-                downloadStats = {};
-                if (statsResult.rankings) {
-                    statsResult.rankings.forEach(item => {
-                        downloadStats[item.skill_name] = item.downloads;
-                    });
-                }
-                console.log('Download stats:', downloadStats);
-
-                allSkills.forEach(skill => {
-                    // Try exact match first
-                    let count = downloadStats[skill.name] || 0;
-
-                    // If not found, try to match by prefix (stats may have version suffix)
-                    if (count === 0) {
-                        for (const [statName, downloads] of Object.entries(downloadStats)) {
-                            if (statName.startsWith(skill.name + '-')) {
-                                count += downloads; // Sum all versions
-                            }
-                        }
-                    }
-
-                    skill.download_count = count;
-                });
-                console.log('Skills with download counts:', allSkills.map(s => ({name: s.name, download_count: s.download_count})));
-
-                sortSkills();
-                filteredSkills = [...allSkills];
-
-                renderCards();
-                renderHotToday();
-                updatePagination();
-
-                // Update stats count
-                document.getElementById('statsCount').textContent = allSkills.length;
-
-            } catch (error) {
-                console.error('Failed to load data:', error);
-                showError();
-            }
-        }
-
-        function sortSkills() {
-            const { field, order } = currentSort;
-            const multiplier = order === 'asc' ? 1 : -1;
-
-            allSkills.sort((a, b) => {
-                let valA, valB;
-
-                switch (field) {
-                    case 'upload_time':
-                        valA = a.versions && a.versions.length > 0 ?
-                            new Date(a.versions[a.versions.length - 1].updated_at) : new Date(0);
-                        valB = b.versions && b.versions.length > 0 ?
-                            new Date(b.versions[b.versions.length - 1].updated_at) : new Date(0);
-                        break;
-                    case 'downloads':
-                        valA = a.download_count || 0;
-                        valB = b.download_count || 0;
-                        break;
-                    case 'name':
-                        valA = (a.metadata?.name || a.name).toLowerCase();
-                        valB = (b.metadata?.name || b.name).toLowerCase();
-                        break;
-                    default:
-                        return 0;
-                }
-
-                if (valA < valB) return -1 * multiplier;
-                if (valA > valB) return 1 * multiplier;
-                return 0;
-            });
-        }
-
-        function renderCards() {
-            const grid = document.getElementById('skillsGrid');
-            const start = (currentPage - 1) * pageSize;
-            const end = Math.min(start + pageSize, filteredSkills.length);
-            const pageSkills = filteredSkills.slice(start, end);
-
-            if (pageSkills.length === 0) {
-                grid.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">🔍</div>
-                        <h2>未找到技能</h2>
-                        <p>请调整搜索条件或<a href="#" onclick="location.reload()">刷新页面</a></p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = pageSkills.map(skill => `
-                <div class="skill-card" data-skill-id="${skill.name}">
-                    ${generateCardHTML(skill)}
-                </div>
-            `).join('');
-
-            document.querySelectorAll('.skill-card').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    if (e.target.closest('a') || e.target.closest('.btn-download')) {
-                        return;
-                    }
-                    const skillName = card.dataset.skillId;
-                    window.location.href = `/skill/${encodeURIComponent(skillName)}`;
-                });
-            });
-        }
-
-        function updatePagination() {
-            const totalPages = Math.ceil(filteredSkills.length / pageSize);
-            const pagination = document.getElementById('pagination');
-
-            let buttons = '';
-
-            buttons += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">‹</button>`;
-
-            const maxVisiblePages = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-            if (endPage - startPage + 1 < maxVisiblePages) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                buttons += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-            }
-
-            buttons += `<button class="page-btn" ${currentPage >= totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">›</button>`;
-
-            pagination.innerHTML = buttons;
-        }
-
-        function goToPage(page) {
-            currentPage = page;
-            renderCards();
-            updatePagination();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        function handleSearch() {
-            const query = document.getElementById('searchInput').value.toLowerCase().trim();
-            filterSkills(query);
-            currentPage = 1;
-            renderCards();
-            updatePagination();
-
-            // Hide/show hot today section based on search query
-            const hotTodaySection = document.getElementById('hotTodaySection');
-            if (hotTodaySection) {
-                if (query) {
-                    hotTodaySection.style.display = 'none';
-                } else {
-                    hotTodaySection.style.display = 'block';
-                }
-            }
-        }
-
-        function filterSkills(query) {
-            filteredSkills = allSkills.filter(skill => {
-                const name = (skill.metadata?.name || skill.name).toLowerCase();
-                const description = (skill.metadata?.description || '').toLowerCase();
-                const author = (skill.metadata?.metadata?.author || '').toLowerCase();
-
-                const matchesSearch = !query ||
-                    name.includes(query) ||
-                    description.includes(query) ||
-                    author.includes(query);
-
-                const skillSourceType = skill.source_type || 'opensource';
-                const matchesCategory = currentCategory === 'all' || skillSourceType === currentCategory;
-
-                return matchesSearch && matchesCategory;
-            });
-        }
-
-        function handleSort() {
-            const value = document.getElementById('sortSelect').value;
-            // Parse the value format: field_order (e.g., "upload_time_desc", "downloads_desc", "name_asc")
-            const parts = value.split('_');
-            const order = parts.pop(); // Get last part as order
-            const field = parts.join('_'); // Join remaining parts as field name
-            currentSort = { field, order };
-
-            // First filter skills based on current search and category
-            const query = document.getElementById('searchInput').value.toLowerCase().trim();
-            filterSkills(query);
-
-            // Then sort the filtered skills
-            const { field: sortField, order: sortOrder } = currentSort;
-            const multiplier = sortOrder === 'asc' ? 1 : -1;
-
-            filteredSkills.sort((a, b) => {
-                let valA, valB;
-
-                switch (sortField) {
-                    case 'upload_time':
-                        valA = a.versions && a.versions.length > 0 ?
-                            new Date(a.versions[a.versions.length - 1].updated_at) : new Date(0);
-                        valB = b.versions && b.versions.length > 0 ?
-                            new Date(b.versions[b.versions.length - 1].updated_at) : new Date(0);
-                        break;
-                    case 'downloads':
-                        valA = a.download_count || 0;
-                        valB = b.download_count || 0;
-                        break;
-                    case 'name':
-                        valA = (a.metadata?.name || a.name).toLowerCase();
-                        valB = (b.metadata?.name || b.name).toLowerCase();
-                        break;
-                    default:
-                        return 0;
-                }
-
-                if (valA < valB) return -1 * multiplier;
-                if (valA > valB) return 1 * multiplier;
-                return 0;
-            });
-
-            currentPage = 1;
-            renderCards();
-            updatePagination();
-        }
-
-        function setupCategoryPills() {
-            const pills = document.querySelectorAll('.category-pill');
-            pills.forEach(pill => {
-                pill.addEventListener('click', () => {
-                    pills.forEach(p => p.classList.remove('active'));
-                    pill.classList.add('active');
-                    currentCategory = pill.dataset.category;
-
-                    const query = document.getElementById('searchInput').value.toLowerCase().trim();
-                    filterSkills(query);
-                    currentPage = 1;
-                    renderCards();
-                    updatePagination();
-                });
-            });
-        }
-
-        function showError() {
-            document.getElementById('skillsGrid').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">⚠️</div>
-                    <h2>加载失败</h2>
-                    <p>请刷新页面重试</p>
-                    <button class="btn-download" onclick="location.reload()" style="margin-top: 16px;">刷新页面</button>
-                </div>
-            `;
-        }
-
-        // 初始化搜索建议
-        function initSearchSuggestions() {
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput && typeof SearchSuggestions !== 'undefined') {
-                new SearchSuggestions(searchInput, {
-                    onSelect: function(query) {
-                        handleSearch();
+                    if (category === 'all' || cardCategory === category) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
                     }
                 });
-            }
-        }
-
-        // 加载分类（从 API）
-        async function loadCategories() {
-            try {
-                const response = await fetch('/api/categories');
-                const data = await response.json();
-
-                if (data.categories && data.categories.length > 0) {
-                    const container = document.getElementById('categoryPills');
-                    if (container) {
-                        // 保留原有的 source_type 分类
-                        let html = `
-                            <button class="category-pill active" data-category="all">全部</button>
-                            <button class="category-pill" data-category="opensource">开源</button>
-                            <button class="category-pill" data-category="icsl">ICSL自研</button>
-                            <button class="category-pill" data-category="huawei">华为自研</button>
-                        `;
-
-                        // 添加新的功能分类
-                        html += '<span style="margin: 0 8px; color: #e5e7eb;">|</span>';
-                        data.categories.forEach(cat => {
-                            html += `<button class="category-pill" data-category-slug="${cat.slug}">${cat.icon || ''} ${cat.name}</button>`;
-                        });
-
-                        container.innerHTML = html;
-
-                        // 重新绑定分类点击事件
-                        setupCategoryPills();
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load categories:', error);
-            }
-        }
-
-        // 页面加载时初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            initSearchSuggestions();
-            // 暂时注释掉分类加载，因为当前功能分类数据尚未填充
-            // loadCategories();
+            });
         });
+
+        // Debounce utility
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(function() {
+                    func.apply(context, args);
+                }, wait);
+            };
+        }
     </script>
-
-    <!-- 引入搜索组件 -->
-    <script src="/static/js/search.js"></script>
 </body>
 </html>

@@ -932,7 +932,6 @@
 
     <script>
         // State
-        let users = [];
         let filteredUsers = [];
         let currentPage = 1;
         const pageSize = 20;
@@ -1016,12 +1015,26 @@
             }
         }
 
-        // Load users
+        // Load users with backend search/filter
         async function loadUsers() {
             const container = document.getElementById('tableContainer');
 
             try {
-                const response = await fetch('/api/admin/users');
+                // Build query params for backend filtering
+                const params = new URLSearchParams();
+                params.append('page', currentPage);
+                params.append('per_page', pageSize);
+                if (currentFilters.search) {
+                    params.append('search', currentFilters.search);
+                }
+                if (currentFilters.role) {
+                    params.append('role', currentFilters.role);
+                }
+                if (currentFilters.status) {
+                    params.append('status_filter', currentFilters.status);
+                }
+
+                const response = await fetch(`/api/admin/users?${params.toString()}`);
                 const result = await response.json();
 
                 if (!result.success) {
@@ -1030,10 +1043,9 @@
 
                 // result.data contains {users: [], total: ..., page: ..., pages: ...}
                 const responseData = result.data || {};
-                users = responseData.users || [];
+                filteredUsers = responseData.users || [];
                 pagination.total = responseData.total || 0;
                 pagination.pages = responseData.pages || 1;
-                applyFilters();
                 renderTable();
 
             } catch (error) {
@@ -1048,30 +1060,11 @@
             }
         }
 
-        // Apply filters
-        function applyFilters() {
-            filteredUsers = users.filter(user => {
-                const matchesSearch = !currentFilters.search ||
-                    user.employee_id.toLowerCase().includes(currentFilters.search.toLowerCase());
-
-                const matchesRole = !currentFilters.role || user.role === currentFilters.role;
-
-                const matchesStatus = !currentFilters.status ||
-                    (currentFilters.status === 'active' && !user.is_disabled) ||
-                    (currentFilters.status === 'disabled' && user.is_disabled);
-
-                return matchesSearch && matchesRole && matchesStatus;
-            });
-
-            currentPage = 1;
-        }
-
         // Render table
         function renderTable() {
             const container = document.getElementById('tableContainer');
-            const start = (currentPage - 1) * pageSize;
-            const end = Math.min(start + pageSize, filteredUsers.length);
-            const pageUsers = filteredUsers.slice(start, end);
+            // Backend already returns paginated data, no need to slice
+            const pageUsers = filteredUsers;
 
             if (filteredUsers.length === 0) {
                 container.innerHTML = `
@@ -1156,7 +1149,7 @@
         // Render pagination
         function renderPagination() {
             const container = document.getElementById('pagination');
-            const totalPages = Math.ceil(filteredUsers.length / pageSize);
+            const totalPages = pagination.pages || 1;
 
             if (totalPages <= 1) {
                 container.innerHTML = '';
@@ -1187,7 +1180,7 @@
         // Go to page
         function goToPage(page) {
             currentPage = page;
-            renderTable();
+            loadUsers();
         }
 
         // Add user
@@ -1507,28 +1500,28 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadUsers();
 
-            // Search with debounce
+            // Search with debounce - call backend API
             document.getElementById('searchInput').addEventListener('input', (e) => {
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
                     currentFilters.search = e.target.value.trim();
-                    applyFilters();
-                    renderTable();
+                    currentPage = 1;
+                    loadUsers();
                 }, 300);
             });
 
-            // Role filter
+            // Role filter - call backend API
             document.getElementById('roleFilter').addEventListener('change', (e) => {
                 currentFilters.role = e.target.value;
-                applyFilters();
-                renderTable();
+                currentPage = 1;
+                loadUsers();
             });
 
-            // Status filter
+            // Status filter - call backend API
             document.getElementById('statusFilter').addEventListener('change', (e) => {
                 currentFilters.status = e.target.value;
-                applyFilters();
-                renderTable();
+                currentPage = 1;
+                loadUsers();
             });
 
             // Add user button

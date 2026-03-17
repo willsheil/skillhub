@@ -10,24 +10,60 @@ Tests cover:
 
 import pytest
 from fastapi.testclient import TestClient
-from main import app, get_current_user, require_auth
+from starlette.requests import Request
+from main import app, get_current_user, require_auth, require_admin
 from database import get_connection, init_db
 import tempfile
 import zipfile
 import io
 
-# 覆盖认证依赖
-def override_get_current_user(request):
-    return {"id": 1, "employee_id": "test-batch-user", "role": "user"}
+# 存储测试创建的用户ID，用于认证覆盖
+_test_user_id = None
 
-def override_require_auth(request):
-    # 设置测试用户 session
-    request.session["user_id"] = 1
+def get_test_user_id():
+    """Get the current test user ID for auth override."""
+    return _test_user_id
+
+# 覆盖认证依赖
+def override_get_current_user(request: Request):
+    global _test_user_id
+    uid = _test_user_id if _test_user_id else 1
+    return {"id": uid, "employee_id": "test-batch-user", "role": "admin"}
+
+def override_require_auth(request: Request):
+    global _test_user_id
+    if _test_user_id:
+        request.session["user_id"] = _test_user_id
+    else:
+        request.session["user_id"] = 1
+    request.session["role"] = "admin"
+    return True
+
+def override_require_admin(request: Request):
+    global _test_user_id
+    if _test_user_id:
+        request.session["user_id"] = _test_user_id
+    else:
+        request.session["user_id"] = 1
+    request.session["role"] = "admin"
     return True
 
 app.dependency_overrides[get_current_user] = override_get_current_user
 app.dependency_overrides[require_auth] = override_require_auth
+app.dependency_overrides[require_admin] = override_require_admin
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_dependency_overrides():
+    """Reset dependency overrides before each test for isolation."""
+    global _test_user_id
+    _test_user_id = None  # Reset user ID for each test
+    # Re-apply overrides to ensure this module's overrides are active
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[require_auth] = override_require_auth
+    app.dependency_overrides[require_admin] = override_require_admin
+    yield
 
 
 def create_test_skill_zip(skill_name: str = "test-skill", version: str = "1.0.0") -> bytes:
@@ -58,6 +94,8 @@ Test skill for batch operations.
 @pytest.fixture(autouse=True)
 def setup_database():
     """Setup test database before each test."""
+    global _test_user_id
+    _test_user_id = None  # Reset before each test for isolation
     init_db()
     # Clean up any existing test data
     with get_connection() as conn:
@@ -74,18 +112,20 @@ def setup_database():
         conn.commit()
 
 
-def create_test_user(employee_id: str = "test-batch-user", role: str = "user") -> int:
+def create_test_user(employee_id: str = "test-batch-user", role: str = "admin") -> int:
     """Create a test user and return user ID."""
+    global _test_user_id
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO users (employee_id, api_key, role)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (employee_id, api_key, role, status, skills_count)
+            VALUES (%s, %s, %s, 1, 0)
             """,
             (employee_id, f"key_{employee_id}", role)
         )
         user_id = cursor.lastrowid
         conn.commit()
+        _test_user_id = user_id  # 保存用户ID供认证覆盖使用
         return user_id
 
 
@@ -145,7 +185,7 @@ def test_batch_unlist_skills():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["unlisted_count"] == 3
+    assert data["success_count"] == 3
 
     # Verify skills are now inactive
     with get_connection() as conn:
@@ -186,7 +226,7 @@ def test_batch_delete_skills():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["deleted_count"] == 3
+    assert data["success_count"] == 3
 
     # Verify skills and notifications are deleted
     with get_connection() as conn:
@@ -210,7 +250,7 @@ def test_batch_unlist_empty_list():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["unlisted_count"] == 0
+    assert data["success_count"] == 0
 
 
 def test_batch_delete_empty_list():
@@ -223,7 +263,7 @@ def test_batch_delete_empty_list():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["deleted_count"] == 0
+    assert data["success_count"] == 0
 
 
 def test_batch_unlist_nonexistent_skills():
@@ -243,7 +283,7 @@ def test_batch_unlist_nonexistent_skills():
     data = response.json()
     assert data["success"] is True
     # Only the valid skill should be unlisted
-    assert data["unlisted_count"] == 1
+    assert data["success_count"] == 1
 
 
 def test_batch_delete_foreign_key_handling():
@@ -306,7 +346,7 @@ def test_batch_unlist_already_unlisted():
     data = response.json()
     assert data["success"] is True
     # Both should be counted as processed
-    assert data["unlisted_count"] == 2
+    assert data["success_count"] == 2
 
     # Verify both are inactive
     with get_connection() as conn:
@@ -334,7 +374,7 @@ def test_batch_operation_limit():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["deleted_count"] == 50
+    assert data["success_count"] == 50
 
 
 if __name__ == "__main__":

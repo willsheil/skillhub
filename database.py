@@ -7,6 +7,7 @@ import pymysql
 import json
 import logging
 import secrets
+import hashlib
 from pathlib import Path
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
@@ -132,6 +133,31 @@ def migrate_add_source_type_to_skills():
             logger.info("Migration: source_type column already exists in skills table")
 
 
+def migrate_add_review_fields_to_skills():
+    """Migrate skills table to add review-related columns if they don't exist.
+
+    Adds: uploaded_at, reviewed_at, reviewer_id, review_comment
+    """
+    with get_connection() as conn:
+        cursor = conn.execute("DESCRIBE skills")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        fields_to_add = [
+            ("uploaded_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ("reviewed_at", "TIMESTAMP NULL"),
+            ("reviewer_id", "INT NULL"),
+            ("review_comment", "VARCHAR(255) NULL"),
+        ]
+
+        for field_name, field_type in fields_to_add:
+            if field_name not in columns:
+                conn.execute(f"ALTER TABLE skills ADD COLUMN {field_name} {field_type}")
+                conn.commit()
+                logger.info(f"Migration: Added {field_name} column to skills table")
+            else:
+                logger.info(f"Migration: {field_name} column already exists in skills table")
+
+
 def migrate_table_engines():
     """Migrate existing tables to InnoDB engine for foreign key support."""
     with get_connection() as conn:
@@ -225,7 +251,7 @@ def init_db():
                 version VARCHAR(50) NOT NULL,
                 filename VARCHAR(255) NOT NULL,
                 uploader_id INT NOT NULL,
-                status VARCHAR(20),
+                status VARCHAR(20) DEFAULT 'pending',
                 source_type VARCHAR(20) DEFAULT 'opensource',
                 uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 reviewed_at TIMESTAMP NULL,
@@ -261,14 +287,20 @@ def init_db():
     migrate_add_user_id_to_downloads()
     migrate_gitea_push_tasks()
     migrate_add_source_type_to_skills()
+    migrate_add_review_fields_to_skills()  # Add uploaded_at, reviewed_at, reviewer_id, review_comment
     migrate_add_user_management_features()
     migrate_add_skill_description_and_metadata()
-    migrate_to_single_version()
+    # TODO: Re-enable when multi-version is properly supported
+    # migrate_to_single_version()
     init_external_api_tables()  # 创建外部 API 相关表
     # 新增：评分评论、搜索、分类系统
     migrate_add_rating_comment_system()
     migrate_add_search_features()
     migrate_add_category_system()
+    # 新增：用户档案字段
+    migrate_add_user_profile_fields()
+    # 新增：用户信息字段
+    migrate_add_user_profile_fields()
 
 
 def migrate_gitea_push_tasks():
@@ -366,6 +398,32 @@ def migrate_gitea_reserved_status():
         # MySQL doesn't support modifying ENUM directly, need to recreate
         logger.info("Migration: Status enum expansion requires manual recreation or use migrate_gitea_push_tasks()")
         logger.info("  For new installations, the full schema includes: pending, reserved, pushing, success, failed, retry_pending")
+
+
+def migrate_add_user_profile_fields():
+    """Migrate users table to add profile fields if they don't exist.
+
+    Adds: name, minDepartment, team, group
+    """
+    with get_connection() as conn:
+        cursor = conn._conn.cursor()
+        cursor.execute("DESCRIBE users")
+        columns = [row["Field"] for row in cursor.fetchall()]
+
+        fields_to_add = [
+            ("name", "VARCHAR(100) NULL"),
+            ("minDepartment", "VARCHAR(100) NULL"),
+            ("team", "VARCHAR(100) NULL"),
+            ("`group`", "VARCHAR(100) NULL"),  # group is reserved keyword
+        ]
+
+        for field_name, field_type in fields_to_add:
+            if field_name.replace("`", "") not in columns:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {field_name} {field_type}")
+                conn.commit()
+                logger.info(f"Migration: Added {field_name} column to users table")
+            else:
+                logger.info(f"Migration: {field_name} column already exists in users table")
 
 
 @contextmanager
@@ -547,11 +605,14 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
 
     Args:
         employee_id: The employee's ID
-        api_key: The API key for authentication
+        api_key: The API key for authentication (plain text, will be hashed)
 
     Returns:
         User dictionary if found and enabled, None otherwise
     """
+    # Hash the API key before comparing with database
+    hashed_api_key = hashlib.sha256(api_key.encode()).hexdigest()
+
     with get_connection() as conn:
         row = conn.execute(
             """
@@ -559,7 +620,7 @@ def get_user_by_credentials(employee_id: str, api_key: str) -> Optional[Dict[str
             FROM users
             WHERE employee_id = %s AND api_key = %s
             """,
-            (employee_id, api_key)
+            (employee_id, hashed_api_key)
         ).fetchone()
 
         if row:
@@ -717,8 +778,8 @@ def create_skill_record(
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO skills (skill_name, version, filename, uploader_id, status, source_type)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO skills (skill_name, version, filename, uploader_id, status, source_type, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, 1)
             """,
             (skill_name, version, filename, uploader_id, status, source_type)
         )
@@ -1094,6 +1155,76 @@ def get_top_users_by_downloads(limit: int = 10) -> List[Dict[str, Any]]:
         return results
 
 
+def get_upload_stats() -> Dict[str, Any]:
+    """Get upload statistics for dashboard.
+
+    Returns:
+        Dict containing:
+        - total_skills: Total number of uploaded skills
+        - this_month: Number of skills uploaded this month
+        - last_month: Number of skills uploaded last month
+        - top_uploaders: List of top 10 uploaders with username and count
+    """
+    with get_connection() as conn:
+        # Total skills count
+        total_row = conn.execute(
+            "SELECT COUNT(*) as count FROM skills"
+        ).fetchone()
+        total_skills = total_row["count"] if total_row else 0
+
+        # This month's uploads
+        this_month_row = conn.execute(
+            """
+            SELECT COUNT(*) as count
+            FROM skills
+            WHERE YEAR(uploaded_at) = YEAR(CURDATE())
+            AND MONTH(uploaded_at) = MONTH(CURDATE())
+            """
+        ).fetchone()
+        this_month = this_month_row["count"] if this_month_row else 0
+
+        # Last month's uploads
+        last_month_row = conn.execute(
+            """
+            SELECT COUNT(*) as count
+            FROM skills
+            WHERE YEAR(uploaded_at) = YEAR(CURDATE() - INTERVAL 1 MONTH)
+            AND MONTH(uploaded_at) = MONTH(CURDATE() - INTERVAL 1 MONTH)
+            """
+        ).fetchone()
+        last_month = last_month_row["count"] if last_month_row else 0
+
+        # Top 10 uploaders
+        top_uploaders_rows = conn.execute(
+            """
+            SELECT u.employee_id, u.name, u.minDepartment, u.team, u.`group`, COUNT(s.id) as upload_count
+            FROM users u
+            INNER JOIN skills s ON u.id = s.uploader_id
+            GROUP BY u.id, u.employee_id, u.name, u.minDepartment, u.team, u.`group`
+            ORDER BY upload_count DESC
+            LIMIT 10
+            """
+        ).fetchall()
+
+        top_uploaders = []
+        for row in top_uploaders_rows:
+            top_uploaders.append({
+                "username": row["employee_id"],
+                "name": row["name"] or row["employee_id"],
+                "minDepartment": row["minDepartment"],
+                "team": row["team"],
+                "group": row["group"],
+                "upload_count": row["upload_count"]
+            })
+
+        return {
+            "total_skills": total_skills,
+            "this_month": this_month,
+            "last_month": last_month,
+            "top_uploaders": top_uploaders
+        }
+
+
 def get_skill_source_type(skill_name: str) -> Optional[str]:
     """Get the source type for a skill by name.
 
@@ -1132,10 +1263,10 @@ def create_user(employee_id: str, api_key: str, role: str = "user") -> int:
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO users (employee_id, api_key, role)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (employee_id, api_key, role, status, skills_count)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (employee_id, api_key, role)
+            (employee_id, api_key, role, 1, 0)  # status=1 means active, skills_count=0
         )
         conn.commit()
         return cursor.lastrowid
@@ -1201,14 +1332,18 @@ def get_users_list(
         ).fetchone()
         total = total_row["total"] if total_row else 0
 
-        # Get paginated results
+        # Get paginated results with dynamic skills count using LEFT JOIN
         offset = (page - 1) * per_page
         rows = conn.execute(
             f"""
-            SELECT id, employee_id, role, status, skills_count, created_at, last_login
-            FROM users
+            SELECT u.id, u.employee_id, u.role, u.status,
+                   COALESCE(COUNT(s.id), 0) as skills_count,
+                   u.created_at, u.last_login
+            FROM users u
+            LEFT JOIN skills s ON s.uploader_id = u.id
             {where_clause}
-            ORDER BY created_at DESC
+            GROUP BY u.id
+            ORDER BY u.created_at DESC
             LIMIT %s OFFSET %s
             """,
             params + [per_page, offset]
@@ -1506,8 +1641,9 @@ def migrate_add_skill_description_and_metadata():
             logger.info("Migration: Added metadata column to skills table")
 
         # Add created_at column if not exists (for ordering)
+        # Note: Cannot use DEFAULT CURRENT_TIMESTAMP as uploaded_at already uses it
         if "created_at" not in columns:
-            conn.execute("ALTER TABLE skills ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            conn.execute("ALTER TABLE skills ADD COLUMN created_at TIMESTAMP NULL")
             conn.commit()
             logger.info("Migration: Added created_at column to skills table")
 
@@ -1559,12 +1695,12 @@ def migrate_to_single_version():
         conn.commit()
         logger.info(f"Migration: Deleted {deleted_count} duplicate skill records")
 
-        # Step 3: Add unique index on skill_name
+        # Step 3: Add unique index on skill_name (use prefix index due to 767 byte limit)
         create_index_if_not_exists(
             cursor,
             "skills",
             "idx_skill_name",
-            "CREATE UNIQUE INDEX idx_skill_name ON skills(skill_name)"
+            "CREATE UNIQUE INDEX idx_skill_name ON skills(skill_name(191))"
         )
         logger.info("Migration: Added unique index idx_skill_name on skills table")
 
@@ -1806,6 +1942,44 @@ def update_skill_active_status(skill_id: int, is_active: bool) -> bool:
         return cursor.rowcount > 0
 
 
+def set_skill_default_version(skill_id: int, skill_name: str) -> bool:
+    """Set a skill version as the default version.
+
+    This will:
+    1. Set is_default_version = 0 for all versions of the same skill_name
+    2. Set is_default_version = 1 for the specified skill_id
+
+    Args:
+        skill_id: The skill version ID to set as default
+        skill_name: The skill name (to clear other versions' default status)
+
+    Returns:
+        True if updated successfully, False otherwise
+    """
+    with get_connection() as conn:
+        # First, clear default status for all versions of this skill
+        conn.execute(
+            """
+            UPDATE skills
+            SET is_default_version = 0
+            WHERE skill_name = %s
+            """,
+            (skill_name,)
+        )
+
+        # Then, set the specified version as default
+        cursor = conn.execute(
+            """
+            UPDATE skills
+            SET is_default_version = 1
+            WHERE id = %s
+            """,
+            (skill_id,)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
 def get_skill_active_status(skill_name: str) -> bool:
     """Get the active status for a skill by name.
 
@@ -1988,6 +2162,15 @@ def delete_skill_version(user_id: int, skill_id: int, is_admin: bool = False) ->
             """
             DELETE FROM notifications
             WHERE related_skill_id = %s
+            """,
+            (skill_id,)
+        )
+
+        # Delete related Gitea push tasks (due to foreign key constraint)
+        conn.execute(
+            """
+            DELETE FROM gitea_push_tasks
+            WHERE skill_id = %s
             """,
             (skill_id,)
         )
@@ -2496,40 +2679,71 @@ def migrate_api_keys_user_id_nullable(conn):
 def migrate_add_rating_comment_system():
     """迁移：添加评分评论系统表和 skills 表相关字段"""
     with get_connection() as conn:
-        # 创建 skill_ratings 表
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS skill_ratings (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                skill_id INT NOT NULL,
-                user_id INT NOT NULL,
-                rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                UNIQUE KEY uk_skill_user (skill_id, user_id),
-                INDEX idx_skill_rating (skill_id, rating)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """)
+        cursor = conn._conn.cursor()
 
-        # 创建 skill_comments 表
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS skill_comments (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                skill_id INT NOT NULL,
-                user_id INT NOT NULL,
-                content VARCHAR(500) NOT NULL,
-                rating_id INT DEFAULT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                is_deleted TINYINT(1) DEFAULT 0,
-                FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (rating_id) REFERENCES skill_ratings(id) ON DELETE SET NULL,
-                INDEX idx_skill_created (skill_id, created_at DESC),
-                INDEX idx_user_comments (user_id, created_at DESC)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        # 检查表是否存在
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM information_schema.tables
+            WHERE table_schema = DATABASE() AND table_name = 'skill_ratings'
         """)
+        ratings_table_exists = cursor.fetchone()["count"] > 0
+
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM information_schema.tables
+            WHERE table_schema = DATABASE() AND table_name = 'skill_comments'
+        """)
+        comments_table_exists = cursor.fetchone()["count"] > 0
+
+        # 创建 skill_ratings 表（如果不存在）
+        if not ratings_table_exists:
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS skill_ratings (
+                        id INT PRIMARY KEY AUTO_INCREMENT,
+                        skill_id INT NOT NULL,
+                        user_id INT NOT NULL,
+                        rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
+                        FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        UNIQUE KEY uk_skill_user (skill_id, user_id),
+                        INDEX idx_skill_rating (skill_id, rating)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+                conn.commit()
+            except Exception as e:
+                if "1293" in str(e):  # 表定义错误，说明表已存在但定义有问题，跳过
+                    logger.warning("Migration: skill_ratings table exists with definition issue, skipping")
+                else:
+                    raise
+
+        # 创建 skill_comments 表（如果不存在）
+        if not comments_table_exists:
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS skill_comments (
+                        id INT PRIMARY KEY AUTO_INCREMENT,
+                        skill_id INT NOT NULL,
+                        user_id INT NOT NULL,
+                        content VARCHAR(500) NOT NULL,
+                        rating_id INT DEFAULT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
+                        is_deleted TINYINT(1) DEFAULT 0,
+                        FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users(id),
+                        FOREIGN KEY (rating_id) REFERENCES skill_ratings(id) ON DELETE SET NULL,
+                        INDEX idx_skill_created (skill_id, created_at DESC),
+                        INDEX idx_user_comments (user_id, created_at DESC)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """)
+                conn.commit()
+            except Exception as e:
+                if "1293" in str(e):  # 表定义错误，说明表已存在但定义有问题，跳过
+                    logger.warning("Migration: skill_comments table exists with definition issue, skipping")
+                else:
+                    raise
 
         # 给 skills 表添加评分统计字段
         cursor = conn._conn.cursor()
@@ -2881,11 +3095,15 @@ def get_search_history(user_id: int, limit: int = 10) -> List[str]:
         搜索历史列表
     """
     with get_connection() as conn:
+        # 使用 GROUP BY 来获取唯一的 query 并按最新时间排序
+        # 修复 MySQL 中 "DISTINCT 与 ORDER BY 列不在 SELECT 列表中" 的不兼容问题
         rows = conn.execute(
             """
-            SELECT DISTINCT query FROM search_history
+            SELECT query, MAX(created_at) as latest_created
+            FROM search_history
             WHERE user_id = %s
-            ORDER BY created_at DESC
+            GROUP BY query
+            ORDER BY latest_created DESC
             LIMIT %s
             """,
             (user_id, limit)

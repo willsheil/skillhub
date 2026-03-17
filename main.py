@@ -15,13 +15,17 @@ import re
 import secrets
 import shutil
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 import yaml
+import markdown
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, status, Query
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
@@ -54,7 +58,7 @@ from database import (
     create_skill_record, get_pending_skills, get_skill_by_id,
     update_skill_status, get_user_uploads, get_total_users_count,
     get_skills_count_by_status, get_today_downloads_count,
-    get_top_skills_by_downloads, get_top_users_by_downloads,
+    get_top_skills_by_downloads, get_top_users_by_downloads, get_upload_stats,
     get_skill_source_type, create_notification, update_skill_active_status,
     get_skill_active_status, get_my_skills,
     get_user_notifications, get_unread_notifications_count,
@@ -64,15 +68,7 @@ from database import (
     get_skill_approval_status, delete_skill_version, batch_unlist_skills,
     batch_delete_skills,
     get_api_keys_list, create_api_key, delete_api_key, toggle_api_key_status,
-    get_api_key_stats,
-    # 新增：评分评论系统
-    submit_rating, get_user_rating, get_skill_ratings,
-    add_comment, get_skill_comments, delete_comment,
-    # 新增：搜索历史
-    add_search_history, get_search_history, clear_search_history,
-    # 新增：分类系统
-    get_categories, get_category_by_slug, increment_skill_view_count,
-    update_skill_category, search_skills, get_search_suggestions
+    get_api_key_stats
 )
 
 # Configure logging - get application logger with proper configuration
@@ -89,6 +85,9 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this")
 _api_key_reset_times = {}
 
 
+# Global scheduler instance
+scheduler = AsyncIOScheduler()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
@@ -96,20 +95,32 @@ async def lifespan(app: FastAPI):
     init_db()
 
     # Start Gitea push service if configured
-    if os.getenv("GITEA_REPO_URL"):
+    gitea_url = os.getenv("GITEA_REPO_URL")
+    logger.info(f"GITEA_REPO_URL = {gitea_url}")
+    if gitea_url:
         try:
+            logger.info("Starting Gitea push service with APScheduler...")
             from gitea_push_service import GiteaPushService
 
             push_service = GiteaPushService(
                 interval=int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
             )
 
-            # Start service in background
-            asyncio.create_task(push_service.run())
-
-            logger.info("Gitea push service started")
+            # Start APScheduler with interval trigger
+            interval_seconds = int(os.getenv("GITEA_PUSH_INTERVAL", "30"))
+            scheduler.add_job(
+                push_service.process_once,
+                trigger=IntervalTrigger(seconds=interval_seconds),
+                id="gitea_push_task",
+                name="Gitea Push Service",
+                replace_existing=True
+            )
+            scheduler.start()
+            logger.info(f"Gitea push service scheduled every {interval_seconds} seconds")
         except Exception as e:
+            import traceback
             logger.error(f"Failed to start Gitea push service: {e}")
+            logger.error(traceback.format_exc())
     else:
         logger.info("Gitea integration disabled (GITEA_REPO_URL not set)")
 
@@ -117,6 +128,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down...")
+    scheduler.shutdown()
 
 
 app = FastAPI(
@@ -171,6 +183,10 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 # Static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+# Initialize templates for pages router
+from api.v1.routes.pages import set_templates as pages_set_templates
+pages_set_templates(templates)
 
 
 def require_auth(request: Request):
@@ -289,6 +305,10 @@ def extract_metadata_from_skill_md(zip_path: Path) -> Optional[dict]:
     """
     import zipfile
 
+    # 快速检查文件是否存在，避免不必要的异常处理和日志
+    if not zip_path.exists():
+        return None
+
     try:
         with zipfile.ZipFile(zip_path, 'r') as zf:
             namelist = zf.namelist()
@@ -308,7 +328,7 @@ def extract_metadata_from_skill_md(zip_path: Path) -> Optional[dict]:
             return metadata
 
     except Exception as e:
-        logger.warning(f"Failed to extract metadata from {zip_path}: {e}", extra={"zip_path": str(zip_path)})
+        logger.debug(f"Failed to extract metadata from {zip_path}: {e}")
         return None
 
 
@@ -498,16 +518,47 @@ def scan_plugins() -> List[dict]:
                     "allowed_tools": None
                 }
 
+            # Get uploader employee_id from database
+            uploader_id = row.get("uploader_id")
+            uploader_employee_id = None
+            if uploader_id:
+                try:
+                    uploader_row = conn.execute(
+                        "SELECT employee_id FROM users WHERE id = %s",
+                        (uploader_id,)
+                    ).fetchone()
+                    if uploader_row:
+                        uploader_employee_id = uploader_row["employee_id"]
+                except Exception:
+                    pass
+
+            # Use uploader employee_id as author if no author in metadata
+            if uploader_employee_id:
+                inner_meta = metadata.get("metadata", {})
+                if not inner_meta.get("author"):
+                    metadata["metadata"] = {**inner_meta, "author": uploader_employee_id}
+
+            # Get file size
+            file_size = 0
+            plugins_dir = os.path.join(os.path.dirname(__file__), "plugins")
+            file_path = os.path.join(plugins_dir, row["filename"])
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+
             result.append({
                 "name": skill_name,
                 "metadata": metadata,
                 "latest_version": row["version"],
                 "source_type": row["source_type"] or "opensource",
                 "uploaded_at": row["uploaded_at"].isoformat() if row["uploaded_at"] else None,
+                "updated_at": row["uploaded_at"].strftime("%Y-%m-%d") if row["uploaded_at"] else None,
                 "download_count": 0,  # TODO: Add download count if tracking
+                "uploader_employee_id": uploader_employee_id,  # Add uploader info
                 "versions": [{
                     "version": row["version"],
-                    "filename": row["filename"]
+                    "filename": row["filename"],
+                    "size": file_size,
+                    "updated_at": row["uploaded_at"].strftime("%Y-%m-%d") if row["uploaded_at"] else None
                 }]
             })
 
@@ -532,6 +583,19 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
     """
     zip_path = PLUGINS_DIR / zip_filename
     skill_name, version = parse_plugin_filename(zip_filename)
+
+    # 快速检查文件是否存在，避免不必要的 ZIP 操作和日志
+    if not zip_path.exists():
+        return {
+            "name": skill_name,
+            "description": f"{skill_name} - 技能描述",
+            "version": version if version != "unknown" else "1.0.0",
+            "author": None,
+            "license": None,
+            "compatibility": None,
+            "metadata": {"version": version, "author": "未知"},
+            "allowed_tools": None
+        }
 
     # Try to extract from SKILL.md
     metadata = extract_metadata_from_skill_md(zip_path)
@@ -606,32 +670,170 @@ def extract_metadata(zip_filename: str) -> Optional[dict]:
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Web UI - Display all skills."""
-    # Check if user is authenticated
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
+    """Web UI - Display featured skills on homepage."""
+    # Allow public access - get user if authenticated
+    user = get_current_user(request)
 
     plugins = scan_plugins()
 
-    # Get current user if authenticated
-    user = get_current_user(request)
+    # Homepage shows only first 12 featured skills
+    featured_plugins = plugins[:12]
 
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "plugins": plugins,
-        "registry_name": "Private Skill Registry",
+        "plugins": featured_plugins,
+        "registry_name": "SkillHub",
         "plugin_count": len(plugins),
-        "user": user
+        "user": user,
+        "page_type": "home"
     })
 
 
-@app.get("/install-guide", response_class=HTMLResponse)
-async def install_guide(request: Request):
-    """Installation guide page."""
-    return templates.TemplateResponse("install_guide.html", {
-        "request": request
+@app.get("/browse", response_class=HTMLResponse)
+async def browse(request: Request, page: int = 1, per_page: int = 12):
+    """Web UI - Browse all skills (public access) with pagination."""
+    user = get_current_user(request)
+    plugins = scan_plugins()
+
+    # Pagination
+    total = len(plugins)
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_plugins = plugins[start:end]
+
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "plugins": paginated_plugins,
+        "registry_name": "SkillHub",
+        "plugin_count": total,
+        "user": user,
+        "page_type": "browse",
+        "current_page": page,
+        "total_pages": total_pages,
+        "per_page": per_page
     })
+
+
+# 隐藏安装指南页面
+# @app.get("/install-guide", response_class=HTMLResponse)
+# async def install_guide(request: Request):
+#     """Installation guide page."""
+#     return templates.TemplateResponse("install_guide.html", {
+#         "request": request
+#     })
+
+
+# Markdown extensions for rendering docs
+MARKDOWN_EXTENSIONS = ["tables", "fenced_code", "toc", "nl2br"]
+
+
+@lru_cache(maxsize=1)
+def _get_spec_html() -> str:
+    """Load and render the spec markdown file once, cache result."""
+    spec_file = Path(__file__).parent / "docs" / "skill_specification_v1.md"
+    try:
+        with open(spec_file, "r", encoding="utf-8") as f:
+            return markdown.markdown(f.read(), extensions=MARKDOWN_EXTENSIONS)
+    except (FileNotFoundError, OSError):
+        return "<h1>规范文档未找到</h1><p>请联系管理员添加规范文档。</p>"
+
+
+@app.get("/skill-specification", response_class=HTMLResponse)
+def skill_specification(request: Request):
+    """Skill technical specification page - renders markdown content."""
+    return templates.TemplateResponse("skill_specification.html", {
+        "request": request,
+        "content": _get_spec_html(),
+        "version": "v1.0"
+    })
+
+
+@app.get("/.well-known/skills/index.json")
+async def skills_well_known_index(request: Request):
+    """Skills index for npx skills CLI.
+
+    Format follows vercel-labs/skills WellKnownIndex specification:
+    - name: skill identifier (required)
+    - description: skill description (required)
+    - files: array of files in the skill (required, must include SKILL.md)
+    """
+    plugins = scan_plugins()
+
+    skills_index = {
+        "skills": []
+    }
+
+    for plugin in plugins:
+        meta = plugin["metadata"]
+        latest = plugin["versions"][-1]
+        skill_name = meta.get("name", plugin["name"])
+
+        # Normalize skill name: lowercase, alphanumeric and hyphens only
+        normalized_name = skill_name.lower().replace("_", "-")
+        # Remove any characters that aren't alphanumeric or hyphens
+        import re
+        normalized_name = re.sub(r'[^a-z0-9-]', '-', normalized_name)
+        normalized_name = re.sub(r'-+', '-', normalized_name).strip('-')
+
+        skills_index["skills"].append({
+            "name": normalized_name,
+            "description": meta.get("description", "No description"),
+            "files": ["SKILL.md"]
+        })
+
+    return skills_index
+
+
+@app.get("/.well-known/skills/{skill_name}/SKILL.md", response_class=PlainTextResponse)
+async def get_skill_well_known(skill_name: str):
+    """Serve SKILL.md file for npx skills CLI.
+
+    Extracts SKILL.md from the skill ZIP file.
+    """
+    import zipfile
+    import io
+
+    plugins = scan_plugins()
+
+    # Find the skill by normalized name
+    for plugin in plugins:
+        meta = plugin["metadata"]
+        latest = plugin["versions"][-1]
+        plugin_skill_name = meta.get("name", plugin["name"])
+
+        # Normalize for comparison
+        import re
+        normalized = plugin_skill_name.lower().replace("_", "-")
+        normalized = re.sub(r'[^a-z0-9-]', '-', normalized)
+        normalized = re.sub(r'-+', '-', normalized).strip('-')
+
+        if normalized == skill_name:
+            # Found the skill, extract SKILL.md from ZIP
+            zip_path = os.path.join(PLUGINS_DIR, latest["filename"])
+
+            if not os.path.exists(zip_path):
+                break
+
+            try:
+                with zipfile.ZipFile(zip_path, 'r') as zf:
+                    # Look for SKILL.md (case-insensitive)
+                    for name in zf.namelist():
+                        if name.lower().endswith('skill.md'):
+                            content = zf.read(name).decode('utf-8')
+                            return content
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to read skill file: {str(e)}"
+                )
+            break
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Skill '{skill_name}' not found"
+    )
 
 
 @app.get("/marketplace.json")
@@ -662,7 +864,7 @@ async def marketplace_json(request: Request):
             "version": latest["version"],
             "description": meta.get("description", "No description"),
             "author": meta.get("author", {"name": "Unknown"}),
-            "download_url": f"http://{request.headers.get('host', 'localhost:28000')}/plugins/{latest['filename']}",
+            "download_url": f"http://{request.headers.get('host', 'localhost:28001')}/plugins/{latest['filename']}",
             "size_kb": round(latest["size"] / 1024, 1)
         })
 
@@ -673,6 +875,8 @@ async def marketplace_json(request: Request):
 async def download_plugin(filename: str, request: Request):
     """Download plugin ZIP file (original uploaded file).
 
+    Public endpoint - no authentication required for downloads.
+
     Args:
         filename: Name of the plugin file
         request: HTTP request
@@ -680,10 +884,8 @@ async def download_plugin(filename: str, request: Request):
     Returns:
         Original ZIP file as uploaded by the user
     """
-    # Require authentication
+    # No authentication required - public download
     user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/admin/login", status_code=302)
 
     file_path = PLUGINS_DIR / filename
 
@@ -765,10 +967,16 @@ async def login_page(request: Request, error: str = None):
 
 @app.post("/admin/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    """Process login."""
+    """Process admin login."""
+    # First verify against ADMIN_USERNAME/ADMIN_PASSWORD (static admin)
     if verify_credentials(username, password):
-        request.session["user"] = username
-        return RedirectResponse(url="/admin/upload", status_code=302)
+        # For static admin, query the database to get user info
+        user = get_user_by_credentials(username, "static_admin") or get_user_by_id(1)
+        if user:
+            request.session["user_id"] = user["id"]
+            request.session["employee_id"] = user["employee_id"]
+            request.session["role"] = user["role"]
+            return RedirectResponse(url="/admin/upload", status_code=302)
     return RedirectResponse(url="/admin/login?error=invalid", status_code=302)
 
 
@@ -887,6 +1095,25 @@ async def admin_dashboard(request: Request):
     })
 
 
+@app.get("/admin/pending", response_class=HTMLResponse)
+async def admin_pending_page(request: Request):
+    """Display pending skills review page (requires admin)."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    if user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return templates.TemplateResponse("admin_pending.html", {
+        "request": request,
+        "user": user
+    })
+
+
 @app.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page(request: Request):
     """Display user management page (requires admin)."""
@@ -929,8 +1156,13 @@ async def admin_api_keys_page(request: Request):
     })
 
 
-def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[bool, dict]:
+def validate_skill_zip(zip_path: Path, allow_missing: bool = False, default_author: str = None) -> tuple[bool, dict]:
     """Validate a skill ZIP file according to Agent Skills specification.
+
+    Args:
+        zip_path: Path to the ZIP file
+        allow_missing: If True, return missing fields info instead of rejecting
+        default_author: Default author to use if not specified in SKILL.md
 
     The ZIP should have structure:
         skill-name/
@@ -976,26 +1208,40 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[boo
             # Read and parse SKILL.md
             skill_md_path = skill_md_paths[0]
             content = zf.read(skill_md_path).decode('utf-8')
-            metadata, _ = parse_skill_md(content)
+            metadata, markdown_body = parse_skill_md(content)
 
+            warnings = []
+
+            # If YAML parsing fails, try to extract info from content
             if metadata is None:
-                return False, {"error": "Invalid YAML frontmatter in SKILL.md"}
+                warnings.append("SKILL.md 的 YAML 格式无法解析，将使用默认值")
+                metadata = {}
 
-            # Validate required fields
-            if "name" not in metadata:
-                return False, {"error": "Missing required field 'name' in SKILL.md YAML frontmatter"}
-            if "description" not in metadata:
-                return False, {"error": "Missing required field 'description' in SKILL.md YAML frontmatter"}
+            # Extract name - try to get from ZIP filename if missing
+            skill_name = metadata.get("name")
+            if not skill_name:
+                # Try to extract from ZIP filename (e.g., skill-name-1.0.0.zip -> skill-name)
+                zip_name = zip_path.stem
+                import re
+                # Remove version suffix like -1.0.0, -1.0, etc.
+                skill_name = re.sub(r'-\d+(\.\d+)*$', '', zip_name)
+                warnings.append(f"未找到 name 字段，将使用文件名: {skill_name}")
 
-            # Validate name format
-            is_name_valid, name_error = validate_skill_name(metadata["name"])
-            if not is_name_valid:
-                return False, {"error": f"Invalid skill name: {name_error}"}
+            # Extract description - use markdown body or default
+            description = metadata.get("description")
+            if not description:
+                # Use first line of markdown body as description
+                if markdown_body:
+                    first_line = markdown_body.strip().split('\n')[0][:200]
+                    description = first_line if first_line else f"Skill: {skill_name}"
+                else:
+                    description = f"Skill: {skill_name}"
+                warnings.append("未找到 description 字段，将使用默认描述")
 
+            # Validate name format - DISABLED: 取消name格式校验
             # Validate description length (max 1024 chars)
-            description = metadata["description"]
             if not isinstance(description, str) or len(description) == 0 or len(description) > 1024:
-                return False, {"error": "Description must be 1-1024 characters"}
+                description = description[:1024] if description else f"Skill: {skill_name}"
 
             # Validate optional fields if present
             # compatibility: max 500 chars
@@ -1004,70 +1250,32 @@ def validate_skill_zip(zip_path: Path, allow_missing: bool = False) -> tuple[boo
                 if not isinstance(compat, str) or len(compat) == 0 or len(compat) > 500:
                     return False, {"error": "Compatibility must be 1-500 characters if provided"}
 
-            # Extract and validate metadata fields (version and author are required)
-            skill_metadata = metadata.get("metadata", {})
-            if not isinstance(skill_metadata, dict):
+            # Extract metadata fields (version and author are optional, will use defaults if missing)
+            skill_metadata = metadata.get("metadata") or {}
+            # If metadata is None or not a dict (e.g., empty in YAML), use empty dict
+            if skill_metadata and not isinstance(skill_metadata, dict):
                 return False, {"error": "Metadata must be a key-value mapping"}
 
-            # 检查缺失字段
-            missing_fields = []
-            version = skill_metadata.get("version")
-            if not version:
-                missing_fields.append("metadata.version")
-
-            author = skill_metadata.get("author")
-            if not author:
-                missing_fields.append("metadata.author")
-
-            # 如果有缺失字段且允许缺失模式，返回缺失信息
-            if missing_fields and allow_missing:
-                # 构建现有字段信息
-                existing_metadata = {
-                    "name": metadata["name"],
-                    "description": metadata["description"],
-                    "license": metadata.get("license"),
-                    "compatibility": metadata.get("compatibility"),
-                    "metadata": skill_metadata,
-                    "allowed_tools": metadata.get("allowed-tools")
-                }
-                # 添加已有的 version 和 author
-                if version:
-                    existing_metadata["version"] = version
-                if author:
-                    existing_metadata["author"] = author
-
-                return False, {
-                    "error": "MISSING_FIELDS",
-                    "missing_fields": missing_fields,
-                    "metadata": existing_metadata
-                }
-
-            # 严格模式：验证所有必填字段
-            if not version:
-                return False, {"error": "Missing required field 'metadata.version' in SKILL.md"}
-            if not isinstance(version, str) or len(version) == 0:
-                return False, {"error": "Metadata.version must be a non-empty string"}
-
-            if not author:
-                return False, {"error": "Missing required field 'metadata.author' in SKILL.md"}
-            if not isinstance(author, str) or len(author) == 0:
-                return False, {"error": "Metadata.author must be a non-empty string"}
-
-            # Validate author format: lowercase letter followed by 8 digits (e.g., w00545471)
-            import re
-            if not re.match(r'^[a-z]\d{8}$', author):
-                return False, {"error": "Invalid author format. Must be a lowercase letter followed by 8 digits (e.g., w00545471)"}
+            # 获取 version 和 author，如果未填写则使用默认值
+            version = skill_metadata.get("version") or "1.0.0"  # 默认版本号
+            # author 如果未填写，使用传入的 default_author（上传用户的id）
+            author = skill_metadata.get("author") or default_author
 
             # Normalize metadata for return (matching API format)
             normalized_metadata = {
-                "name": metadata["name"],
-                "description": metadata["description"],
+                "name": skill_name,
+                "description": description,
                 "version": version,
+                "author": author,
                 "license": metadata.get("license"),
                 "compatibility": metadata.get("compatibility"),
                 "metadata": skill_metadata,
                 "allowed_tools": metadata.get("allowed-tools")
             }
+
+            # Add warnings to metadata if any
+            if warnings:
+                normalized_metadata["_warnings"] = warnings
 
             return True, normalized_metadata
 
@@ -1301,6 +1509,15 @@ async def api_review_skill(
 
         # Perform action
         if action == "approve":
+            # Re-check status before approval to handle race conditions
+            skill = get_skill_by_id(skill_id)
+            if not skill or skill["status"] != "pending":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Skill {skill_id} is no longer pending, may have been processed"
+                )
+
+            # Proceed with approval
             success = approve_skill_file(skill_id)
             if not success:
                 raise HTTPException(
@@ -1942,8 +2159,8 @@ async def upload_plugin(
         with open(temp_zip, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        # Validate the ZIP file (allow missing fields for补充)
-        is_valid, result = validate_skill_zip(temp_zip, allow_missing=True)
+        # Validate the ZIP file (allow missing fields, use current user as default author)
+        is_valid, result = validate_skill_zip(temp_zip, allow_missing=True, default_author=user_id)
 
         if not is_valid:
             error_msg = result.get('error', 'Unknown error')
@@ -1995,18 +2212,11 @@ async def upload_plugin(
             # Use user-friendly message if available, otherwise use original
             user_friendly_error = error_messages.get(error_msg, error_msg)
 
-            # Return HTML error for admin_upload page
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": None,
-                    "error": user_friendly_error
-                })
-            else:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={"success": False, "error": user_friendly_error}
-                )
+            # Return JSON error for all cases
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"success": False, "error": user_friendly_error}
+            )
 
         # Save the skill ZIP to pending directory
         skill_name = result["name"]
@@ -2065,22 +2275,21 @@ async def upload_plugin(
             # Return success response
             success_msg = f"成功更新 {result['name']}@{result['version']}，等待管理员审核"
 
-            if "admin" in request.headers.get("referer", ""):
-                return templates.TemplateResponse("admin_upload.html", {
-                    "request": request,
-                    "success": success_msg,
-                    "error": None
-                })
-            else:
-                return JSONResponse(
-                    content={
-                        "success": True,
-                        "message": success_msg,
-                        "skill_name": result['name'],
-                        "version": result['version'],
-                        "skill_id": skill_id
-                    }
-                )
+            # Check for warnings
+            upload_warnings = result.get("_warnings", [])
+
+            # Return JSON for all cases
+            response_content = {
+                "success": True,
+                "message": success_msg,
+                "skill_name": result['name'],
+                "version": result['version'],
+                "skill_id": skill_id
+            }
+            if upload_warnings:
+                response_content["warnings"] = upload_warnings
+
+            return JSONResponse(content=response_content)
 
         # Copy file to pending location
         shutil.copy(temp_zip, target_path)
@@ -2099,24 +2308,21 @@ async def upload_plugin(
         # Return success response
         success_msg = f"成功上传 {result['name']}@{result['version']}，等待管理员审核"
 
-        # Return HTML success for admin_upload page
-        if "admin" in request.headers.get("referer", ""):
-            return templates.TemplateResponse("admin_upload.html", {
-                "request": request,
-                "success": success_msg,
-                "error": None
-            })
-        else:
-            # Return JSON for AJAX requests
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "message": success_msg,
-                    "skill_name": result['name'],
-                    "version": result['version'],
-                    "skill_id": skill_id
-                }
-            )
+        # Check for warnings
+        upload_warnings = result.get("_warnings", [])
+
+        # Return JSON for all cases
+        response_content = {
+            "success": True,
+            "message": success_msg,
+            "skill_name": result['name'],
+            "version": result['version'],
+            "skill_id": skill_id
+        }
+        if upload_warnings:
+            response_content["warnings"] = upload_warnings
+
+        return JSONResponse(content=response_content)
 
     except Exception as e:
         import traceback
@@ -2271,7 +2477,7 @@ async def complete_upload_with_metadata(
         update_skill_metadata_in_zip(temp_zip, version, author)
 
         # 重新验证 ZIP 文件
-        is_valid, result = validate_skill_zip(temp_zip, allow_missing=False)
+        is_valid, result = validate_skill_zip(temp_zip, allow_missing=False, default_author=user_id)
 
         if not is_valid:
             return JSONResponse(
@@ -2347,6 +2553,9 @@ async def upload_batch(
     """Upload multiple skill ZIP files (batch upload)."""
     import tempfile
 
+    # Get user_id from session at the beginning
+    user_id = request.session.get("user_id")
+
     if not files:
         return templates.TemplateResponse("admin_upload.html", {
             "request": request,
@@ -2380,7 +2589,7 @@ async def upload_batch(
                 shutil.copyfileobj(file.file, f)
 
             # Validate the ZIP file
-            is_valid, metadata = validate_skill_zip(temp_zip)
+            is_valid, metadata = validate_skill_zip(temp_zip, default_author=user_id)
 
             if not is_valid:
                 results["failed"].append({
@@ -2410,7 +2619,6 @@ async def upload_batch(
             shutil.copy(temp_zip, target_path)
 
             # Create database record with source_type
-            user_id = request.session.get("user_id")
             create_skill_record(
                 skill_name=skill_name,
                 version=skill_version,
@@ -3006,6 +3214,26 @@ async def api_stats_top(
         raise HTTPException(500, f"Failed to get stats: {e}")
 
 
+@app.get("/api/stats/uploads")
+async def api_stats_uploads():
+    """Get upload statistics for dashboard (public, no auth required).
+
+    Returns:
+        - total_skills: Total number of uploaded skills
+        - this_month: Number of skills uploaded this month
+        - last_month: Number of skills uploaded last month
+        - top_uploaders: List of top 10 uploaders with username and count
+    """
+    try:
+        stats = get_upload_stats()
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get upload stats: {e}")
+
+
 @app.get("/api/stats/export")
 async def api_stats_export(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -3114,23 +3342,30 @@ async def stats_page(request: Request):
 @app.get("/skill/{skill_name}", response_class=HTMLResponse)
 async def skill_detail_page(request: Request, skill_name: str):
     """Display skill detail page with Skill.md content."""
-    # Check if user is authenticated
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
-
-    # Get the skill from database (single-version mode)
+    # Try to get skill from database first
     from database import get_skill_by_name
     skill = get_skill_by_name(skill_name)
 
     skill_zip = None
+    real_skill_name = skill_name
 
     if skill and skill["status"] == "approved" and skill["is_active"]:
         # Use the skill's filename
         skill_zip = PLUGINS_DIR / skill["filename"]
         if not skill_zip.exists():
-            # Skill file not found, fall back to searching
             skill_zip = None
+
+    # If not found in database, try to find in plugins directory
+    if not skill_zip:
+        # Try exact match first
+        exact_match = PLUGINS_DIR / f"{skill_name}.zip"
+        if exact_match.exists():
+            skill_zip = exact_match
+        else:
+            # Try pattern match (skill-name-*.zip)
+            matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
+            if matching_zips:
+                skill_zip = matching_zips[0]
 
     if not skill_zip:
         # No skill found or file not found, try exact match
@@ -3158,14 +3393,22 @@ async def skill_detail_page(request: Request, skill_name: str):
             download_count = ranking["downloads"]
             break
 
-    # Get author from metadata
+    # Get author from metadata or database
     author = "Unknown"
     if metadata and "metadata" in metadata:
-        author_meta = metadata["metadata"].get("author", "Unknown")
+        author_meta = metadata["metadata"].get("author", "")
         if isinstance(author_meta, dict):
-            author = author_meta.get("name", "Unknown")
+            author = author_meta.get("name", "")
         else:
-            author = str(author_meta) if author_meta else "Unknown"
+            author = str(author_meta) if author_meta else ""
+
+    # If author not in metadata, try to get from database uploader
+    if not author or author == "Unknown":
+        skill_record = get_skill_by_name(real_skill_name)
+        if skill_record and skill_record.get("uploader_id"):
+            uploader = get_user_by_id(skill_record["uploader_id"])
+            if uploader:
+                author = uploader.get("employee_id", "Unknown")
 
     # Get version
     version = metadata.get("version", "1.0.0") if metadata else "1.0.0"
@@ -3176,6 +3419,12 @@ async def skill_detail_page(request: Request, skill_name: str):
     # Get current user
     user = get_current_user(request)
 
+    # Get Gitea repo URL for Agent installation
+    gitea_repo_url = os.getenv("GITEA_REPO_URL", "")
+
+    # Build skill directory path for Gitea (format: {skill_name}/SKILL.md)
+    skill_dir = real_skill_name
+
     return templates.TemplateResponse("skill_detail.html", {
         "request": request,
         "skill_name": real_skill_name,
@@ -3184,8 +3433,60 @@ async def skill_detail_page(request: Request, skill_name: str):
         "version": version,
         "updated_at": updated_at,
         "download_url": f"/plugins/{skill_zip.name}",
-        "user": user
+        "filename": skill_zip.name,
+        "request_url": str(request.base_url).rstrip("/"),
+        "user": user,
+        "gitea_repo_url": gitea_repo_url,
+        "skill_dir": skill_dir
     })
+
+
+@app.get("/skill/{skill_name}/skill.md", response_class=PlainTextResponse)
+async def get_skill_md_file(skill_name: str):
+    """Get SKILL.md file for Agent installation.
+
+    Returns the SKILL.md file content as plain text for curl download.
+    """
+    logger.debug(f"SKILL.md requested for: '{skill_name}'")
+
+    # Find the skill ZIP file
+    skill_zip = None
+
+    # Try exact match first
+    exact_match = PLUGINS_DIR / f"{skill_name}.zip"
+    if exact_match.exists():
+        skill_zip = exact_match
+    else:
+        # Try pattern match (skill-name-*.zip)
+        matching_zips = list(PLUGINS_DIR.glob(f"{skill_name}-*.zip"))
+        if matching_zips:
+            skill_zip = matching_zips[0]
+
+    if not skill_zip:
+        raise HTTPException(status_code=404, detail=f"Skill not found: {skill_name}")
+
+    try:
+        import zipfile
+
+        with zipfile.ZipFile(skill_zip, 'r') as zf:
+            # Find SKILL.md (may be in root or subdirectory)
+            skill_md_paths = [name for name in zf.namelist()
+                             if 'SKILL.md' in name or name.endswith('SKILL.md')]
+
+            if not skill_md_paths:
+                raise HTTPException(status_code=404, detail=f"SKILL.md not found in {skill_name}")
+
+            # Read and return SKILL.md content
+            skill_md_path = skill_md_paths[0]
+            content = zf.read(skill_md_path).decode('utf-8')
+
+            return PlainTextResponse(content=content, media_type="text/markdown")
+
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=500, detail="Invalid ZIP file")
+    except Exception as e:
+        logger.error(f"Error reading SKILL.md: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/skill/{skill_name}/content")
@@ -3461,14 +3762,64 @@ async def api_get_gitea_tasks(
         )
 
 
+@app.post("/api/admin/gitea-tasks/{task_id}/retry")
+async def api_retry_gitea_task(
+    task_id: int,
+    _: bool = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Retry a failed Gitea push task.
+
+    Args:
+        task_id: ID of the task to retry
+
+    Returns:
+        Success message
+    """
+    try:
+        from database import get_connection
+
+        with get_connection() as conn:
+            # Check task status
+            row = conn.execute("""
+                SELECT status, skill_id FROM gitea_push_tasks WHERE id = %s
+            """, (task_id,)).fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Task not found")
+
+            if row["status"] == "success":
+                raise HTTPException(status_code=400, detail="Task already succeeded")
+
+            # Reset task to pending
+            conn.execute("""
+                UPDATE gitea_push_tasks
+                SET status = 'pending', error_message = NULL, retry_count = retry_count + 1
+                WHERE id = %s
+            """, (task_id,))
+            conn.commit()
+
+            return {
+                "success": True,
+                "message": f"Task {task_id} queued for retry"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retry task: {str(e)}"
+        )
+
+
 # ==================== User Management API Endpoints ====================
 
 @app.get("/api/admin/users")
 async def api_get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    role: Optional[str] = Query(None, regex="^(admin|user)$"),
-    status_filter: Optional[str] = Query(None, regex="^(active|disabled)$"),
+    role: Optional[str] = Query(None, pattern="^(admin|user)$"),
+    status_filter: Optional[str] = Query(None, pattern="^(active|disabled)$"),
     search: Optional[str] = Query(None, max_length=50),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
@@ -3507,7 +3858,7 @@ async def api_get_users(
 async def api_create_user(
     request: Request,
     employee_id: str = Form(..., max_length=50),
-    role: str = Form(..., regex="^(admin|user)$"),
+    role: str = Form(..., pattern="^(admin|user)$"),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Create a new user.
@@ -3569,7 +3920,7 @@ async def api_create_user(
 async def api_update_user_role(
     user_id: int,
     request: Request,
-    role: str = Form(..., regex="^(admin|user)$"),
+    role: str = Form(..., pattern="^(admin|user)$"),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Update a user's role.
@@ -3859,7 +4210,7 @@ async def api_get_api_keys(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None, max_length=50),
-    status_filter: Optional[str] = Query(None, regex="^(active|inactive)$"),
+    status_filter: Optional[str] = Query(None, pattern="^(active|inactive)$"),
     _: bool = Depends(require_admin)
 ) -> Dict[str, Any]:
     """获取 API Keys 列表（管理员）"""
@@ -3996,270 +4347,6 @@ async def api_get_api_key_stats(
         )
 
 
-# ==================== 搜索、评分、评论、分类 API ====================
-
-@app.get("/api/search")
-async def api_search(
-    request: Request,
-    q: str = "",
-    category: str = None,
-    source_type: str = None,
-    sort: str = "relevance",
-    page: int = 1,
-    per_page: int = 20
-):
-    """高级搜索技能 API
-
-    Args:
-        q: 搜索关键词
-        category: 分类 slug
-        source_type: 来源类型 (opensource/icsl/huawei)
-        sort: 排序方式 (relevance/downloads/rating/newest)
-        page: 页码
-        per_page: 每页数量
-    """
-    user = get_current_user(request)
-
-    # 记录搜索历史（仅登录用户）
-    if user and q.strip():
-        add_search_history(user["id"], q)
-
-    results = search_skills(
-        query=q,
-        category_slug=category,
-        source_type=source_type,
-        sort_by=sort,
-        page=page,
-        per_page=per_page
-    )
-
-    return JSONResponse(content=results)
-
-
-@app.get("/api/search/suggestions")
-async def api_search_suggestions(q: str = "", limit: int = 5):
-    """获取搜索建议 API
-
-    Args:
-        q: 搜索关键词
-        limit: 最大返回数量
-    """
-    suggestions = get_search_suggestions(q, limit)
-    return JSONResponse(content={"suggestions": suggestions})
-
-
-@app.get("/api/search/history")
-async def api_search_history(request: Request, limit: int = 10):
-    """获取搜索历史 API"""
-    user = require_auth(request)
-    history = get_search_history(user["id"], limit)
-    return JSONResponse(content={"history": history})
-
-
-@app.delete("/api/search/history")
-async def api_clear_search_history(request: Request):
-    """清空搜索历史 API"""
-    user = require_auth(request)
-    clear_search_history(user["id"])
-    return JSONResponse(content={"success": True, "message": "搜索历史已清空"})
-
-
-@app.get("/api/categories")
-async def api_get_categories():
-    """获取所有分类 API"""
-    categories = get_categories()
-
-    # 获取每个分类的技能数量
-    for cat in categories:
-        # 通过 scan_plugins 获取活跃技能，然后统计分类
-        cat["skill_count"] = 0  # 暂时设为 0，后续可以通过数据库统计
-
-    return JSONResponse(content={"categories": categories})
-
-
-@app.get("/api/categories/{slug}/skills")
-async def api_get_category_skills(
-    slug: str,
-    page: int = 1,
-    per_page: int = 20,
-    sort: str = "rating"
-):
-    """获取分类下的技能列表 API
-
-    Args:
-        slug: 分类 slug
-        page: 页码
-        per_page: 每页数量
-        sort: 排序方式
-    """
-    category = get_category_by_slug(slug)
-    if not category:
-        raise HTTPException(status_code=404, detail="分类不存在")
-
-    results = search_skills(
-        query="",
-        category_slug=slug,
-        sort_by=sort,
-        page=page,
-        per_page=per_page
-    )
-
-    return JSONResponse(content={
-        "category": category,
-        **results
-    })
-
-
-@app.post("/api/skills/{skill_id}/rating")
-async def api_submit_rating(request: Request, skill_id: int):
-    """提交评分 API"""
-    user = require_auth(request)
-
-    # 验证技能存在
-    skill = database.get_skill_by_id(skill_id)
-    if not skill:
-        raise HTTPException(status_code=404, detail="技能不存在")
-
-    # 获取请求体
-    body = await request.json()
-    rating = body.get("rating")
-
-    if not rating:
-        raise HTTPException(status_code=400, detail="评分不能为空")
-
-    result = submit_rating(skill_id, user["id"], int(rating))
-
-    if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["error"])
-
-    return JSONResponse(content=result)
-
-
-@app.get("/api/skills/{skill_id}/rating")
-async def api_get_rating(request: Request, skill_id: int):
-    """获取技能评分统计和当前用户评分 API"""
-    user = get_current_user(request)
-
-    # 获取评分统计
-    stats = get_skill_ratings(skill_id)
-
-    # 获取当前用户评分
-    user_rating = None
-    if user:
-        user_rating = get_user_rating(skill_id, user["id"])
-
-    return JSONResponse(content={
-        "average": stats["average"],
-        "total": stats["total"],
-        "distribution": stats["distribution"],
-        "user_rating": user_rating
-    })
-
-
-@app.get("/api/skills/{skill_id}/comments")
-async def api_get_comments(skill_id: int, page: int = 1, per_page: int = 10):
-    """获取技能评论列表 API"""
-    result = get_skill_comments(skill_id, page, per_page)
-    return JSONResponse(content=result)
-
-
-@app.post("/api/skills/{skill_id}/comments")
-async def api_add_comment(request: Request, skill_id: int):
-    """发表评论 API"""
-    user = require_auth(request)
-
-    # 验证技能存在
-    skill = database.get_skill_by_id(skill_id)
-    if not skill:
-        raise HTTPException(status_code=404, detail="技能不存在")
-
-    # 获取请求体
-    body = await request.json()
-    content = body.get("content", "").strip()
-    rating_id = body.get("rating_id")
-
-    if not content:
-        raise HTTPException(status_code=400, detail="评论内容不能为空")
-
-    result = add_comment(skill_id, user["id"], content, rating_id)
-
-    if not result["success"]:
-        raise HTTPException(status_code=400, detail=result["error"])
-
-    return JSONResponse(content=result)
-
-
-@app.delete("/api/skills/{skill_id}/comments/{comment_id}")
-async def api_delete_comment(request: Request, skill_id: int, comment_id: int):
-    """删除评论 API"""
-    user = require_auth(request)
-
-    success = delete_comment(comment_id, user["id"])
-
-    if not success:
-        raise HTTPException(status_code=404, detail="评论不存在或无权删除")
-
-    return JSONResponse(content={"success": True, "message": "评论已删除"})
-
-
-@app.post("/api/skills/{skill_id}/view")
-async def api_increment_view(skill_id: int):
-    """增加技能浏览次数 API"""
-    database.increment_skill_view_count(skill_id)
-    return JSONResponse(content={"success": True})
-
-
-@app.get("/api/skills/{skill_id}/related")
-async def api_get_related_skills(skill_id: int, limit: int = 5):
-    """获取相关技能推荐 API
-
-    基于同分类和相似名称推荐
-    """
-    skill = database.get_skill_by_id(skill_id)
-    if not skill:
-        raise HTTPException(status_code=404, detail="技能不存在")
-
-    # 获取所有插件
-    plugins = scan_plugins()
-
-    related = []
-    for plugin in plugins:
-        # 排除自己
-        if plugin.get("name") == skill["skill_name"]:
-            continue
-
-        # 计算相关性分数
-        score = 0
-
-        # 同分类加分
-        # TODO: 当插件有分类信息时启用
-
-        # 名称相似度
-        if skill["skill_name"][:3] in plugin.get("name", ""):
-            score += 1
-
-        # 根据评分调整
-        score += float(plugin.get("metadata", {}).get("rating_average", 0)) / 5
-
-        related.append({
-            "name": plugin.get("name"),
-            "description": plugin.get("description", ""),
-            "rating_average": float(plugin.get("metadata", {}).get("rating_average", 0)),
-            "view_count": plugin.get("metadata", {}).get("view_count", 0),
-            "score": score
-        })
-
-    # 排序并取前 limit 个
-    related.sort(key=lambda x: x["score"], reverse=True)
-    related = related[:limit]
-
-    # 移除 score 字段
-    for r in related:
-        del r["score"]
-
-    return JSONResponse(content={"related": related})
-
-
 # ==================== UI Routes ====================
 
 @app.get("/admin/gitea-tasks", response_class=HTMLResponse)
@@ -4272,4 +4359,4 @@ async def gitea_tasks_page(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=28000)
+    uvicorn.run(app, host="0.0.0.0", port=28001)

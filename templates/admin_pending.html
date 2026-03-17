@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>待审核技能 - SkillHub</title>
+    <link rel="stylesheet" href="/static/css/skills4sec.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20100%20100%27%3E%3Ctext%20y%3D%27.9em%27%20font-size%3D%2790%27%3E%E2%9A%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="max-w-7xl px-container">
+            <div class="nav-inner">
+                <a class="nav-logo" href="/">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="32" height="32" rx="8" fill="#6366f1"/>
+                        <path d="M17.5 7L9 17.5h7L14.5 25 23 14.5h-7L17.5 7z" fill="white"/>
+                    </svg>
+                    <span>SkillHub</span>
+                </a>
+
+                <div class="nav-links">
+                    <a class="nav-link" href="/">首页</a>
+                    <a class="nav-link" href="/browse">浏览技能</a>
+                </div>
+
+                <div class="nav-right">
+                    <a class="nav-link" href="/my-skills">我的技能</a>
+                    <a class="nav-link active" href="/admin">管理</a>
+                    <span class="nav-user-name">{{ user.employee_id }}</span>
+                    <a class="nav-link" href="/logout">退出</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Admin Layout -->
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="admin-sidebar-header">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--muted-foreground);">管理菜单</h3>
+            </div>
+            <nav class="admin-sidebar-nav">
+                <a href="/admin" class="admin-nav-item" data-section="dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    仪表盘
+                </a>
+                <a href="/admin/pending" class="admin-nav-item active" data-section="pending">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    待审核技能
+                </a>
+                <a href="/admin/users" class="admin-nav-item" data-section="users">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    用户管理
+                </a>
+                <a href="/admin/api-keys" class="admin-nav-item" data-section="api-keys">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                    API 密钥
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <div class="admin-header">
+                <h1>待审核技能</h1>
+                <p>审核用户上传的技能</p>
+            </div>
+
+            <!-- Pending Skills List -->
+            <div id="pending-container">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/skills4sec.js"></script>
+    <script>
+        // Load pending skills
+        async function loadPendingSkills() {
+            const container = document.getElementById('pending-container');
+
+            try {
+                const response = await fetch('/api/pending');
+                const result = await response.json();
+
+                const skills = result.data || [];
+
+                if (skills.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M20 7h-9"/>
+                                <path d="M14 17H5"/>
+                                <circle cx="17" cy="17" r="3"/>
+                                <circle cx="7" cy="7" r="3"/>
+                            </svg>
+                            <h3>暂无待审核技能</h3>
+                            <p>所有技能已审核完成</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const tableHtml = `
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>技能名称</th>
+                                    <th>版本</th>
+                                    <th>上传者</th>
+                                    <th>上传时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${skills.map(skill => `
+                                    <tr>
+                                        <td>
+                                            <div style="font-weight: 500;">${skill.skill_name}</div>
+                                        </td>
+                                        <td>
+                                            <span class="version-badge">${skill.version}</span>
+                                        </td>
+                                        <td>${skill.uploader_id || '-'}</td>
+                                        <td>${skill.uploaded_at || '-'}</td>
+                                        <td>
+                                            <button onclick="reviewSkill(${skill.id}, 'approve')" class="btn-primary" style="padding: 0.375rem 0.75rem; margin-right: 0.5rem;">通过</button>
+                                            <button onclick="reviewSkill(${skill.id}, 'reject')" class="btn-secondary" style="padding: 0.375rem 0.75rem; border: 1px solid var(--danger); color: var(--danger);">拒绝</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                container.innerHTML = tableHtml;
+
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>加载失败</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Review skill
+        async function reviewSkill(skillId, action) {
+            if (!confirm(action === 'approve' ? '确定通过该技能审核?' : '确定拒绝该技能?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/review/' + skillId, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: action})
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(action === 'approve' ? '审核通过!' : '已拒绝');
+                    loadPendingSkills();
+                } else {
+                    alert('操作失败: ' + result.detail);
+                }
+            } catch (error) {
+                alert('操作失败: ' + error.message);
+            }
+        }
+
+        // Initial load
+        loadPendingSkills();
+    </script>
+</body>
+</html>
